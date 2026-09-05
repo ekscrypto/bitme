@@ -1,86 +1,43 @@
 import SwiftUI
+import BitMeCore
 
-/// The glanceable activity screen: big bush countdown, citric alert,
-/// stamina projection, food-buff watch. Rendering runs at 4 Hz locally via
-/// `TimelineView`, re-anchored every 1 Hz poll.
+/// The glanceable activity screen: renders `ViewRep.Session` and interpolates
+/// countdowns locally between machine publications (4 Hz ticks, 1 Hz polls).
 struct ActivityScreen: View {
-    @Environment(AppModel.self) private var appModel
+    let session: ViewRep.Session
+    let ingest: @Sendable (Sendable) async -> Void
 
-    @State private var monitor: SessionMonitor
-    private let config = GameConfig.shared
-
-    init(identity: StoredIdentity) {
-        _monitor = State(initialValue: SessionMonitor(
-            client: RelayClient.production,
-            entityID: identity.entityID
-        ))
+    /// Converts device time to relay-clock ms (snapshot anchors are relay ms).
+    private var relayOffsetMs: Double {
+        session.nowMs.map { now in now - Date().timeIntervalSince1970 * 1_000 } ?? 0
     }
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 0.25)) { _ in
-            let now = monitor.nowRelayMs
+            let now = Date().timeIntervalSince1970 * 1_000 + relayOffsetMs
             ZStack {
                 Color(white: 0.05).ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 14) {
                         header
-                        switch monitor.connection {
+                        switch session.connection {
                         case .down: ReconnectingBanner()
                         case .degraded: DegradedBanner()
                         case .ok: EmptyView()
                         }
-                        if let snapshot = monitor.snapshot {
-                            CitricBanner(
-                                alert: HarvestStateEngine.detectCitric(
-                                    previous: monitor.previous,
-                                    current: snapshot,
-                                    citricResourceIDs: config.citricResourceIDs,
-                                    fallbackWindowMs: config.citricFallbackWindowMs,
-                                    nowMs: now
-                                ),
-                                now: now,
-                                hotWindowMs: config.citricHotWindowMs
-                            )
-                            if snapshot.signedIn == false {
-                                OfflineBanner()
-                            }
-                            BushCountdownCard(
-                                snapshot: snapshot,
-                                msPerHealthPoint: monitor.pacingMsPerHealthPoint,
-                                now: now
-                            )
-                            StaminaCard(
-                                projection: HarvestStateEngine.staminaProjection(
-                                    in: snapshot, rules: config.regen, nowMs: now
-                                )
-                            )
-                            FoodCard(
-                                state: HarvestStateEngine.foodBuffState(
-                                    in: snapshot,
-                                    foodBuffIDs: monitor.foodBuffGamedata?.foodBuffIDs ?? [],
-                                    nowMs: now
-                                ),
-                                rawBuffs: snapshot.buffs,
-                                foodTrackingConfigured: monitor.foodBuffGamedata != nil,
-                                now: now
-                            )
-                        } else {
-                            Spacer()
-                            Text(monitor.connection == .down
-                                 ? "Reconnecting…"
-                                 : "Connecting to relay…")
-                                .font(.title3)
-                                .foregroundStyle(.secondary)
-                            Spacer()
+                        CitricBanner(alert: session.citric, nowMs: now)
+                        if session.signedIn == false {
+                            OfflineBanner()
                         }
+                        bushCard(nowMs: now)
+                        staminaCard
+                        foodCard
                     }
                     .padding()
                 }
             }
             .preferredColorScheme(.dark)
         }
-        .onAppear { monitor.start() }
-        .onDisappear { monitor.stop() }
     }
 
     // MARK: - Header
@@ -88,14 +45,14 @@ struct ActivityScreen: View {
     private var header: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text(appModel.identity?.username ?? monitor.snapshot?.username ?? "—")
+                Text(session.username ?? "—")
                     .font(.headline)
                 HStack(spacing: 6) {
-                    if let region = monitor.snapshot?.region {
+                    if let region = session.region {
                         Text("Region \(region)")
                     }
-                    if let claim = monitor.snapshot?.claim {
-                        Text("· \(claim.name)")
+                    if let claim = session.claimName {
+                        Text("· \(claim)")
                             .lineLimit(1)
                     }
                 }
@@ -103,15 +60,149 @@ struct ActivityScreen: View {
                 .foregroundStyle(.secondary)
             }
             Spacer()
-            ConnectionPill(connection: monitor.connection)
+            ConnectionPill(connection: session.connection)
         }
+    }
+
+    // MARK: - Bush countdown
+
+    private func bushCard(nowMs: Double) -> some View {
+        VStack(spacing: 8) {
+            if let bush = session.bush {
+                Text(bush.name)
+                    .font(.title3)
+                    .lineLimit(1)
+
+                let timeLeft = [bush.depletesAtMs, bush.windowEndsAtMs]
+                    .compactMap { $0 }
+                    .map { $0 - nowMs }
+                    .min()
+
+                if let timeLeft, timeLeft > 0 {
+                    Text(Format.mmss(timeLeft))
+                        .font(.system(size: 96, weight: .heavy, design: .rounded))
+                        .monospacedDigit()
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
+                    Text("until depleted")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if let pct = bush.harvestedPct {
+                    // Health known but pacing not learned yet — percentage only.
+                    Gauge(value: pct) {
+                        Text("depleted")
+                    }
+                    .gaugeStyle(.accessoryCircularCapacity)
+                    .font(.system(size: 64))
+                    Text("\(Int((pct * 100).rounded()))% harvested")
+                        .font(.title3.monospacedDigit())
+                } else {
+                    Text("Waiting for health data…")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Text("No resource targeted")
+                    .font(.title2)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 140)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .background(Color(white: 0.1), in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    // MARK: - Stamina
+
+    private var staminaCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label("Stamina", systemImage: "bolt")
+                    .font(.subheadline.bold())
+                Spacer()
+                if let stamina = session.stamina {
+                    Text("\(Int(stamina.projected.rounded())) / \(Int(stamina.max.rounded()))")
+                        .font(.subheadline.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if let stamina = session.stamina {
+                ProgressView(value: stamina.pct)
+                    .tint(stamina.pct < 0.15 ? .red : .yellow)
+                HStack {
+                    if let fullAtMs = stamina.fullAtMs {
+                        Text("Full at \(Format.clockTime(fullAtMs))")
+                    } else if stamina.pct >= 1 {
+                        Text("Full — ready to harvest")
+                    } else {
+                        Text("No regen anchor yet")
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            } else {
+                Text("No stamina data")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color(white: 0.1), in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    // MARK: - Food
+
+    private var foodCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Food buff", systemImage: "fork.knife")
+                .font(.subheadline.bold())
+
+            let relayNowSec = Int64((Date().timeIntervalSince1970 * 1_000 + relayOffsetMs) / 1_000)
+
+            if !session.food.configured {
+                Label("Food tracking pending gamedata — live buffs below",
+                      systemImage: "clock.badge.questionmark")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else if session.food.active, let expiresAtSec = session.food.expiresAtSec {
+                HStack {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                    Text("Active — \(Format.mmss(Double(expiresAtSec - relayNowSec) * 1_000)) left")
+                        .font(.title3.monospacedDigit())
+                }
+            } else {
+                HStack {
+                    Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.red)
+                    Text("No food buff — eat before the citric phase")
+                        .font(.subheadline)
+                }
+            }
+
+            if session.food.liveBuffs.isEmpty {
+                Text("No live buffs")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(session.food.liveBuffs, id: \.id) { buff in
+                    let remainingMs = Double(buff.expiresAtSec - relayNowSec) * 1_000
+                    Text("buff #\(buff.id) — \(Format.mmss(max(0, remainingMs))) left")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color(white: 0.1), in: RoundedRectangle(cornerRadius: 16))
     }
 }
 
 // MARK: - Banners & pills
 
 private struct ConnectionPill: View {
-    let connection: SessionMonitor.Connection
+    let connection: ViewRep.Session.Connection
 
     var body: some View {
         Text(label)
@@ -173,214 +264,25 @@ private struct OfflineBanner: View {
 
 /// Full attention when a Citric bush is up: the 30-second rare window.
 private struct CitricBanner: View {
-    let alert: HarvestStateEngine.CitricAlert?
-    let now: Double
-    let hotWindowMs: Double
+    let alert: ViewRep.Session.Citric?
+    let nowMs: Double
 
     var body: some View {
         if let alert {
-            let remaining = max(0, alert.remainingMs(nowMs: now))
-            let hot = alert.isNewlySpawned || (now - alert.spawnedAtMs) < hotWindowMs
+            let remaining = max(0, alert.expiresAtMs - nowMs)
+            let hot = alert.isNewlySpawned || (nowMs - alert.spawnedAtMs) < 10_000
             VStack(spacing: 4) {
                 Label(hot ? "CITRIC BUSH UP!" : "Citric bush active",
                       systemImage: "sparkles")
                     .font(.title2).bold()
                 Text("\(Format.mmss(remaining)) left")
                     .font(.title3.monospacedDigit())
-                if let location = alert.location {
-                    Text("at tile \(location.tileX), \(location.tileZ)")
-                        .font(.caption)
-                }
             }
             .frame(maxWidth: .infinity)
             .padding()
             .background(hot ? Color.red : Color.purple, in: RoundedRectangle(cornerRadius: 16))
             .foregroundStyle(.white)
         }
-    }
-}
-
-// MARK: - Cards
-
-/// The big countdown: time left on the resource being harvested.
-private struct BushCountdownCard: View {
-    let snapshot: SessionSnapshot
-    let msPerHealthPoint: Double?
-    let now: Double
-
-    var body: some View {
-        VStack(spacing: 8) {
-            if let target = snapshot.target, target.resourceID != nil {
-                Text(target.name ?? "Unknown resource")
-                    .font(.title3)
-                    .lineLimit(1)
-
-                let pct = depletionPct(target)
-                let timeLeft = HarvestStateEngine.depletionCountdownMs(
-                    target: target, msPerHealthPoint: msPerHealthPoint
-                ) ?? HarvestStateEngine.spawnWindowRemainingMs(
-                    in: snapshot,
-                    resourceID: target.resourceID ?? -1,
-                    nowMs: now
-                )
-
-                if let timeLeft, timeLeft > 0 {
-                    Text(Format.mmss(timeLeft))
-                        .font(.system(size: 96, weight: .heavy, design: .rounded))
-                        .monospacedDigit()
-                        .minimumScaleFactor(0.5)
-                        .lineLimit(1)
-                    Text("until depleted")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else if let pct {
-                    // Health known but pacing not learned yet — show the
-                    // percentage ring (tutorial 2, §2).
-                    Gauge(value: pct) {
-                        Text("depleted")
-                    }
-                    .gaugeStyle(.accessoryCircularCapacity)
-                    .font(.system(size: 64))
-                    Text("\(Int((pct * 100).rounded()))% harvested")
-                        .font(.title3.monospacedDigit())
-                } else {
-                    Text(target.health == nil ? "Waiting for health data…" : "—")
-                        .font(.title2)
-                        .foregroundStyle(.secondary)
-                }
-
-                if let health = target.health, let maxHealth = target.maxHealth, maxHealth > 0 {
-                    ProgressView(value: 1 - health / maxHealth)
-                        .tint(.green)
-                }
-            } else {
-                Text("No resource targeted")
-                    .font(.title2)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 140)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding()
-        .background(Color(white: 0.1), in: RoundedRectangle(cornerRadius: 16))
-    }
-
-    private func depletionPct(_ target: Target) -> Double? {
-        guard let health = target.health, let maxHealth = target.maxHealth, maxHealth > 0 else {
-            return nil
-        }
-        return HarvestStateEngine.clamp01(1 - health / maxHealth)
-    }
-}
-
-/// Stamina bar + "full at T" projection.
-private struct StaminaCard: View {
-    let projection: HarvestStateEngine.StaminaProjection?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label("Stamina", systemImage: "bolt")
-                    .font(.subheadline.bold())
-                Spacer()
-                if let projection {
-                    Text("\(Int(projection.projected.rounded())) / \(Int(projection.max.rounded()))")
-                        .font(.subheadline.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-            }
-            if let projection {
-                ProgressView(value: projection.pct)
-                    .tint(projection.pct < 0.15 ? .red : .yellow)
-                HStack {
-                    if let fullAtMs = projection.fullAtMs {
-                        Text("Full at \(Format.clockTime(fullAtMs))")
-                    } else if projection.pct >= 1 {
-                        Text("Full — ready to harvest")
-                    } else {
-                        Text("No regen anchor yet")
-                    }
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            } else {
-                Text("No stamina data")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color(white: 0.1), in: RoundedRectangle(cornerRadius: 16))
-    }
-}
-
-/// Food-buff watch. Buff ids are classified via gamedata fetched from the
-/// relay mirror (`GamedataService`, 48 h cache); until it loads the card
-/// stays neutral. Expired-but-lingering rows are filtered and the list
-/// capped — only live buffs count, latest expiry first.
-private struct FoodCard: View {
-    let state: HarvestStateEngine.FoodBuffState
-    let rawBuffs: [Buff]
-    let foodTrackingConfigured: Bool
-    let now: Double
-
-    private static let maxVisible = 4
-
-    private var liveBuffs: [Buff] {
-        rawBuffs
-            .filter { Double($0.expiresAtUnixSec) * 1_000 > now }
-            .sorted { $0.expiresAtUnixSec > $1.expiresAtUnixSec }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("Food buff", systemImage: "fork.knife")
-                .font(.subheadline.bold())
-
-            if !foodTrackingConfigured {
-                // Food buff ids not bundled yet — can't classify, so stay
-                // neutral instead of crying wolf.
-                Label("Food tracking pending gamedata — live buffs below",
-                      systemImage: "clock.badge.questionmark")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            } else if state.active, let remaining = state.remainingMs {
-                HStack {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                    Text("Active — \(Format.mmss(remaining)) left")
-                        .font(.title3.monospacedDigit())
-                }
-            } else {
-                HStack {
-                    Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.red)
-                    Text("No food buff — eat before the citric phase")
-                        .font(.subheadline)
-                }
-            }
-
-            let live = liveBuffs
-            if live.isEmpty {
-                Text("No live buffs")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(live.prefix(Self.maxVisible), id: \.buffID) { buff in
-                    let remainingMs = Double(buff.expiresAtUnixSec) * 1_000 - now
-                    Text("buff #\(buff.buffID) — \(Format.mmss(remainingMs)) left")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                if live.count > Self.maxVisible {
-                    Text("+\(live.count - Self.maxVisible) more live buffs")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color(white: 0.1), in: RoundedRectangle(cornerRadius: 16))
     }
 }
 

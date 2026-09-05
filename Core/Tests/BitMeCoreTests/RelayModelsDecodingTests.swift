@@ -1,6 +1,6 @@
 import Testing
 import Foundation
-@testable import BitMe
+@testable import BitMeCore
 
 /// Locks the Codable wire format against the exact JSON shapes documented in
 /// docs/api.md (which mirror the relay's BITME-API.md). If the relay changes

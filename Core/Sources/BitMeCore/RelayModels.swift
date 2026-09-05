@@ -11,17 +11,17 @@ import Foundation
 
 // MARK: - GET /bitme/resolve
 
-struct ResolveResponse: Codable, Equatable, Sendable {
-    let found: Bool
-    let entityID: String
-    let username: String
-    let usernameLowercase: String
-    let identity: String?
-    let regionID: Int?
-    let regionName: String?
-    let host: String?
-    let module: String?
-    let signedIn: Bool?
+public struct ResolveResponse: Codable, Equatable, Sendable {
+    public let found: Bool
+    public let entityID: String
+    public let username: String
+    public let usernameLowercase: String
+    public let identity: String?
+    public let regionID: Int?
+    public let regionName: String?
+    public let host: String?
+    public let module: String?
+    public let signedIn: Bool?
 
     enum CodingKeys: String, CodingKey {
         case found
@@ -39,20 +39,20 @@ struct ResolveResponse: Codable, Equatable, Sendable {
 
 // MARK: - GET /bitme/session/:entity_id
 
-struct SessionSnapshot: Codable, Equatable, Sendable {
-    let found: Bool
-    let playerEntityID: String
-    let username: String?
-    let signedIn: Bool?
-    let region: Int
-    let position: Position?
-    let claim: Claim?
-    let stamina: Stamina?
-    let buffs: [Buff]
-    let actions: [PlayerAction]
-    let target: Target?
-    let activitySpawns: [ActivitySpawn]
-    let serverTimeMs: Int64
+public struct SessionSnapshot: Codable, Equatable, Sendable {
+    public let found: Bool
+    public let playerEntityID: String
+    public let username: String?
+    public let signedIn: Bool?
+    public let region: Int
+    public let position: Position?
+    public let claim: Claim?
+    public let stamina: Stamina?
+    public let buffs: [Buff]
+    public let actions: [PlayerAction]
+    public let target: Target?
+    public let activitySpawns: [ActivitySpawn]
+    public let serverTimeMs: Int64
 
     enum CodingKeys: String, CodingKey {
         case found
@@ -71,18 +71,18 @@ struct SessionSnapshot: Codable, Equatable, Sendable {
     }
 }
 
-struct Position: Codable, Equatable, Sendable {
-    let worldX: Double
-    let worldZ: Double
-    let tileX: Int
-    let tileZ: Int
-    let destinationWorldX: Double
-    let destinationWorldZ: Double
+public struct Position: Codable, Equatable, Sendable {
+    public let worldX: Double
+    public let worldZ: Double
+    public let tileX: Int
+    public let tileZ: Int
+    public let destinationWorldX: Double
+    public let destinationWorldZ: Double
     /// 1 = overworld; > 1 = building/dungeon interior (claim is not resolved).
-    let dimension: Int
-    let isWalking: Bool
-    let timestampMs: Int64
-    let ageMs: Int64
+    public let dimension: Int
+    public let isWalking: Bool
+    public let timestampMs: Int64
+    public let ageMs: Int64
 
     enum CodingKeys: String, CodingKey {
         case worldX = "world_x"
@@ -98,11 +98,11 @@ struct Position: Codable, Equatable, Sendable {
     }
 }
 
-struct Claim: Codable, Equatable, Sendable {
-    let entityID: String
-    let name: String
-    let ownerPlayerEntityID: String
-    let neutral: Bool
+public struct Claim: Codable, Equatable, Sendable {
+    public let entityID: String
+    public let name: String
+    public let ownerPlayerEntityID: String
+    public let neutral: Bool
 
     enum CodingKeys: String, CodingKey {
         case entityID = "entity_id"
@@ -112,12 +112,12 @@ struct Claim: Codable, Equatable, Sendable {
     }
 }
 
-struct Stamina: Codable, Equatable, Sendable {
-    let current: Double
-    let max: Double
-    let maxHealth: Double
+public struct Stamina: Codable, Equatable, Sendable {
+    public let current: Double
+    public let max: Double
+    public let maxHealth: Double
     /// RFC 3339, e.g. "2026-09-05T17:14:52.000Z". Null when never decreased.
-    let lastDecreaseAt: String?
+    public let lastDecreaseAt: String?
 
     enum CodingKeys: String, CodingKey {
         case current
@@ -129,13 +129,13 @@ struct Stamina: Codable, Equatable, Sendable {
 
 /// Live buffs only (zeroed placeholder entries are filtered server-side).
 /// Expired entries may linger upstream — check the countdown, not presence.
-struct Buff: Codable, Equatable, Sendable {
-    let buffID: Int
+public struct Buff: Codable, Equatable, Sendable {
+    public let buffID: Int
     /// Unix seconds.
-    let startTimestamp: Int64
+    public let startTimestamp: Int64
     /// Unix seconds.
-    let duration: Int64
-    let values: [Double]
+    public let duration: Int64
+    public let values: [Double]
 
     enum CodingKeys: String, CodingKey {
         case buffID = "buff_id"
@@ -144,22 +144,22 @@ struct Buff: Codable, Equatable, Sendable {
         case values
     }
 
-    var expiresAtUnixSec: Int64 { startTimestamp + duration }
+    public var expiresAtUnixSec: Int64 { startTimestamp + duration }
 }
 
-struct PlayerAction: Codable, Equatable, Sendable {
-    let autoID: String
+public struct PlayerAction: Codable, Equatable, Sendable {
+    public let autoID: String
     /// "None" | "Attack" | "Extract" | "Craft" | "Build" | "Terraform" | …
-    let actionType: String
+    public let actionType: String
     /// "Base" | "UpperBody"
-    let layer: String
-    let startTimeMs: Int64
-    let durationMs: Int64
-    let endsAtMs: Int64
-    let targetEntityID: String?
-    let recipeID: Int?
-    let lastActionResult: String
-    let clientCancel: Bool
+    public let layer: String
+    public let startTimeMs: Int64
+    public let durationMs: Int64
+    public let endsAtMs: Int64
+    public let targetEntityID: String?
+    public let recipeID: Int?
+    public let lastActionResult: String
+    public let clientCancel: Bool
 
     enum CodingKeys: String, CodingKey {
         case autoID = "auto_id"
@@ -177,16 +177,16 @@ struct PlayerAction: Codable, Equatable, Sendable {
 
 /// The acted-on entity, enriched. Primary target = Extract target, else the
 /// Base-layer target (e.g. a crafting station, which has resourceID == nil).
-struct Target: Codable, Equatable, Sendable {
-    let entityID: String
-    let resourceID: Int?
-    let name: String?
+public struct Target: Codable, Equatable, Sendable {
+    public let entityID: String
+    public let resourceID: Int?
+    public let name: String?
     /// Tracked server-side only while a session polls; null right after targeting.
-    let health: Double?
-    let maxHealth: Double?
-    let despawnTimeSecs: Double?
-    let respawnTimeSecs: Double?
-    let location: TileLocation?
+    public let health: Double?
+    public let maxHealth: Double?
+    public let despawnTimeSecs: Double?
+    public let respawnTimeSecs: Double?
+    public let location: TileLocation?
 
     enum CodingKeys: String, CodingKey {
         case entityID = "entity_id"
@@ -203,17 +203,17 @@ struct Target: Codable, Equatable, Sendable {
 /// Watched spawns in the player's claim/wilderness scope: destroy-yield
 /// chains (Withering → Bountiful, depleted ore, baited schools) and the
 /// Citric Giant berry bushes. This is the citric-detection signal.
-struct ActivitySpawn: Codable, Equatable, Sendable {
-    let entityID: String
-    let resourceID: Int
-    let name: String?
+public struct ActivitySpawn: Codable, Equatable, Sendable {
+    public let entityID: String
+    public let resourceID: Int
+    public let name: String?
     /// Non-null means someone is already harvesting it.
-    let health: Double?
-    let maxHealth: Double?
-    let location: TileLocation?
-    let spawnedAtMs: Int64
+    public let health: Double?
+    public let maxHealth: Double?
+    public let location: TileLocation?
+    public let spawnedAtMs: Int64
     /// spawned_at_ms + despawn_time when gamedata has a timer; else null.
-    let expiresAtMs: Int64?
+    public let expiresAtMs: Int64?
 
     enum CodingKeys: String, CodingKey {
         case entityID = "entity_id"
@@ -227,9 +227,9 @@ struct ActivitySpawn: Codable, Equatable, Sendable {
     }
 }
 
-struct TileLocation: Codable, Equatable, Sendable {
-    let tileX: Int
-    let tileZ: Int
+public struct TileLocation: Codable, Equatable, Sendable {
+    public let tileX: Int
+    public let tileZ: Int
 
     enum CodingKeys: String, CodingKey {
         case tileX = "tile_x"
@@ -239,6 +239,6 @@ struct TileLocation: Codable, Equatable, Sendable {
 
 // MARK: - GET /cache-health
 
-struct CacheHealth: Codable, Sendable {
-    let ready: Bool
+public struct CacheHealth: Codable, Sendable {
+    public let ready: Bool
 }

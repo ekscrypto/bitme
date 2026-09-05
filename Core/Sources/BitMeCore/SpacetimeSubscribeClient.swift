@@ -2,14 +2,14 @@ import Foundation
 
 /// Typed rows for the two static gamedata tables Bit-Me consumes over the
 /// relay's mirror WebSocket. Unknown columns are ignored.
-struct BuffTypeDescRow: Decodable, Equatable, Sendable {
-    let id: Int
-    let name: String
+public struct BuffTypeDescRow: Decodable, Equatable, Sendable {
+    public let id: Int
+    public let name: String
 }
 
-struct BuffDescRow: Decodable, Equatable, Sendable {
-    let id: Int
-    let buffTypeID: Int
+public struct BuffDescRow: Decodable, Equatable, Sendable {
+    public let id: Int
+    public let buffTypeID: Int
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -17,13 +17,13 @@ struct BuffDescRow: Decodable, Equatable, Sendable {
     }
 }
 
-enum FoodBuffClassification {
+public enum FoodBuffClassification {
     /// `buff_type_desc` names whose member buffs count as "food" for the
     /// eat-food indicator. Name-based because `category` is 1 (generic) for
     /// most combat-unrelated types. Adjust here as game knowledge grows.
-    static let foodTypeNames: Set<String> = ["Food Buffs", "Food Regen", "Teas"]
+    public static let foodTypeNames: Set<String> = ["Food Buffs", "Food Regen", "Teas"]
 
-    static func foodBuffIDs(
+    public static func foodBuffIDs(
         types: [BuffTypeDescRow],
         buffs: [BuffDescRow]
     ) -> Set<Int> {
@@ -43,7 +43,7 @@ enum FoodBuffClassification {
 /// hard-closes the socket); literals are inlined in the SQL; u64 ids arrive
 /// as raw JSON numbers (fine for Swift Int64); rows arrive as JSON *strings*
 /// inside `SubscribeApplied.rows.table_rows.updates[].Uncompressed.inserts`.
-struct SpacetimeSubscribeClient: Sendable {
+public struct SpacetimeSubscribeClient: Sendable {
     enum ClientError: Error, Equatable, Sendable {
         case timeout(String)
         case protocolError(String)

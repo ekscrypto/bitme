@@ -30,10 +30,38 @@ run client-side from snapshots + bundled gamedata.
   harvest pacing) are bundled gamedata and must be confirmed in playtests —
   see tutorial 2, §5.
 
-## iOS app
+## Architecture
 
-SwiftUI (iOS 17+, Swift 6, zero third-party dependencies). The project is
-generated with XcodeGen:
+All behavior lives in the **`Core/` local Swift package** (fenex-light-style
+one-way state machine), shared by the iOS app and a headless CLI:
+
+- `StateMachine` — `final actor`, owns `PersistentState` (resolved identity)
+  and `EphemeralState`; all mutation flows through serially-processed
+  `Intent.*` values; async work happens in `Activity.*` structs that feed
+  results back as intents. Internal state is not queryable — observers read
+  the published `ViewRep` only.
+- `ViewRep` — screen-shaped, Equatable/Codable projection with relay-clock
+  anchor timestamps; UIs interpolate countdowns locally.
+- `Adapters` — closure-based system boundaries (relay HTTP, mirror WebSocket
+  gamedata, identity persistence, sleep) so tests substitute simulated
+  doubles and flows run deterministically.
+- API layer (relay HTTP client, mirror WebSocket gamedata client) and the
+  pure harvest engine are internal to the package.
+
+### CLI (`bitme-cli`) — headless testing surface
+
+```bash
+cd Core
+swift run bitme-cli resolve maplesugar      # resolve, print outcome, exit
+swift run bitme-cli watch maplesugar        # stream live session ViewReps
+swift run bitme-cli watch maplesugar --json # one JSON ViewRep per line
+swift test                                  # core unit tests (no simulator)
+```
+
+### iOS app
+
+SwiftUI (iOS 17+, Swift 6, zero third-party dependencies). The Xcode project
+is generated with XcodeGen:
 
 ```bash
 xcodegen generate          # creates BitMe.xcodeproj from project.yml
@@ -41,27 +69,22 @@ open BitMe.xcodeproj       # Cmd+R in Xcode
 ```
 
 - Bundle ID: `life.encoded.bitme.ios` (display name "Bit-Me")
-- Layout: `BitMe/Models` (wire types), `BitMe/Networking` (`RelayClient`,
-  `SessionMonitor` 1 Hz poller, `SpacetimeSubscribeClient` one-shot mirror
-  WebSocket), `BitMe/Engine` (pure snapshot → screen-state logic +
-  `GameConfig` + `GamedataService`), `BitMe/Views` (onboarding, activity
-  screen), `BitMeTests/` (wire-format lock + engine + gamedata tests)
-- Gamedata: `buff_desc`/`buff_type_desc` are fetched live from the relay's
-  global mirror (`wss://relay.bitcraftsync.app:3000/v1/database/
-  bitcraft-live-global/subscribe`, JSON subprotocol, subscribe-read-close)
-  and cached 48 h; food-buff classification derives from `buff_type_desc`
-  names ("Food Buffs", "Food Regen", "Teas"). No gamedata is bundled.
-- Debug smoke test: run with environment `BITME_AUTO_RESOLVE=<name>` to skip
-  typed onboarding; with simctl:
-  `SIMCTL_CHILD_BITME_AUTO_RESOLVE=maplesugar xcrun simctl launch booted life.encoded.bitme.ios`
+- `BitMe/` is presentation only: `BitMeApp` owns the `StateMachine` and
+  mirrors the published `ViewRep`; `OnboardingView` / `ActivityScreen` render
+  reps and dispatch intents.
+- Identity persists at `<Application Support>/BitMe/identity.json` (written
+  by the core after a successful resolve) — on relaunch the app goes
+  straight to the activity screen.
 
-Known gaps (tunable placeholders live in `BitMe/Engine/GameConfig.swift`):
+Known gaps (tunable placeholders live in `Core/Sources/BitMeCore/GameConfig.swift`):
 stamina regen constants need gamedata + playtest confirmation.
 
 ## Status
 
 - Relay: **Phase 1 shipped to production** (2026-09-05) — resolve + session
   endpoints, server-side target-health tracking, watched-spawn (citric) log.
-- iOS app: **v0.1 working against production** — onboarding → live session
-  screen (big depletion countdown with learned pacing, stamina projection,
-  food-buff card, citric detection); 17 unit tests green.
+- Core + CLI: state machine, API, ViewRep extracted; 26 unit tests; CLI
+  verified against production (resolve + live watch).
+- iOS app: **v0.2** — thin ViewRep renderer over the core (onboarding, big
+  countdown with learned pacing, citric banner, stamina projection,
+  food-buff classification), verified live against production.

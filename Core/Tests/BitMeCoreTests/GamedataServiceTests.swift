@@ -1,6 +1,6 @@
 import Testing
 import Foundation
-@testable import BitMe
+@testable import BitMeCore
 
 /// GamedataService pieces: wire-row decoding, food classification against
 /// real live rows (captured 2026-09-05 from `bitcraft-live-global`), 48 h

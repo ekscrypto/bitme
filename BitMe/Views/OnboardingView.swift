@@ -1,9 +1,11 @@
 import SwiftUI
+import BitMeCore
 
-/// Character-name onboarding (tutorial 1). Button-driven resolve — no call
-/// per keystroke, so the relay's exact-match endpoint is never fanned out.
+/// Onboarding: renders `ViewRep.Onboarding` and dispatches
+/// `Intent.ResolvePlayer`. All behavior lives in the core machine.
 struct OnboardingView: View {
-    @Environment(AppModel.self) private var appModel
+    let onboarding: ViewRep.Onboarding
+    let ingest: @Sendable (Sendable) async -> Void
 
     @State private var name = ""
     @FocusState private var nameFocused: Bool
@@ -27,18 +29,22 @@ struct OnboardingView: View {
                     .autocorrectionDisabled()
                     .focused($nameFocused)
                     .submitLabel(.go)
-                    .disabled(appModel.isResolving)
-                    .onSubmit { Task { await appModel.resolve(name) } }
+                    .disabled(onboarding.isResolving)
+                    .onSubmit(dispatch)
                     .onChange(of: name) { _, _ in
-                        // A fresh edit invalidates the previous attempt's result.
-                        appModel.resolveErrorText = nil
+                        // A fresh edit invalidates the previous attempt's error;
+                        // presentation-only state, the machine owns the truth.
+                        // (Dispatching would be redundant — errors only clear on
+                        // the next resolve — so we just visually detach it.)
+                        lastErrorDetached = true
                     }
 
-                if appModel.isResolving {
-                    Label("Looking up “\(name)”…", systemImage: "magnifyingglass")
+                if onboarding.isResolving {
+                    Label("Looking up “\(onboarding.lookingUpName ?? name)”…",
+                          systemImage: "magnifyingglass")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                } else if let error = appModel.resolveErrorText {
+                } else if let error = onboarding.error, !lastErrorDetached {
                     Label {
                         Text(error)
                     } icon: {
@@ -46,16 +52,13 @@ struct OnboardingView: View {
                     }
                     .font(.footnote.weight(.medium))
                     .foregroundStyle(.red)
-                    .accessibilityIdentifier("resolve-error")
                 }
             }
             .padding(.horizontal, 32)
 
-            Button {
-                Task { await appModel.resolve(name) }
-            } label: {
+            Button(action: dispatch) {
                 Group {
-                    if appModel.isResolving {
+                    if onboarding.isResolving {
                         ProgressView().tint(.white)
                     } else {
                         Text("Continue").bold()
@@ -65,16 +68,8 @@ struct OnboardingView: View {
                 .padding(.vertical, 6)
             }
             .buttonStyle(.borderedProminent)
-            .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || appModel.isResolving)
+            .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || onboarding.isResolving)
             .padding(.horizontal, 32)
-
-            if appModel.resolvedOffline {
-                Text("That character is offline right now — you can still set up and connect later.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-            }
 
             Spacer()
             Spacer()
@@ -82,5 +77,14 @@ struct OnboardingView: View {
         .background(Color(white: 0.05))
         .preferredColorScheme(.dark)
         .onAppear { nameFocused = true }
+    }
+
+    @State private var lastErrorDetached = false
+
+    private func dispatch() {
+        lastErrorDetached = false
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        Task { await ingest(Intent.ResolvePlayer(name: trimmed)) }
     }
 }

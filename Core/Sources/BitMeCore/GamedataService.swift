@@ -7,25 +7,25 @@ let gamedataLog = Logger(subsystem: "life.encoded.bitme.ios", category: "gamedat
 /// the app for 48 h (per design: docs/tutorial + relay assessment §2 — the
 /// local static-gamedata exports have gone stale before, so live fetch beats
 /// bundling for tables the relay already serves).
-struct FoodBuffGamedata: Codable, Equatable, Sendable {
-    static let ttl: TimeInterval = 48 * 60 * 60
+public struct FoodBuffGamedata: Codable, Equatable, Sendable {
+    public static let ttl: TimeInterval = 48 * 60 * 60
 
     /// `buff_desc.id` values whose `buff_type_id` resolves to a food type.
-    let foodBuffIDs: Set<Int>
-    let fetchedAt: Date
+    public let foodBuffIDs: Set<Int>
+    public let fetchedAt: Date
 
-    func isStale(now: Date = .now) -> Bool {
+    public func isStale(now: Date = .now) -> Bool {
         now.timeIntervalSince(fetchedAt) >= FoodBuffGamedata.ttl
     }
 }
 
-enum GamedataService {
-    static let client = SpacetimeSubscribeClient(
+public enum GamedataService {
+    public static let client = SpacetimeSubscribeClient(
         hostPort: "relay.bitcraftsync.app:3000",
         database: "bitcraft-live-global"
     )
 
-    static var cacheURL: URL {
+    public static var cacheURL: URL {
         FileManager.default
             .urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("bitme-food-buff-gamedata.json")
@@ -35,7 +35,7 @@ enum GamedataService {
     /// the mirror WebSocket and re-cache. If the fetch fails (deploy reseed,
     /// offline), a stale cache is still returned — classifying with old
     /// gamedata beats not classifying at all.
-    static func loadFoodBuffGamedata(now: Date = .now) async -> FoodBuffGamedata? {
+    public static func loadFoodBuffGamedata(now: Date = .now) async -> FoodBuffGamedata? {
         let cached = cachedFoodBuffGamedata()
         if let cached, !cached.isStale(now: now) {
             gamedataLog.info("gamedata cache fresh (\(cached.foodBuffIDs.count) ids)")
@@ -53,7 +53,7 @@ enum GamedataService {
         }
     }
 
-    static func fetchFoodBuffGamedata() async throws -> FoodBuffGamedata {
+    public static func fetchFoodBuffGamedata() async throws -> FoodBuffGamedata {
         let rows = try await client.fetchRows(tables: ["buff_type_desc", "buff_desc"])
         let types = try rows["buff_type_desc", default: []].map { try JSONDecoder().decode(BuffTypeDescRow.self, from: $0) }
         let buffs = try rows["buff_desc", default: []].map { try JSONDecoder().decode(BuffDescRow.self, from: $0) }
@@ -65,12 +65,12 @@ enum GamedataService {
 
     // MARK: - Cache I/O
 
-    static func cachedFoodBuffGamedata(at url: URL = cacheURL) -> FoodBuffGamedata? {
+    public static func cachedFoodBuffGamedata(at url: URL = cacheURL) -> FoodBuffGamedata? {
         guard let data = try? Data(contentsOf: url) else { return nil }
         return try? JSONDecoder().decode(FoodBuffGamedata.self, from: data)
     }
 
-    static func writeCache(_ gamedata: FoodBuffGamedata, at url: URL = cacheURL) {
+    public static func writeCache(_ gamedata: FoodBuffGamedata, at url: URL = cacheURL) {
         guard let data = try? JSONEncoder().encode(gamedata) else { return }
         try? data.write(to: url, options: .atomic)
     }

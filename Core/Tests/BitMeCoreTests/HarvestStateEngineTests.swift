@@ -1,6 +1,6 @@
 import Testing
 import Foundation
-@testable import BitMe
+@testable import BitMeCore
 
 /// The tutorial-2 checklist as executable tests: action liveness, citric
 /// insert detection, lingering-buff exclusion, stamina projection, pacing.
