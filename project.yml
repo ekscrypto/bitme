@@ -20,7 +20,8 @@ targets:
     type: application
     platform: iOS
     sources:
-      - BitMe
+      - path: BitMe
+        type: syncedFolder
     dependencies:
       - package: BitMeCore
     settings:
