@@ -54,6 +54,9 @@ public enum ViewRep: Equatable, Sendable, Codable {
         public struct LiveBuff: Equatable, Sendable, Codable {
             public var id: Int
             public var expiresAtSec: Int64
+            /// buff_desc display name; nil when gamedata lacks this id.
+            public var name: String?
+            public var stats: [BuffStat]
         }
 
         public struct Food: Equatable, Sendable, Codable {
@@ -170,7 +173,15 @@ public enum ViewRep: Equatable, Sendable, Codable {
                 .filter { Double($0.expiresAtUnixSec) * 1_000 > (nowMs ?? 0) }
                 .sorted { $0.expiresAtUnixSec > $1.expiresAtUnixSec }
                 .prefix(4)
-                .map { Session.LiveBuff(id: $0.buffID, expiresAtSec: $0.expiresAtUnixSec) }
+                .map { buff in
+                    let info = ephemeral.gamedata?.buffs[buff.buffID]
+                    return Session.LiveBuff(
+                        id: buff.buffID,
+                        expiresAtSec: buff.expiresAtUnixSec,
+                        name: info?.name,
+                        stats: BuffStat.sortedForDisplay(info?.stats ?? [])
+                    )
+                }
             food = Session.Food(
                 configured: ephemeral.gamedata != nil,
                 active: state.active,

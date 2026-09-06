@@ -187,9 +187,16 @@ struct ActivityScreen: View {
             } else {
                 ForEach(session.food.liveBuffs, id: \.id) { buff in
                     let remainingMs = Double(buff.expiresAtSec - relayNowSec) * 1_000
-                    Text("buff #\(buff.id) — \(Format.mmss(max(0, remainingMs))) left")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(buff.name ?? "buff #\(buff.id)") — \(Format.mmss(max(0, remainingMs))) left")
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                        ForEach(buff.stats, id: \.self) { stat in
+                            Text("\(stat.label) \(stat.displayValue)")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
                 }
             }
         }

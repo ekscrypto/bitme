@@ -274,6 +274,53 @@ struct StateMachineTests {
         #expect(citricRep.isNewlySpawned == true)
     }
 
+    @Test func liveBuffsCarryGamedataNamesAndStats() async {
+        let gamedata = FoodBuffGamedata(
+            foodBuffIDs: [42],
+            buffs: [
+                124_924_8521: BuffInfo(
+                    name: "Level 8 Food Regen",
+                    stats: [
+                        BuffStat(statID: 2, value: 10, isPercent: false),
+                        BuffStat(statID: 3, value: 19, isPercent: false),
+                    ]
+                )
+            ],
+            fetchedAt: .now
+        )
+        let live = Buff(
+            buffID: 124_924_8521,
+            startTimestamp: Self.nowMs / 1_000,
+            duration: 2_400,
+            values: [10, 19]
+        )
+        let machine = makeMachine(
+            relay: SimulatedRelay(
+                resolveResults: [.found(Self.resolved)],
+                snapshots: [Self.snapshot(buffs: [live])]
+            ),
+            gamedata: gamedata
+        )
+        await machine.start()
+        let reps = await collect(machine, dispatch: {
+            await machine.ingest(Intent.ResolvePlayer(name: "whisper"))
+        }, until: { rep in
+            if case .session(let s) = rep { return !(s.food.liveBuffs.isEmpty) }
+            return false
+        })
+        guard case .session(let session)? = reps.last(where: {
+            if case .session = $0 { return true }
+            return false
+        }), let rep = session.food.liveBuffs.first else {
+            Issue.record("expected a session rep with live buffs")
+            return
+        }
+        #expect(rep.name == "Level 8 Food Regen")
+        // Stamina regen sorts ahead of health regen for display.
+        #expect(rep.stats.map(\.statID) == [3, 2])
+        #expect(rep.stats.first?.displayValue == "+19")
+    }
+
     @Test func signOutClearsIdentity() async {
         let identity = StoredIdentity(
             entityID: "1000", username: "Whisper", regionID: 7, resolvedAt: .distantPast

@@ -23,9 +23,9 @@ struct GamedataServiceTests {
 
     private let buffsJSON = """
     [
-      {"id": 478954807, "buff_type_id": 861783812, "duration": 180, "beneficial": true},
+      {"id": 478954807, "buff_type_id": 861783812, "description": "Level 7 Deluxe Action Speed", "duration": 180, "beneficial": true, "stats": [[[15,[]],0.094,true],[[16,[]],0.094,true]]},
       {"id": 37, "buff_type_id": 861783812, "duration": 60, "beneficial": true},
-      {"id": 123, "buff_type_id": 1790361536, "duration": 60},
+      {"id": 123, "buff_type_id": 1790361536, "description": "Level 8 Food Regen", "duration": 60, "stats": [[[2,[]],10.0,false],[[3,[]],19.0,false]]},
       {"id": 5887916, "buff_type_id": 351703766, "duration": 3600},
       {"id": 999, "buff_type_id": 2, "duration": 1500}
     ]
@@ -38,6 +38,48 @@ struct GamedataServiceTests {
         )
         #expect(row.id == 478_954_807)
         #expect(row.buffTypeID == 861_783_812)
+        // Columns we don't model yet, plus absent description/stats, are tolerated.
+        #expect(row.name == nil)
+        #expect(row.stats.isEmpty)
+    }
+
+    @Test func decodingReadsNameAndStatsEntries() throws {
+        let row = try JSONDecoder().decode(
+            BuffDescRow.self,
+            from: Data(#"{"id": 1249248521, "buff_type_id": 1790361536, "description": "Level 8 Food Regen", "stats": [[[2,[]],10.0,false],[[3,[]],19.0,false]]}"#.utf8)
+        )
+        #expect(row.name == "Level 8 Food Regen")
+        #expect(row.stats == [
+            BuffStat(statID: 2, value: 10.0, isPercent: false),
+            BuffStat(statID: 3, value: 19.0, isPercent: false),
+        ])
+    }
+
+    @Test func statLabelsValuesAndDisplayOrder() {
+        let stamina = BuffStat(statID: 3, value: 19, isPercent: false)
+        let health = BuffStat(statID: 2, value: 10, isPercent: false)
+        let percent = BuffStat(statID: 15, value: 0.094, isPercent: true)
+        let unknown = BuffStat(statID: 601, value: 1, isPercent: false)
+
+        #expect(stamina.label == "Stamina Regen" && stamina.displayValue == "+19")
+        #expect(health.label == "Health Regen" && health.displayValue == "+10")
+        #expect(percent.label == "Crafting Speed" && percent.displayValue == "+9.4%")
+        #expect(unknown.label == "Stat 601")
+
+        // Stamina before health; unknown/other stats keep row order.
+        let sorted = BuffStat.sortedForDisplay([health, percent, stamina, unknown])
+        #expect(sorted.map(\.statID) == [3, 2, 15, 601])
+    }
+
+    @Test func gamedataCarriesBuffMetadata() {
+        let gamedata = FoodBuffGamedata(
+            foodBuffIDs: [37],
+            buffs: [37: BuffInfo(name: "Level 1 Food Buff", stats: [BuffStat(statID: 3, value: 5, isPercent: false)])],
+            fetchedAt: .now
+        )
+        #expect(gamedata.buffs[37]?.name == "Level 1 Food Buff")
+        #expect(gamedata.buffs[37]?.stats.first?.displayValue == "+5")
+        #expect(gamedata.buffs[999] == nil)
     }
 
     @Test func classificationPicksFoodTypesOnly() throws {

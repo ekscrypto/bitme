@@ -10,10 +10,44 @@ public struct BuffTypeDescRow: Decodable, Equatable, Sendable {
 public struct BuffDescRow: Decodable, Equatable, Sendable {
     public let id: Int
     public let buffTypeID: Int
+    /// Human buff name (wire column `description`).
+    public let name: String?
+    /// Stat modifiers; [] when absent or shaped unexpectedly.
+    public let stats: [BuffStat]
 
     enum CodingKeys: String, CodingKey {
         case id
         case buffTypeID = "buff_type_id"
+        case name = "description"
+        case stats
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(Int.self, forKey: .id)
+        buffTypeID = try container.decode(Int.self, forKey: .buffTypeID)
+        name = try container.decodeIfPresent(String.self, forKey: .name)
+        stats = (try? Self.decodeStats(container)) ?? []
+    }
+
+    /// Entry shape: `[[stat_id, modifiers], value, is_percent]`. The
+    /// modifiers list is always empty on the wire; its container is consumed
+    /// but not iterated so a future non-empty shape can't fail the row.
+    private static func decodeStats(
+        _ container: KeyedDecodingContainer<CodingKeys>
+    ) throws -> [BuffStat] {
+        var entries = try container.nestedUnkeyedContainer(forKey: .stats)
+        var stats: [BuffStat] = []
+        while !entries.isAtEnd {
+            var entry = try entries.nestedUnkeyedContainer()
+            var key = try entry.nestedUnkeyedContainer()
+            let statID = try key.decode(Int.self)
+            _ = try key.nestedUnkeyedContainer()
+            let value = try entry.decode(Double.self)
+            let isPercent = try entry.decode(Bool.self)
+            stats.append(BuffStat(statID: statID, value: value, isPercent: isPercent))
+        }
+        return stats
     }
 }
 
