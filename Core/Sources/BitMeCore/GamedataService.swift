@@ -43,27 +43,90 @@ public struct BuffStat: Codable, Equatable, Hashable, Sendable {
     }
 
     /// Static stat id → label. The mirror serves no `stat_desc` table, so
-    /// names come from live `buff_desc` rows whose description names a single
-    /// stat (e.g. "Level 1 Combat Cooldown" → stat 8, "Level 1 Food Regen"
-    /// → stats 2/3). Unknown ids fall back to "Stat <id>".
+    /// names come from the game's `CharacterStatType` enum (BitCraftPublic
+    /// `static_data.rs`, 0-based; verified against live `buff_desc` rows —
+    /// e.g. "Emperor's Gift of Stamina" +50 → stat 1, "Level 1 Combat
+    /// Cooldown" +4.1% → stat 8). Unknown ids fall back to "Stat <id>".
     public var label: String {
-        switch statID {
-        case 2: return "Health Regen"
-        case 3: return "Stamina Regen"
-        case 4: return "Movement Speed"
-        case 8: return "Combat Cooldown"
-        case 15: return "Crafting Speed"
-        case 16: return "Gathering Speed"
-        case 17: return "Construction Speed"
-        case 47: return "Active Health Regen"
-        case 48: return "Active Stamina Regen"
-        default: return "Stat \(statID)"
-        }
+        Self.statNames[statID] ?? "Stat \(statID)"
     }
 
-    /// "+19" for a flat bonus, "+4.1%" for a fractional one.
+    /// Player-facing stat names keyed by `CharacterStatType` ordinal. The
+    /// professions repeat through the enum (speed 21–33, power 34–46, crit
+    /// chance 55–66, crit multiplier 67–78) — but the crit blocks have no
+    /// Cooking entry, so they're twelve long, not thirteen.
+    private static let statNames: [Int: String] = {
+        var names: [Int: String] = [
+            0: "Max Health",
+            1: "Max Stamina",
+            2: "Health Regen",
+            3: "Stamina Regen",
+            4: "Movement Speed",
+            5: "Sprint Speed", // deprecated
+            6: "Sprint Stamina Drain", // deprecated
+            7: "Armor",
+            8: "Combat Cooldown",
+            9: "Hunting Weapon Power",
+            10: "Strength",
+            11: "Cold Protection",
+            12: "Heat Protection",
+            13: "Evasion",
+            14: "Toolbelt Slots",
+            15: "Crafting Speed",
+            16: "Gathering Speed",
+            17: "Construction Speed",
+            18: "Satiation Regen",
+            19: "Max Satiation",
+            20: "Defense Level",
+            47: "Active Health Regen",
+            48: "Active Stamina Regen",
+            49: "Climb Proficiency",
+            50: "Experience Rate",
+            51: "Accuracy",
+            52: "Max Teleport Energy",
+            53: "Teleport Energy Regen",
+            54: "Construction Power",
+            79: "Hexite Gathering Power",
+            80: "Hexite Gathering Speed",
+            81: "Hexite Crit Chance",
+            82: "Hexite Crit Multiplier",
+            83: "Cart Speed",
+            84: "Mount Speed",
+            85: "Boat Speed",
+        ]
+        let professions = [
+            "Forestry", "Carpentry", "Masonry", "Mining", "Smithing", "Scholar",
+            "Leatherworking", "Hunting", "Tailoring", "Farming", "Fishing",
+            "Cooking", "Foraging",
+        ]
+        let critProfessions = professions.filter { $0 != "Cooking" }
+        for (offset, profession) in professions.enumerated() {
+            names[21 + offset] = "\(profession) Speed"
+            names[34 + offset] = "\(profession) Power"
+        }
+        for (offset, profession) in critProfessions.enumerated() {
+            names[55 + offset] = "\(profession) Crit Chance"
+            names[67 + offset] = "\(profession) Crit Multiplier"
+        }
+        return names
+    }()
+
+    /// Stats stored as fractions of a base (0.05 = 5%), so a *flat* modifier
+    /// is in percentage points and renders with a "%" too ("Deep Roots"
+    /// +0.1 Foraging Crit Chance → "+10%").
+    private static let fractionScaleStats: Set<Int> = {
+        var ids: Set<Int> = [4, 8, 13, 50, 81, 82, 83, 84, 85]
+        ids.formUnion(55...78)
+        return ids
+    }()
+
+    /// "+19" for a flat bonus, "+4.1%" for a fractional one, "-60%" for a
+    /// penalty (sign comes from the value, never doubled).
     public var displayValue: String {
-        "+\(Self.trimmed(isPercent ? value * 100 : value))\(isPercent ? "%" : "")"
+        let asPercent = isPercent || Self.fractionScaleStats.contains(statID)
+        let scaled = asPercent ? value * 100 : value
+        let sign = scaled < 0 ? "-" : "+"
+        return "\(sign)\(Self.trimmed(abs(scaled)))\(asPercent ? "%" : "")"
     }
 
     private static func trimmed(_ value: Double) -> String {

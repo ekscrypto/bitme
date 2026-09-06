@@ -71,6 +71,23 @@ struct GamedataServiceTests {
         #expect(sorted.map(\.statID) == [3, 2, 15, 601])
     }
 
+    @Test func deepRootsAndPenaltyDisplay() {
+        // "Deep Roots" (Foraging Charm) carries flat modifiers on
+        // fraction-scale stats — +0.1 crit chance / +0.25 crit multiplier.
+        let critChance = BuffStat(statID: 66, value: 0.1, isPercent: false)
+        let critMultiplier = BuffStat(statID: 78, value: 0.25, isPercent: false)
+        #expect(critChance.label == "Foraging Crit Chance" && critChance.displayValue == "+10%")
+        #expect(critMultiplier.label == "Foraging Crit Multiplier" && critMultiplier.displayValue == "+25%")
+
+        // "Exquisite Reckless Poison": -60% Max Stamina renders one sign.
+        let poison = BuffStat(statID: 1, value: -0.6, isPercent: true)
+        #expect(poison.label == "Max Stamina" && poison.displayValue == "-60%")
+
+        // A percent-speed penalty likewise ("Foraging Pie" -0.1).
+        let pie = BuffStat(statID: 33, value: -0.1, isPercent: true)
+        #expect(pie.label == "Foraging Speed" && pie.displayValue == "-10%")
+    }
+
     @Test func gamedataCarriesBuffMetadata() {
         let gamedata = FoodBuffGamedata(
             foodBuffIDs: [37],
