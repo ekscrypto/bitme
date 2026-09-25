@@ -11,11 +11,13 @@ struct BitMeApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView(viewRep: viewRep) { intent in
-                await machine.ingest(intent)
-            }
+            RootView(
+                machine: machine,
+                viewRep: viewRep,
+                ingest: { intent in await machine.ingest(intent) }
+            )
             .task {
-                let stream = await machine.viewRep.values
+                let stream = machine.viewRep.values
                 for await rep in stream {
                     viewRep = rep
                 }
@@ -28,6 +30,7 @@ struct BitMeApp: App {
 }
 
 struct RootView: View {
+    let machine: StateMachine
     let viewRep: ViewRep?
     let ingest: @Sendable (Sendable) async -> Void
 
@@ -38,7 +41,11 @@ struct RootView: View {
         case .onboarding(let onboarding):
             OnboardingView(onboarding: onboarding, ingest: ingest)
         case .session(let session):
-            ActivityScreen(session: session, ingest: ingest)
+            ActivityScreen(
+                session: session,
+                machine: machine,
+                ingest: ingest
+            )
         case nil:
             Color(white: 0.05).ignoresSafeArea()
         }

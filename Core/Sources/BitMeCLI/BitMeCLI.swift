@@ -6,7 +6,9 @@ import Foundation
 // flows can be exercised and observed from a terminal.
 //
 //   bitme-cli resolve <name>        resolve a character, print outcome, exit
-//   bitme-cli watch <name>          resolve, then stream session ViewReps
+//   bitme-cli watch <name>          stream session ViewReps (incl. the live
+//                                   resource map: window, nearby counts,
+//                                   spawn/despawn feed, stream status)
 //   bitme-cli watch <name> --json   same, one JSON ViewRep per line
 
 @main
@@ -132,6 +134,29 @@ struct BitMeCLI {
             }
         } else {
             lines.append("food: gamedata pending (\(s.food.liveBuffs.count) live buffs)")
+        }
+        let map = s.resourceMap
+        if map.region != nil || map.stream != .off {
+            var line = "map: "
+            if let region = map.region, let width = map.width,
+               let ox = map.originTileX, let oz = map.originTileZ {
+                line += "region \(region) · \(width)×\(width) @ (\(ox),\(oz)) · \(map.populatedTiles) resource tiles"
+            } else {
+                line += "waiting for window"
+            }
+            line += " · stream \(map.stream.rawValue.uppercased())"
+            lines.append(line)
+        }
+        if !map.nearby.isEmpty {
+            let counts = map.nearby.prefix(6).map { entry in
+                "\(entry.name ?? entry.resourceID.map(String.init) ?? "?") ×\(entry.count)"
+            }
+            lines.append("nearby: " + counts.joined(separator: " · "))
+        }
+        for event in map.feed.prefix(4) {
+            let name = event.name ?? event.resourceID.map(String.init) ?? "?"
+            let age = s.nowMs.map { now in max(0, Int((now - event.atMs) / 1_000)) }
+            lines.append("feed: \(event.spawned ? "+" : "-")\(name) @ (\(event.tileX),\(event.tileZ))\(age.map { " · \($0)s ago" } ?? "")")
         }
         print(lines.joined(separator: "\n"))
     }

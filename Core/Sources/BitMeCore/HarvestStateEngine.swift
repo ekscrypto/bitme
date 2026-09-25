@@ -105,15 +105,20 @@ enum HarvestStateEngine {
     }
 
     /// Clock-based countdown for a resource that arrived as a watched spawn
-    /// (its whole despawn window is on the wire). Nil when not present or no
-    /// server-side despawn timer.
+    /// (its whole despawn window is on the wire). Prefers the spawn entry for
+    /// the exact entity, falls back to any spawn of the same resource type.
+    /// Nil when not present or no stage-end clock is known.
     static func spawnWindowRemainingMs(
         in snapshot: SessionSnapshot,
+        targetEntityID: String?,
         resourceID: Int,
         nowMs: Double
     ) -> Double? {
-        guard let spawn = snapshot.activitySpawns.first(where: { $0.resourceID == resourceID }),
-              let expiresAtMs = spawn.expiresAtMs else { return nil }
+        guard
+            let spawn = snapshot.activitySpawns.first(where: { $0.entityID == targetEntityID })
+                ?? snapshot.activitySpawns.first(where: { $0.resourceID == resourceID }),
+            let expiresAtMs = spawn.effectiveExpiresAtMs
+        else { return nil }
         return Double(expiresAtMs) - nowMs
     }
 
@@ -142,8 +147,10 @@ enum HarvestStateEngine {
     ) -> CitricAlert? {
         for spawn in current.activitySpawns {
             guard citricResourceIDs.contains(spawn.resourceID) else { continue }
+            // Growth timer is the exact 30 s clock the game schedules; the
+            // fallback only covers a missing timer row.
             let expiresAtMs = Double(
-                spawn.expiresAtMs ?? spawn.spawnedAtMs + Int64(fallbackWindowMs)
+                spawn.effectiveExpiresAtMs ?? spawn.spawnedAtMs + Int64(fallbackWindowMs)
             )
             let alert = CitricAlert(
                 entityID: spawn.entityID,

@@ -12,17 +12,23 @@ public final actor StateMachine: IntentIngestor {
     /// The UI subscribes here. `nonisolated` so callers can reach `.values`
     /// without an actor hop.
     public nonisolated let viewRep: ViewRepBroadcaster
+    /// Tile-data channel for the hex-grid map renderer (`MapRep`) — the raw
+    /// window/terrain/dictionary state, published only when it changes.
+    /// Same `nonisolated` reasoning as `viewRep`.
+    public nonisolated let mapRep: RepBroadcaster<MapRep>
 
     private let adapters: Adapters
     private var persistentState = PersistentState()
     private var ephemeralState = EphemeralState()
     private var started = false
+    private var lastMapRep: MapRep = .empty
 
     public init(adapters: Adapters) {
         self.adapters = adapters
         self.viewRep = ViewRepBroadcaster(initial: .onboarding(ViewRep.Onboarding(
             isResolving: false, lookingUpName: nil, error: nil, resolvedOfflineHint: false
         )))
+        self.mapRep = RepBroadcaster<MapRep>(initial: .empty)
     }
 
     /// Idempotent bootstrap: restore persisted identity, then load gamedata
@@ -48,6 +54,12 @@ public final actor StateMachine: IntentIngestor {
             ephemeralState = ephemeral
         }
         await viewRep.send(ViewRep.from(persistent: persistentState, ephemeral: ephemeralState))
+        let map = MapRep.from(ephemeral: ephemeralState)
+        if map != lastMapRep {
+            // Equality on 160k words is a memcmp — cheap next to a poll.
+            lastMapRep = map
+            await mapRep.send(map)
+        }
         await runActivities(change.activities)
     }
 

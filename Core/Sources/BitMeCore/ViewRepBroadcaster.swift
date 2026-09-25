@@ -1,38 +1,38 @@
 import Foundation
 
-/// Broadcasts the derived `ViewRep` to subscribers (SwiftUI, CLI, tests).
-/// Replays the latest value on subscribe, then every subsequent send, in
-/// causal order, under actor isolation (fenex-light ADR-009).
-public actor ViewRepBroadcaster {
-    private var latest: ViewRep
-    private var subscribers: [UUID: AsyncStream<ViewRep>.Continuation] = [:]
+/// Broadcasts a derived rep to subscribers (SwiftUI, CLI, tests). Replays
+/// the latest value on subscribe, then every subsequent send, in causal
+/// order, under actor isolation (fenex-light ADR-009).
+public actor RepBroadcaster<Rep: Sendable> {
+    private var latest: Rep
+    private var subscribers: [UUID: AsyncStream<Rep>.Continuation] = [:]
     private var terminated = false
 
-    init(initial: ViewRep) {
+    init(initial: Rep) {
         self.latest = initial
     }
 
     /// The latest emitted value. Diagnostics only — observation should drive
     /// off `values`.
-    public var current: ViewRep { latest }
+    public var current: Rep { latest }
 
-    func send(_ viewRep: ViewRep) {
+    func send(_ rep: Rep) {
         guard !terminated else { return }
-        latest = viewRep
+        latest = rep
         for continuation in subscribers.values {
-            continuation.yield(viewRep)
+            continuation.yield(rep)
         }
     }
 
-    /// Async stream of ViewRep values; replays current on subscribe.
+    /// Async stream of values; replays current on subscribe.
     /// `nonisolated` so callers can start consuming without an actor hop.
-    public nonisolated var values: AsyncStream<ViewRep> {
+    public nonisolated var values: AsyncStream<Rep> {
         AsyncStream(bufferingPolicy: .bufferingNewest(64)) { continuation in
             Task { await self.attach(continuation) }
         }
     }
 
-    private func attach(_ continuation: AsyncStream<ViewRep>.Continuation) {
+    private func attach(_ continuation: AsyncStream<Rep>.Continuation) {
         let id = UUID()
         continuation.yield(latest)
         subscribers[id] = continuation
@@ -43,19 +43,19 @@ public actor ViewRepBroadcaster {
 
     /// Closure subscription; cancels when the returned task is cancelled.
     @discardableResult
-    public nonisolated func sink(_ receiveValue: @Sendable @escaping (ViewRep) -> Void) -> Task<Void, Never> {
+    public nonisolated func sink(_ receiveValue: @Sendable @escaping (Rep) -> Void) -> Task<Void, Never> {
         let stream = values
         return Task {
-            for await viewRep in stream {
-                receiveValue(viewRep)
+            for await rep in stream {
+                receiveValue(rep)
             }
         }
     }
 
     public func finish() {
         terminated = true
-        for continuation in subscribers.values {
-            continuation.finish()
+        for continuation in subscribers {
+            continuation.value.finish()
         }
         subscribers.removeAll()
     }
@@ -64,3 +64,6 @@ public actor ViewRepBroadcaster {
         subscribers[id] = nil
     }
 }
+
+/// The screen-shaped projection the UI (and CLI) subscribe to.
+public typealias ViewRepBroadcaster = RepBroadcaster<ViewRep>

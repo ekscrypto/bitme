@@ -8,13 +8,31 @@ public struct Adapters: Sendable {
         public let resolve: @Sendable (_ name: String) async throws -> ResolveResponse
         /// One session snapshot; GET is also the server-side tracker registration.
         public let session: @Sendable (_ entityID: String) async throws -> SessionSnapshot
+        /// BMR1 resource window around the player (session-anchored).
+        /// Throws `RelayError.seeding` on 202, `.notFound` on 404.
+        public let sessionResources: @Sendable (_ entityID: String) async throws -> ResourceWindow
+        /// Region resource dictionary (tile-word indices → resource identity).
+        public let resourceDictionary: @Sendable (_ regionID: Int) async throws -> ResourceDictionary
+        /// BME1 terrain plane centered near a world tile (map background).
+        public let worldElevation: @Sendable (_ centerX: Int, _ centerZ: Int) async throws -> TerrainPlane
+        /// One change-stream connection. The returned stream ends when the
+        /// socket closes; reconnection is the caller's policy.
+        public let openResourceStream: @Sendable (_ entityID: String) -> AsyncStream<ResourceStreamEvent>
 
         public init(
             resolve: @escaping @Sendable (String) async throws -> ResolveResponse,
-            session: @escaping @Sendable (String) async throws -> SessionSnapshot
+            session: @escaping @Sendable (String) async throws -> SessionSnapshot,
+            sessionResources: @escaping @Sendable (String) async throws -> ResourceWindow,
+            resourceDictionary: @escaping @Sendable (Int) async throws -> ResourceDictionary,
+            worldElevation: @escaping @Sendable (Int, Int) async throws -> TerrainPlane,
+            openResourceStream: @escaping @Sendable (String) -> AsyncStream<ResourceStreamEvent>
         ) {
             self.resolve = resolve
             self.session = session
+            self.sessionResources = sessionResources
+            self.resourceDictionary = resourceDictionary
+            self.worldElevation = worldElevation
+            self.openResourceStream = openResourceStream
         }
     }
 
@@ -46,10 +64,19 @@ public struct Adapters: Sendable {
 
     /// Real relay + on-disk persistence + real waiting.
     public static func production() -> Adapters {
-        Adapters(
+        let relay = RelayClient.production
+        return Adapters(
             relay: Relay(
-                resolve: { name in try await RelayClient.production.resolve(name: name) },
-                session: { entityID in try await RelayClient.production.session(entityID: entityID) }
+                resolve: { name in try await relay.resolve(name: name) },
+                session: { entityID in try await relay.session(entityID: entityID) },
+                sessionResources: { entityID in try await relay.sessionResources(entityID: entityID) },
+                resourceDictionary: { regionID in try await relay.resourceDictionary(regionID: regionID) },
+                worldElevation: { centerX, centerZ in
+                    try await relay.worldElevation(centerX: centerX, centerZ: centerZ)
+                },
+                openResourceStream: { entityID in
+                    ResourceStreamClient.production.events(entityID: entityID)
+                }
             ),
             loadFoodBuffGamedata: { await GamedataService.loadFoodBuffGamedata() },
             restoreIdentity: { Self.restoreIdentity() },

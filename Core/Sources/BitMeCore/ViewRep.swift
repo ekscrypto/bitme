@@ -59,12 +59,81 @@ public enum ViewRep: Equatable, Sendable, Codable {
             public var stats: [BuffStat]
         }
 
+        /// An action in progress (`server_time_ms < ends_at_ms`) — one per
+        /// layer, Base first. Feeds the Live Activity and the map HUD.
+        public struct RunningAction: Equatable, Sendable, Codable {
+            public var actionType: String
+            /// "Base" or "UpperBody".
+            public var layer: String
+            /// Session target's name when it is this action's target.
+            public var targetName: String?
+            /// Relay-clock ms.
+            public var startsAtMs: Double
+            public var endsAtMs: Double
+            public var durationMs: Double
+        }
+
         public struct Food: Equatable, Sendable, Codable {
             /// False while gamedata has not loaded — classification unknown.
             public var configured: Bool
             public var active: Bool
             public var expiresAtSec: Int64?
             public var liveBuffs: [LiveBuff]
+        }
+
+        /// Live resource map around the player (relay §6–7 endpoints):
+        /// nearby-resource counts from the BMR1 window plus the spawn /
+        /// despawn feed maintained from the change stream. A compact,
+        /// renderer-friendly projection — the raw tile words stay in state.
+        public struct ResourceMap: Equatable, Sendable, Codable {
+            public enum StreamStatus: String, Equatable, Sendable, Codable {
+                case off
+                case connecting
+                case live
+                case reconnecting
+            }
+
+            public struct NearbyResource: Equatable, Sendable, Codable {
+                public var resourceID: Int?
+                /// nil while the region dictionary has not loaded yet.
+                public var name: String?
+                public var count: Int
+                public var harvestable: Bool?
+            }
+
+            public struct FeedEvent: Equatable, Sendable, Codable {
+                public var resourceID: Int?
+                /// nil while the region dictionary has not loaded yet.
+                public var name: String?
+                public var tileX: Int
+                public var tileZ: Int
+                /// False = despawned / the tile emptied.
+                public var spawned: Bool
+                /// Relay-clock ms (best effort — see the stream loop).
+                public var atMs: Double
+            }
+
+            public var region: Int?
+            /// Top-left tile of the window (`anchor − width/2`).
+            public var originTileX: Int?
+            public var originTileZ: Int?
+            public var width: Int?
+            /// Window center the stream subscription is anchored to.
+            public var anchorTileX: Int?
+            public var anchorTileZ: Int?
+            /// Populated resource tiles in the window (nonzero, non-paving).
+            public var populatedTiles: Int
+            public var stream: StreamStatus
+            /// Resource ids aggregated from the window tally, count-sorted.
+            public var nearby: [NearbyResource]
+            /// Newest-first spawn/despawn events (capped for rendering).
+            public var feed: [FeedEvent]
+
+            static let empty = ResourceMap(
+                region: nil, originTileX: nil, originTileZ: nil, width: nil,
+                anchorTileX: nil, anchorTileZ: nil, populatedTiles: 0,
+                stream: .off, nearby: [], feed: []
+            )
         }
 
         public var username: String?
@@ -79,6 +148,8 @@ public enum ViewRep: Equatable, Sendable, Codable {
         public var citric: Citric?
         public var stamina: Stamina?
         public var food: Food
+        public var actions: [RunningAction]
+        public var resourceMap: ResourceMap
     }
 
     static func from(persistent: PersistentState, ephemeral: EphemeralState) -> ViewRep {
@@ -108,12 +179,16 @@ public enum ViewRep: Equatable, Sendable, Codable {
             )
             var windowEndsAtMs: Double?
             if let windowIn = HarvestStateEngine.spawnWindowRemainingMs(
-                in: snapshot, resourceID: target.resourceID ?? -1, nowMs: now
+                in: snapshot,
+                targetEntityID: target.entityID,
+                resourceID: target.resourceID ?? -1,
+                nowMs: now
             ) {
                 windowEndsAtMs = now + windowIn
-            } else if let despawn = target.despawnTimeSecs, despawn > 0 {
-                // No live spawn entry — anchor from passthrough gamedata.
-                windowEndsAtMs = now + despawn * 1_000
+            } else if let growthEndsMs = target.growthEndsAtMs, growthEndsMs > 0 {
+                // Target carries its own growth-stage clock but no matching
+                // spawn entry (e.g. outside the watched-spawn scope).
+                windowEndsAtMs = Double(growthEndsMs)
             }
             bush = Session.Resource(
                 name: target.name ?? "Unknown resource",
@@ -192,6 +267,32 @@ public enum ViewRep: Equatable, Sendable, Codable {
             food = Session.Food(configured: ephemeral.gamedata != nil, active: false, expiresAtSec: nil, liveBuffs: [])
         }
 
+        // -- running actions --------------------------------------------------
+        let actions: [Session.RunningAction]
+        if let snapshot = ephemeral.session?.snapshot {
+            let now = Double(snapshot.serverTimeMs)
+            actions = snapshot.actions
+                .filter { $0.durationMs > 0 && Double($0.endsAtMs) > now }
+                .sorted { lhs, rhs in
+                    if lhs.layer == rhs.layer { return lhs.layer < rhs.layer }
+                    return lhs.layer == "Base" // Base layer first
+                }
+                .map { action in
+                    Session.RunningAction(
+                        actionType: action.actionType,
+                        layer: action.layer,
+                        targetName: action.targetEntityID.flatMap { targetID in
+                            snapshot.target?.entityID == targetID ? snapshot.target?.name : nil
+                        },
+                        startsAtMs: Double(action.startTimeMs),
+                        endsAtMs: Double(action.endsAtMs),
+                        durationMs: Double(action.durationMs)
+                    )
+                }
+        } else {
+            actions = []
+        }
+
         return .session(Session(
             username: persistent.identity?.username,
             entityID: persistent.identity?.entityID,
@@ -209,7 +310,85 @@ public enum ViewRep: Equatable, Sendable, Codable {
             bush: bush,
             citric: citric,
             stamina: stamina,
-            food: food
+            food: food,
+            actions: actions,
+            resourceMap: resourceMap(from: ephemeral.session)
         ))
+    }
+
+    /// Projects the session's resource-map state: aggregates the tile tally
+    /// through the dictionary into per-resource nearby counts, and resolves
+    /// feed entries' dictionary indices into names. Indices missing from the
+    /// dictionary (rotation race) are dropped — the refetch converges them.
+    private static func resourceMap(from session: EphemeralState.Session?) -> Session.ResourceMap {
+        guard let session else { return .empty }
+        let map = session.resourceMap
+        let entries = map.dictionary?.entryByIndex ?? [:]
+
+        struct Aggregate {
+            var count = 0
+            var resourceID: Int?
+            var name: String?
+            var harvestable: Bool?
+        }
+        var byResource: [Int: Aggregate] = [:]
+        for (index, count) in map.tally where count > 0 {
+            guard let entry = entries[index], entry.paving != true else { continue }
+            // Dictionary indices repeat per resource id; entries without a
+            // resource id still count, grouped per-index.
+            let key = entry.resourceID ?? -(1_000_000 + index)
+            var aggregate = byResource[key] ?? Aggregate()
+            aggregate.count += count
+            if aggregate.name == nil {
+                aggregate.resourceID = entry.resourceID
+                aggregate.name = entry.name
+                aggregate.harvestable = entry.harvestable
+            }
+            byResource[key] = aggregate
+        }
+        let nearby = byResource.values
+            .sorted {
+                $0.count != $1.count ? $0.count > $1.count
+                    : ($0.name ?? "") < ($1.name ?? "")
+            }
+            .prefix(12)
+            .map {
+                Session.ResourceMap.NearbyResource(
+                    resourceID: $0.resourceID, name: $0.name,
+                    count: $0.count, harvestable: $0.harvestable
+                )
+            }
+
+        let feed = map.feed.prefix(10).map { entry in
+            let resolved = entries[entry.dictIndex]
+            return Session.ResourceMap.FeedEvent(
+                resourceID: resolved?.resourceID,
+                name: resolved?.name,
+                tileX: entry.tileX,
+                tileZ: entry.tileZ,
+                spawned: entry.spawned,
+                atMs: entry.atMs
+            )
+        }
+
+        let stream: Session.ResourceMap.StreamStatus
+        switch map.streamStatus {
+        case .off: stream = .off
+        case .connecting: stream = .connecting
+        case .live: stream = .live
+        case .reconnecting: stream = .reconnecting
+        }
+        return Session.ResourceMap(
+            region: map.window?.region,
+            originTileX: map.window?.originX,
+            originTileZ: map.window?.originZ,
+            width: map.window?.width,
+            anchorTileX: map.anchorX,
+            anchorTileZ: map.anchorZ,
+            populatedTiles: map.populatedTiles,
+            stream: stream,
+            nearby: Array(nearby),
+            feed: Array(feed)
+        )
     }
 }

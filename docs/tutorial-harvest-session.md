@@ -100,6 +100,15 @@ Also read `target.despawn_time_secs` / `respawn_time_secs` — passthrough
 gamedata the relay includes precisely so the client can reason about windows
 without shipping its own copy of `resource_desc` lookups for this screen.
 
+**Growth-stage clocks (preferred when present).** `activity_spawns` rows and
+the target both carry `growth_ends_at_ms`: the server-authoritative moment
+the entity's current growth stage ends (`resource_growth_timer.scheduled_at`,
+the same reducer clock the game client's target-frame countdown renders).
+T2 event berry bushes carry their whole life window there — 600 s Bountiful,
+30 s Citric — even though their gamedata `despawn_time_secs` is 0. Prefer it
+over the gamedata despawn estimate and fixed fallbacks; the citric detector's
+30 s fallback only applies when the timer row is missing.
+
 ## 3. Citric detection — the 30-second window
 
 This is what `activity_spawns` exists for. The Citric bush is a **new

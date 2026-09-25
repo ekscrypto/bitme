@@ -64,6 +64,7 @@ struct RelayModelsDecodingTests {
         "max_health": 10000,
         "despawn_time_secs": 0.0,
         "respawn_time_secs": 600.0,
+        "growth_ends_at_ms": null,
         "location": {"tile_x": 10213, "tile_z": 12367}
       },
       "activity_spawns": [
@@ -71,7 +72,8 @@ struct RelayModelsDecodingTests {
          "name": "Baited School Of Muddy Auratus",
          "health": null, "max_health": 3000,
          "location": {"tile_x": 11448, "tile_z": 11357},
-         "spawned_at_ms": 1788622724778, "expires_at_ms": null}
+         "spawned_at_ms": 1788622724778, "expires_at_ms": null,
+         "growth_ends_at_ms": 1788664248840}
       ],
       "server_time_ms": 1788628492673
     }
@@ -121,12 +123,16 @@ struct RelayModelsDecodingTests {
         #expect(target.health == 2398)
         #expect(target.maxHealth == 10_000)
         #expect(target.respawnTimeSecs == 600.0)
+        #expect(target.growthEndsAtMs == nil)
         #expect(target.location?.tileX == 10_213)
 
         let spawn = try #require(snapshot.activitySpawns.first)
         #expect(spawn.resourceID == 2_089_325_907)
         #expect(spawn.health == nil)
         #expect(spawn.expiresAtMs == nil)
+        // Growth timer beats the null gamedata despawn estimate.
+        #expect(spawn.growthEndsAtMs == 1_788_664_248_840)
+        #expect(spawn.effectiveExpiresAtMs == 1_788_664_248_840)
     }
 
     @Test func nullableFieldsDecodeAsNil() throws {
@@ -154,5 +160,48 @@ struct RelayModelsDecodingTests {
         #expect(snapshot.position == nil)
         #expect(snapshot.target == nil)
         #expect(snapshot.buffs.isEmpty)
+    }
+
+    // MARK: - GET /bitme/region/:region_id/resource-dictionary
+
+    private let dictionaryJSON = """
+    {
+      "ready": true,
+      "region": 7,
+      "dict_version": 1713931368,
+      "entries": [
+        {"index": 1, "name": "Rough Quarry Rock", "paving": false,
+         "resource_id": 815748648, "harvestable": false,
+         "max_health": 5000, "respawn_time_secs": 0.0, "despawn_time_secs": 0.0},
+        {"index": 2, "name": "Dirt Road", "paving": true, "paving_type_id": 895904764},
+        {"index": 3, "name": "Giant Bountiful Strawberry Bush", "paving": false,
+         "resource_id": 1822942131, "harvestable": true,
+         "max_health": 500, "respawn_time_secs": 0.0, "despawn_time_secs": 0.0}
+      ]
+    }
+    """
+
+    @Test func resourceDictionaryDecodes() throws {
+        let dictionary = try JSONDecoder().decode(ResourceDictionary.self, from: Data(dictionaryJSON.utf8))
+        #expect(dictionary.ready)
+        #expect(dictionary.region == 7)
+        #expect(dictionary.dictVersion == 1_713_931_368)
+
+        let rock = try #require(dictionary.entryByIndex[1])
+        #expect(rock.resourceID == 815_748_648)
+        #expect(rock.harvestable == false)
+        #expect(rock.maxHealth == 5_000)
+        #expect(rock.pavingTypeID == nil)
+
+        // Paving entries carry paving_type_id instead of resource fields.
+        let road = try #require(dictionary.entryByIndex[2])
+        #expect(road.paving == true)
+        #expect(road.resourceID == nil)
+        #expect(road.pavingTypeID == 895_904_764)
+        #expect(road.harvestable == nil)
+
+        let bush = try #require(dictionary.entryByIndex[3])
+        #expect(bush.harvestable == true)
+        #expect(bush.name == "Giant Bountiful Strawberry Bush")
     }
 }

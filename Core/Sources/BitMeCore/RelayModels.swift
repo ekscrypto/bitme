@@ -186,6 +186,11 @@ public struct Target: Codable, Equatable, Sendable {
     public let maxHealth: Double?
     public let despawnTimeSecs: Double?
     public let respawnTimeSecs: Double?
+    /// Server-authoritative end of the target's current growth stage (relay
+    /// unix ms): the exact clock the in-game target frame counts down for
+    /// growth-stage resources (T2 event berry bushes: 600 s Bountiful,
+    /// 30 s Citric). Null when the entity has no live growth timer.
+    public let growthEndsAtMs: Int64?
     public let location: TileLocation?
 
     enum CodingKeys: String, CodingKey {
@@ -196,6 +201,7 @@ public struct Target: Codable, Equatable, Sendable {
         case maxHealth = "max_health"
         case despawnTimeSecs = "despawn_time_secs"
         case respawnTimeSecs = "respawn_time_secs"
+        case growthEndsAtMs = "growth_ends_at_ms"
         case location
     }
 }
@@ -214,6 +220,9 @@ public struct ActivitySpawn: Codable, Equatable, Sendable {
     public let spawnedAtMs: Int64
     /// spawned_at_ms + despawn_time when gamedata has a timer; else null.
     public let expiresAtMs: Int64?
+    /// Server-authoritative growth-stage end (relay unix ms) — the exact
+    /// despawn/wither/transition clock for growth-stage resources; else null.
+    public let growthEndsAtMs: Int64?
 
     enum CodingKeys: String, CodingKey {
         case entityID = "entity_id"
@@ -224,7 +233,12 @@ public struct ActivitySpawn: Codable, Equatable, Sendable {
         case location
         case spawnedAtMs = "spawned_at_ms"
         case expiresAtMs = "expires_at_ms"
+        case growthEndsAtMs = "growth_ends_at_ms"
     }
+
+    /// Best known stage-end clock: the server-authoritative growth timer
+    /// when present, else the gamedata despawn estimate.
+    public var effectiveExpiresAtMs: Int64? { growthEndsAtMs ?? expiresAtMs }
 }
 
 public struct TileLocation: Codable, Equatable, Sendable {
@@ -234,6 +248,80 @@ public struct TileLocation: Codable, Equatable, Sendable {
     enum CodingKeys: String, CodingKey {
         case tileX = "tile_x"
         case tileZ = "tile_z"
+    }
+}
+
+// MARK: - GET /bitme/region/:region_id/resource-dictionary
+
+/// Per-region dictionary mapping the BMR1/BMD1 tile-word dictionary index
+/// (bits 0–9) to resource identity. Rotates as the region's resource mix
+/// changes — windows and deltas carry the `dict_version` they were built
+/// against; a mismatch means re-fetch before trusting indices.
+public struct ResourceDictionary: Codable, Equatable, Sendable {
+    public let ready: Bool
+    public let region: Int
+    public let dictVersion: Int
+    public let entries: [Entry]
+
+    enum CodingKeys: String, CodingKey {
+        case ready
+        case region
+        case dictVersion = "dict_version"
+        case entries
+    }
+
+    public struct Entry: Codable, Equatable, Sendable {
+        public let index: Int
+        public let name: String?
+        /// False / absent on paving entries.
+        public let harvestable: Bool?
+        public let paving: Bool?
+        /// Null on paving entries (they carry `paving_type_id` instead).
+        public let resourceID: Int?
+        public let pavingTypeID: Int?
+        public let maxHealth: Double?
+        public let respawnTimeSecs: Double?
+        public let despawnTimeSecs: Double?
+
+        enum CodingKeys: String, CodingKey {
+            case index
+            case name
+            case harvestable
+            case paving
+            case resourceID = "resource_id"
+            case pavingTypeID = "paving_type_id"
+            case maxHealth = "max_health"
+            case respawnTimeSecs = "respawn_time_secs"
+            case despawnTimeSecs = "despawn_time_secs"
+        }
+
+        public init(
+            index: Int, name: String?, harvestable: Bool?, paving: Bool?,
+            resourceID: Int?, pavingTypeID: Int?, maxHealth: Double?,
+            respawnTimeSecs: Double?, despawnTimeSecs: Double?
+        ) {
+            self.index = index
+            self.name = name
+            self.harvestable = harvestable
+            self.paving = paving
+            self.resourceID = resourceID
+            self.pavingTypeID = pavingTypeID
+            self.maxHealth = maxHealth
+            self.respawnTimeSecs = respawnTimeSecs
+            self.despawnTimeSecs = despawnTimeSecs
+        }
+    }
+
+    public init(ready: Bool, region: Int, dictVersion: Int, entries: [Entry]) {
+        self.ready = ready
+        self.region = region
+        self.dictVersion = dictVersion
+        self.entries = entries
+    }
+
+    /// Index → entry lookup (indices are unique within a dictionary).
+    public var entryByIndex: [Int: Entry] {
+        Dictionary(entries.map { ($0.index, $0) }, uniquingKeysWith: { first, _ in first })
     }
 }
 

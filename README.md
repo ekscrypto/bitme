@@ -12,7 +12,7 @@ run client-side from snapshots + bundled gamedata.
 
 | Doc | Contents |
 |---|---|
-| [docs/api.md](docs/api.md) | **API reference** — `/bitme/resolve`, `/bitme/session/:entity_id`, field-by-field, error and deploy semantics. |
+| [docs/api.md](docs/api.md) | **API reference** — `/bitme/resolve`, `/bitme/session/:entity_id`, the resource-map endpoints (BMR1 windows, region dictionary, BME1 terrain), and the resource change stream (BMD1 + control protocol), field-by-field, error and deploy semantics. |
 | [docs/tutorial-onboarding-and-polling.md](docs/tutorial-onboarding-and-polling.md) | **Tutorial 1** — name → character resolution, readiness probe, a production-shaped 1 Hz polling client with clock-skew correction and backoff. |
 | [docs/tutorial-harvest-session.md](docs/tutorial-harvest-session.md) | **Tutorial 2** — snapshot → screen state: bush countdown, citric detection, food-buff and stamina alerts; lifecycle (backgrounding, deploys) and a playtest checklist. |
 | [docs/relay-data-requirements.md](docs/relay-data-requirements.md) | Design history — the original data-requirements spec sent to the relay team (superseded; static-gamedata list §6 still applies). |
@@ -42,11 +42,15 @@ one-way state machine), shared by the iOS app and a headless CLI:
   the published `ViewRep` only.
 - `ViewRep` — screen-shaped, Equatable/Codable projection with relay-clock
   anchor timestamps; UIs interpolate countdowns locally.
-- `Adapters` — closure-based system boundaries (relay HTTP, mirror WebSocket
-  gamedata, identity persistence, sleep) so tests substitute simulated
-  doubles and flows run deterministically.
-- API layer (relay HTTP client, mirror WebSocket gamedata client) and the
-  pure harvest engine are internal to the package.
+- `MapRep` — the tile-data channel for the hex-grid map renderer: raw BMR1
+  window words, the BME1 terrain plane, and the dictionary, published only
+  when map state changes (never on every poll).
+- `Adapters` — closure-based system boundaries (relay HTTP, resource change
+  stream, mirror WebSocket gamedata, identity persistence, sleep) so tests
+  substitute simulated doubles and flows run deterministically.
+- API layer (relay HTTP client incl. the BMR1/BMD1/BME1 binary codecs,
+  change-stream WebSocket client, mirror WebSocket gamedata client) and the
+  pure harvest/resource-map engines are internal to the package.
 
 ### CLI (`bitme-cli`) — headless testing surface
 
@@ -83,8 +87,22 @@ stamina regen constants need gamedata + playtest confirmation.
 
 - Relay: **Phase 1 shipped to production** (2026-09-05) — resolve + session
   endpoints, server-side target-health tracking, watched-spawn (citric) log.
-- Core + CLI: state machine, API, ViewRep extracted; 26 unit tests; CLI
-  verified against production (resolve + live watch).
-- iOS app: **v0.2** — thin ViewRep renderer over the core (onboarding, big
+  **Resource-map APIs live** (2026-09-24, first shipped on the X-Ray web
+  client): BMR1 session/world windows, region dictionaries, BME1 terrain,
+  and the BMD1 change-stream WebSocket.
+- Core + CLI: state machine, API, ViewRep extracted; 56 unit tests; CLI
+  verified against production (resolve, live watch, live resource map —
+  window + dictionary + stream). The session/map loops also survive the
+  CLI's start → SignOut → resolve race (late bootstraps can no longer
+  resurrect the previous character).
+- iOS app: **v0.3** — thin ViewRep renderer over the core (onboarding, big
   countdown with learned pacing, citric banner, stamina projection,
-  food-buff classification), verified live against production.
+  food-buff classification, live nearby-resources card with the
+  spawn/despawn feed) plus the **odd-r hex-grid map**: terrain from BME1
+  planes, resources colored per id, live deltas, pan/pinch/follow,
+  tap-to-inspect tiles, and a **resource filter panel** (nearby counts,
+  search, tracked set persisted in UserDefaults, untracked resources
+  faded to 10%), plus a **gathering HUD** — a ¼-width × ⅒-height banner
+  pinned to the left edge below the half point while the character is
+  Extract-ing, showing the resource name, time until depleted, and the
+  stamina meter — verified rendered in the simulator against production.

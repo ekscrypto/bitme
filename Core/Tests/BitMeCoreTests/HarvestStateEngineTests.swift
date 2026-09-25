@@ -54,12 +54,14 @@ struct HarvestStateEngineTests {
         id: String,
         resource: Int,
         expiresAt: Int64?,
-        spawnedAt: Int64 = 1_000_000
+        spawnedAt: Int64 = 1_000_000,
+        growthEndsAt: Int64? = nil
     ) -> ActivitySpawn {
         ActivitySpawn(
             entityID: id, resourceID: resource, name: "test",
             health: nil, maxHealth: 500, location: nil,
-            spawnedAtMs: spawnedAt, expiresAtMs: expiresAt
+            spawnedAtMs: spawnedAt, expiresAtMs: expiresAt,
+            growthEndsAtMs: growthEndsAt
         )
     }
 
@@ -126,8 +128,40 @@ struct HarvestStateEngineTests {
         Target(
             entityID: entity, resourceID: 38, name: "bush",
             health: health, maxHealth: 500,
-            despawnTimeSecs: nil, respawnTimeSecs: nil, location: nil
+            despawnTimeSecs: nil, respawnTimeSecs: nil,
+            growthEndsAtMs: nil, location: nil
         )
+    }
+
+    // MARK: - Growth-stage window (the game's target-frame countdown)
+
+    @Test func spawnWindowUsesAuthoritativeGrowthClock() {
+        // T2 event bush: null gamedata despawn, exact 600 s growth timer.
+        let bush = spawn(id: "8000", resource: 353_689_546, expiresAt: nil, growthEndsAt: 1_600_000)
+        let window = HarvestStateEngine.spawnWindowRemainingMs(
+            in: snapshot(spawns: [bush]), targetEntityID: "8000",
+            resourceID: 353_689_546, nowMs: 1_000_000
+        )
+        #expect(window == 600_000)
+    }
+
+    @Test func spawnWindowFallsBackToGamedataDespawnEstimate() {
+        let school = spawn(id: "8001", resource: 2_089_325_907, expiresAt: 1_030_000)
+        let window = HarvestStateEngine.spawnWindowRemainingMs(
+            in: snapshot(spawns: [school]), targetEntityID: "8001",
+            resourceID: 2_089_325_907, nowMs: 1_000_000
+        )
+        #expect(window == 30_000)
+    }
+
+    @Test func spawnWindowPrefersEntityMatchOverResourceMatch() {
+        let targetSpawn = spawn(id: "8000", resource: 353_689_546, expiresAt: nil, growthEndsAt: 1_500_000)
+        let sameResourceOtherEntity = spawn(id: "8009", resource: 353_689_546, expiresAt: nil, growthEndsAt: 1_200_000)
+        let window = HarvestStateEngine.spawnWindowRemainingMs(
+            in: snapshot(spawns: [sameResourceOtherEntity, targetSpawn]),
+            targetEntityID: "8000", resourceID: 353_689_546, nowMs: 1_000_000
+        )
+        #expect(window == 500_000)
     }
 
     // MARK: - Citric detection
@@ -175,6 +209,19 @@ struct HarvestStateEngineTests {
         )
         #expect(alert?.entityID == "9001")
         #expect(alert?.remainingMs(nowMs: 1_020_000) == 10_000)
+    }
+
+    @Test func citricUsesGrowthClockOverFixedFallback() {
+        // Live relay shape: the citric bush's 30 s life is on the wire as a
+        // growth timer; expires_at_ms (gamedata despawn) is null.
+        let citric = spawn(id: "9003", resource: 65_901_922, expiresAt: nil, growthEndsAt: 1_029_000)
+        let alert = HarvestStateEngine.detectCitric(
+            previous: nil, current: snapshot(spawns: [citric]),
+            citricResourceIDs: config.citricResourceIDs,
+            fallbackWindowMs: 30_000,
+            nowMs: 1_005_000
+        )
+        #expect(alert?.remainingMs(nowMs: 1_005_000) == 24_000)
     }
 
     @Test func nonCitricSpawnsDoNotAlert() {

@@ -1,16 +1,17 @@
 # Bit-Me — Relay API Reference
 
-The two HTTP endpoints Bit-Me consumes, served by the relay-cache embedded in
-the mirror fleet at **`https://relay.bitcraftsync.app`**. Plain JSON over
-HTTPS — no authentication, no WebSocket, no SpacetimeDB protocol. The app
-only polls.
+The HTTP + WebSocket endpoints Bit-Me consumes, served by the relay-cache
+embedded in the mirror fleet at **`https://relay.bitcraftsync.app`**. JSON
+over HTTPS for session data (§2–3), binary formats plus one WebSocket for
+the live resource map (§6–7) — no authentication, no SpacetimeDB protocol
+for either.
 
 > **Source of truth:** the relay repo's
 > `spacetimedb-bitcraft-mirror/crates/relay-cache/BITME-API.md`
 > (handlers: `src/bitme_serve.rs`, tracker: `src/bitme.rs`). This document
 > mirrors it for Bit-Me development; if the two ever disagree, the relay
 > repo wins. Design history: `relay-bitcraftsync-app/BITME-DATA-ASSESSMENT.md`.
-> Last synced: 2026-09-05.
+> Last synced: 2026-09-24.
 
 ---
 
@@ -18,13 +19,13 @@ only polls.
 
 | Convention | Detail |
 |---|---|
-| Transport | HTTPS GET, JSON responses. `Cache-Control: no-store` on every response. CORS: `*`. |
+| Transport | HTTPS GET, JSON or binary responses (`application/octet-stream`). `Cache-Control: no-store` on every response. CORS: `*`. One WebSocket (§7). |
 | Entity ids | **JSON strings** — upstream ids are u64 and exceed JS `Number.MAX_SAFE_INTEGER`. Never parse them as numbers. |
 | Positions | `world_x`/`world_z` are float world units (upstream milli-units ÷ 1000; one tile = 1.0). `tile_x`/`tile_z` are integer odd-r tiles (`floor(world)`), same coordinate space as the relay's `/roads` endpoints. |
 | Clocks | `*_ms` fields are unix **milliseconds**. Buff `start_timestamp`/`duration` are unix **seconds**. `stamina.last_decrease_at` is RFC 3339. `server_time_ms` lets you correct for device clock skew. |
 | Nulls | Present-but-`null` means *unknown or not applicable* — never an error. Every documented field is always present on the wire. |
-| Errors | `400` with `{"error": "…"}` for bad input; `404` with `{"found": false, …}` for misses. |
-| Rate limits | None enforced today (nginx 60 s timeouts only). Design for **1 Hz polling** per active session; a snapshot is ~2–6 KB. |
+| Errors | `400` with `{"error": "…"}` for bad input; `404` with `{"found": false, …}` for misses; **`202` (empty body) means the region is still seeding** — back off (~30 s) and retry. |
+| Rate limits | None enforced today (nginx 60 s timeouts only). Design for **1 Hz polling** per active session; a snapshot is ~2–6 KB. The resource window is ~320 KB — fetch on drift/staleness, not on a timer (§6). |
 | Sessions | A `GET /bitme/session/:id` **is** the registration. Stop polling for >15 min and the server drops its tracking (next poll transparently re-registers). |
 
 ---
@@ -220,6 +221,7 @@ disabled (it is enabled in production).
   "max_health": 10000,
   "despawn_time_secs": 0.0,
   "respawn_time_secs": 600.0,
+  "growth_ends_at_ms": 1788664248840,
   "location": { "tile_x": 10213, "tile_z": 12367 }
 }
 ```
@@ -235,6 +237,12 @@ disabled (it is enabled in production).
   `null` identity but still report `health`.
 - `despawn_time_secs` / `respawn_time_secs` are passthrough gamedata for
   client-side countdowns.
+- `growth_ends_at_ms` is the server-authoritative end of the target's
+  current growth stage (unix ms) — see `activity_spawns` below. This is
+  what the in-game target frame counts down for growth-stage resources
+  (T2 event berry bushes show their 600 s Bountiful window here even
+  though `despawn_time_secs` is 0). Null when the entity has no live
+  growth timer.
 
 ### 3.7 `activity_spawns` — watched spawns in the player's area
 
@@ -247,7 +255,8 @@ disabled (it is enabled in production).
   "max_health": 3000,
   "location": { "tile_x": 11448, "tile_z": 11357 },
   "spawned_at_ms": 1788622724778,
-  "expires_at_ms": null
+  "expires_at_ms": null,
+  "growth_ends_at_ms": null
 }
 ```
 
@@ -262,6 +271,16 @@ disabled (it is enabled in production).
   delete) or after 30 minutes.
 - `expires_at_ms` = `spawned_at_ms + despawn_time` when the resource gamedata
   has a despawn timer; otherwise `null` (compute client-side from gamedata).
+- `growth_ends_at_ms` = when the entity's current **growth stage** ends (unix
+  ms), from the scheduled reducer clock (`resource_growth_timer`, legacy
+  fallback `growth_state.end_timestamp`). Null when the entity has no live
+  growth timer. Growth-stage resources carry their whole life window here —
+  T2 event berry bushes: 600 s Bountiful (then Citric spawns in place), 30 s
+  Citric (then back to Withering). This is the exact clock the in-game target
+  frame counts down; prefer it over the `expires_at_ms` gamedata estimate and
+  over fixed fallbacks. Note the semantic differs per resource: on depleted
+  nodes carrying a respawn timer (hexite) it is the respawn completion, not a
+  despawn.
 - `health` non-null means someone is already harvesting it.
 
 #### Citric / Bountiful Berry Bush gamedata ids
@@ -292,6 +311,118 @@ A player **resolves globally** even when their region is not mirrored, but a
 **session requires them to be present** in one of the mirrored regions
 (currently 3, 7, 8, 9, 11, 12, 13, 14, 15, 17, 18, 19, 23 — read dynamically
 from `GET /roads/regions` rather than hardcoding).
+
+---
+
+## 6. Resource map endpoints
+
+The live resource map the X-Ray web client renders
+(`https://bitcraftsync.app/x-ray/`): a player-anchored window of resource
+tiles, a per-region dictionary that names them, and (§7) a change stream
+that keeps the window fresh. All bodies are **binary, little-endian**.
+
+### 6.1 `GET /bitme/session/:entity_id/resources` — BMR1 window
+
+A `width × width` odd-r small-hex resource window centered on the player's
+current position (anchor = center; `origin = anchor − width/2`, currently
+400×400 ⇒ ~320 KB). Served from the last-known position even when signed
+out. `202` while the region seeds, `404` when the player is not in a
+mirrored region.
+
+**BMR1 layout** — header (24 bytes): magic `BMR1`, u16 version (1), u16
+width, i32 origin_world_x, i32 origin_world_z, u32 region, u32 dict_version.
+Body: `width × width` row-major LE u16 tile words (row = +z, col = +x),
+relative to the origin.
+
+**Tile word bits** (shared with BMD1): 0–9 dictionary index into the
+region's resource dictionary (§6.3), 10 origin/anchor flag of the footprint,
+11–13 footprint direction, 14 paving namespace, 15 water. Word `0` (and any
+water-only word, index 0) = no resource — the tile is outside the region or
+emptied. Resources on water (fishing schools) carry both bit 15 and an
+index.
+
+### 6.2 `GET /bitme/world/:cx/:cz/resources` / `…/elevation` — world windows
+
+The same BMR1 format anchored at an arbitrary world tile `(cx, cz)` (the
+anchor is the window center), for free-pan map rendering beyond the
+session window. `404` outside the covered region grid. The elevation
+variant returns **BME1**:
+
+**BME1 layout** — header (26 bytes): magic `BME1`, u16 version (2), u16
+width, u16 height (super columns/rows — the odd-r shear makes width vary
+with row alignment), i32 origin_center_world_x/z (the center tile of cell
+(0,0)), u32 region, u32 generation. Body: `width × height` row-major LE u64
+cells in super offset space. Cell fields: bits 0–15 elevation (i16), 16–31
+original elevation (i16), 32–47 water level (i16, `i16::MIN` = none),
+48–55 water body type. Cell 0 (both halves zero) = outside the region.
+
+The terrain lattice is a **true hex grid at 3× tile scale** (a "super"):
+tile (odd-r) → super N/E offset is
+`q = x − (z − (z&1))/2; Q = ⌊(q+1)/3⌋; N = ⌊(z+1)/3⌋; E = Q + (N − (N&1))/2`,
+and the center tile of super (N, E) is `(3E + (N&1), 3N)`. A generation
+bump means terraform changed terrain — drop cached planes.
+
+### 6.3 `GET /bitme/region/:region_id/resource-dictionary`
+
+JSON. Maps the tile words' 10-bit dictionary index to resource identity;
+rotates as the region's resource mix changes — every window/delta carries
+the `dict_version` it was built against. A mismatch means re-fetch the
+dictionary (and the window, for deltas) before trusting indices.
+
+```json
+{
+  "ready": true,
+  "region": 7,
+  "dict_version": 1713931368,
+  "entries": [
+    {"index": 1, "name": "Rough Quarry Rock", "paving": false,
+     "resource_id": 815748648, "harvestable": false,
+     "max_health": 5000, "respawn_time_secs": 0.0, "despawn_time_secs": 0.0},
+    {"index": 2, "name": "Dirt Road", "paving": true, "paving_type_id": 895904764}
+  ]
+}
+```
+
+- Paving entries carry `paving_type_id` instead of `resource_id` /
+  `harvestable` / health fields (absent, not null).
+- `resource_id` repeats across indices (multiple indices → one resource);
+  aggregate by `resource_id` when counting. ~700–800 entries per region.
+- `ready: false` during deploys — keep the previous dictionary and retry on
+  the next window fetch.
+
+---
+
+## 7. `WS /bitme/session/:entity_id/resources/ws` — change stream
+
+The live feed of resources spawning/despawning: every in-window tile change
+pushed the moment the mirror sees it. Binary frames are **BMD1** deltas;
+JSON text frames are control messages. The client owns convergence — any
+recovery is "re-fetch the BMR1 window" (§6.1); movement/staleness refetches
+stay, the stream just keeps the window fresh in between.
+
+**BMD1 layout** — header (16 bytes): magic `BMD1`, u16 version (1), u32
+region, u32 dict_version, u16 entry count n. Body: n × 10 bytes of i32
+world_x, i32 world_z, u16 tile word — **absolute world coordinates**, same
+bit layout as BMR1. A 0 / water-only word means the tile emptied. Batches
+larger than 65,535 tiles arrive as consecutive frames. Apply entries only
+when region *and* dict_version match the window; a mismatch means the
+dictionary rotated — refetch the window.
+
+**Control messages** (JSON text):
+
+| Message | Meaning |
+|---|---|
+| `{"type":"subscribed","anchor":{"x":…,"z":…},"width":400,"region":…,"dict_version":…,"player_entity_id":"…"}` | Subscription active. Anchor = window center. |
+| `{"type":"resync"}` | Server rolled the window (dictionary rotation, reseed, …) — refetch. |
+| `{"type":"moved"}` | The anchor moved (player drifted far) — refetch to converge. |
+| `{"ts":…}` | Heartbeat, ~5 s cadence. No frame for ~15 s ⇒ treat the socket as dead (half-open TCP after sleep/wake never fires close) and reconnect. |
+| `{"type":"gone"}` | The session is gone — the server closes right after. |
+
+**Lifecycle guidance** (matches the web client): connect one stream per
+player only while the session is live in the overworld; reconnect with
+exponential backoff (2 s base ×2, 30 s cap); always refetch the window
+before reconnecting. The stream is fleet-capped — close it when not
+needed.
 
 ---
 

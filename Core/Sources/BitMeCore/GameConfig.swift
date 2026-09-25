@@ -35,4 +35,26 @@ struct GameConfig: Sendable {
 
     /// Alert hard (sound/vibration copy) for the first part of the window.
     let citricHotWindowMs: Double = 10_000
+
+    // Resource map / change stream (docs/api.md §6–7) — cadences follow the
+    // reference web client's guidance.
+    /// Refetch an on-screen resource window this often (deltas keep it fresh
+    /// in between; the refetch is the convergence move).
+    let mapWindowStaleMs: Double = 60_000
+    /// Player drift (tiles from the window center) that triggers a refetch.
+    let mapDriftRefetchTiles: Int = 100
+    /// 202 "seeding" backoff before retrying a window fetch.
+    let mapSeedingBackoffMs: Double = 30_000
+    /// Backoff after a failed window fetch (network error / 5xx).
+    let mapFetchFailureBackoffMs: Double = 5_000
+    /// Terrain plane TTL — terrain rarely changes (terraform bumps the
+    /// plane generation instead).
+    let mapTerrainStaleMs: Double = 600_000
+    /// Spawn/despawn feed ring capacity (newest first).
+    let mapFeedCapacity = 32
+    /// Change-stream reconnect backoff: base × 2^attempt, capped.
+    let mapStreamReconnectBaseSecs: Double = 2
+    let mapStreamReconnectMaxSecs: Double = 30
+    /// How long the pause loop sleeps between wanted-checks.
+    let mapStreamPausePollSecs: Double = 1
 }

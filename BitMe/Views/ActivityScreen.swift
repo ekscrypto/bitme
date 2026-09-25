@@ -5,7 +5,11 @@ import BitMeCore
 /// countdowns locally between machine publications (4 Hz ticks, 1 Hz polls).
 struct ActivityScreen: View {
     let session: ViewRep.Session
+    let machine: StateMachine
     let ingest: @Sendable (Sendable) async -> Void
+
+    /// UI-testing hook: present the map immediately on launch.
+    @State private var showMap = ProcessInfo.processInfo.arguments.contains("-uitest-map")
 
     /// Converts device time to relay-clock ms (snapshot anchors are relay ms).
     private var relayOffsetMs: Double {
@@ -32,11 +36,15 @@ struct ActivityScreen: View {
                         bushCard(nowMs: now)
                         staminaCard
                         foodCard
+                        nearbyCard(nowMs: now)
                     }
                     .padding()
                 }
             }
             .preferredColorScheme(.dark)
+        }
+        .fullScreenCover(isPresented: $showMap) {
+            MapScreen(machine: machine)
         }
     }
 
@@ -60,6 +68,15 @@ struct ActivityScreen: View {
                 .foregroundStyle(.secondary)
             }
             Spacer()
+            Button {
+                showMap = true
+            } label: {
+                Image(systemName: "map.fill")
+                    .font(.subheadline.bold())
+                    .padding(8)
+                    .background(Color(white: 0.18), in: Circle())
+            }
+            .accessibilityLabel("Resource map")
             ConnectionPill(connection: session.connection)
         }
     }
@@ -204,6 +221,107 @@ struct ActivityScreen: View {
         .padding()
         .background(Color(white: 0.1), in: RoundedRectangle(cornerRadius: 16))
     }
+    // MARK: - Nearby resources (live resource map)
+
+    /// Compact rendering of the live resource map: nearby counts from the
+    /// player-anchored window plus the spawn/despawn feed from the change
+    /// stream (relay §6–7 endpoints, integrated in the core).
+    @ViewBuilder
+    private func nearbyCard(nowMs: Double) -> some View {
+        let map = session.resourceMap
+        if map.stream != .off || !map.nearby.isEmpty || !map.feed.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Label("Nearby resources", systemImage: "map")
+                        .font(.subheadline.bold())
+                    Spacer()
+                    StreamPill(status: map.stream)
+                }
+
+                if map.nearby.isEmpty {
+                    Text("Loading the resource window…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(Array(map.nearby.prefix(6).enumerated()), id: \.offset) { _, entry in
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(Color(resourceID: entry.resourceID ?? 0))
+                                .frame(width: 8, height: 8)
+                            Text(entry.name ?? "resource")
+                                .font(.caption)
+                                .lineLimit(1)
+                            Spacer()
+                            Text("×\(entry.count)")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                if !map.feed.isEmpty {
+                    Rectangle()
+                        .fill(Color(white: 0.25))
+                        .frame(height: 1)
+                    ForEach(Array(map.feed.prefix(3).enumerated()), id: \.offset) { _, event in
+                        HStack(spacing: 6) {
+                            Image(systemName: event.spawned ? "plus.circle.fill" : "minus.circle.fill")
+                                .font(.caption2)
+                                .foregroundStyle(event.spawned ? .green : .red)
+                            Text(event.name ?? "resource")
+                                .font(.caption2)
+                                .lineLimit(1)
+                            Spacer()
+                            Text("\(Format.ago(nowMs - event.atMs)) · (\(event.tileX), \(event.tileZ))")
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+            .background(Color(white: 0.1), in: RoundedRectangle(cornerRadius: 16))
+        }
+    }
+}
+
+// MARK: - Stream pill
+
+/// Live change-stream state, mirroring the CLI/ViewRep status.
+private struct StreamPill: View {
+    let status: ViewRep.Session.ResourceMap.StreamStatus
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(color)
+                .frame(width: 6, height: 6)
+            Text(label)
+                .font(.caption2).bold()
+        }
+        .padding(.horizontal, 8).padding(.vertical, 4)
+        .background(color.opacity(0.25), in: Capsule())
+        .foregroundStyle(color)
+    }
+
+    private var label: String {
+        switch status {
+        case .off: "MAP OFF"
+        case .connecting: "MAP…"
+        case .live: "LIVE MAP"
+        case .reconnecting: "RECONNECTING"
+        }
+    }
+
+    private var color: Color {
+        switch status {
+        case .off: .gray
+        case .connecting: .orange
+        case .live: .cyan
+        case .reconnecting: .orange
+        }
+    }
 }
 
 // MARK: - Banners & pills
@@ -306,5 +424,22 @@ enum Format {
     static func clockTime(_ relayMs: Double) -> String {
         let date = Date(timeIntervalSince1970: relayMs / 1_000)
         return date.formatted(date: .omitted, time: .shortened)
+    }
+
+    /// Elapsed ms → "now" / "45s ago" / "12m ago".
+    static func ago(_ ms: Double) -> String {
+        let seconds = max(0, Int(ms / 1_000))
+        if seconds < 5 { return "now" }
+        if seconds < 60 { return "\(seconds)s ago" }
+        return "\(seconds / 60)m ago"
+    }
+}
+
+extension Color {
+    /// Stable distinct hue per resource id — golden-angle spacing of the id,
+    /// matching the reference web map's resource palette (dark variant).
+    init(resourceID: Int) {
+        let hue = abs(Double(resourceID) * 137.508).truncatingRemainder(dividingBy: 360)
+        self.init(hue: hue / 360, saturation: 0.72, brightness: 0.62)
     }
 }
