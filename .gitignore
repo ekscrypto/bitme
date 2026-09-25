@@ -6,3 +6,6 @@ xcuserdata/
 *.xcuserstate
 .build/
 build/
+
+# ZCode agent workspace
+.zcode/
