@@ -1,0 +1,11 @@
+import { execSync } from 'node:child_process';
+import WebSocket from 'ws';
+const tok = execSync(`defaults read com.ClockworkLabs.BitCraft 'EarlyAccess:http://127.0.0.1:8443:ekscrypto_gmail.com:AuthToken'`).toString().trim();
+const url = 'ws://127.0.0.1:9443/v1/database/bitcraft-live-global/subscribe?connection_id=7E57CAFE0000000000000000000000FF&compression=Brotli&confirmed=false';
+const ws = new WebSocket(url, ['v2.bsatn.spacetimedb'], { headers: { authorization: `Bearer ${tok}` } });
+const t = setTimeout(() => { console.log('TIMEOUT'); process.exit(1); }, 8000);
+ws.on('open', () => { console.log('OPEN protocol=' + ws.protocol); });
+ws.on('message', (d, b) => { console.log('FRAME', d.length, 'bytes'); ws.close(1000, 'test-done'); });
+ws.on('close', (c, r) => { console.log('CLOSE', c, r.toString()); clearTimeout(t); process.exit(0); });
+ws.on('error', (e) => { console.log('ERROR', e.message); clearTimeout(t); process.exit(1); });
+ws.on('unexpected-response', (_q, res) => { console.log('REJECTED HTTP', res.statusCode); res.resume(); clearTimeout(t); process.exit(1); });

@@ -9,3 +9,7 @@ build/
 
 # ZCode agent workspace
 .zcode/
+
+# net-recon tooling
+tools/tap/node_modules/
+tools/tap/captures/

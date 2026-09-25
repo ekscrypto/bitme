@@ -1,0 +1,1036 @@
+2026-09-25 16:16:26
+connmon started (interval 0.25s); baseline connections follow
+BASELINE|10035|(ESTABLISHED)|rapportd                          10035 ekscrypto   24u  IPv6 0xaaa206dc2639f8de      0t0  TCP [fe80:21::80f4:96ff:fe6a:2a27]:59074->[fe80:21::80f4:96ff:fe6a:2ad8]:57601 (ESTABLISHED)
+BASELINE|10035|(LISTEN)|rapportd                          10035 ekscrypto   14u  IPv4 0xc8fb7962e73508c1      0t0  TCP *:59074 (LISTEN)
+BASELINE|10035|(LISTEN)|rapportd                          10035 ekscrypto   15u  IPv6 0xe19840d8e1acbab6      0t0  TCP *:59074 (LISTEN)
+BASELINE|10035|(LISTEN)|rapportd                          10035 ekscrypto   18u  IPv6 0x3b995e2a06344457      0t0  TCP *:62202 (LISTEN)
+BASELINE|10035|(LISTEN)|rapportd                          10035 ekscrypto   21u  IPv6  0xd4d4ff8111386d9      0t0  TCP *:62203 (LISTEN)
+BASELINE|10035|*:3722|rapportd                          10035 ekscrypto   25u  IPv6 0x7af06b306661ff3b      0t0  UDP *:3722
+BASELINE|10088|(ESTABLISHED)|identityservicesd                 10088 ekscrypto   61u  IPv6 0x6e9964ae36cc1688      0t0  TCP [fe80:18::2445:b09d:89dd:22c1]:1024->[fe80:18::f923:a2bb:2972:e8d5]:1024 (ESTABLISHED)
+BASELINE|10088|(ESTABLISHED)|identityservicesd                 10088 ekscrypto   65u  IPv6 0x4208d491406fd3f7      0t0  TCP [fe80:17::a7c8:b8c:c9d0:25a]:1024->[fe80:17::f07e:bfd1:7f05:7332]:1024 (ESTABLISHED)
+BASELINE|10088|(ESTABLISHED)|identityservicesd                 10088 ekscrypto   69u  IPv6 0x786fa5e45f1cd57c      0t0  TCP [fe80:18::2445:b09d:89dd:22c1]:1025->[fe80:18::f923:a2bb:2972:e8d5]:1031 (ESTABLISHED)
+BASELINE|10088|(ESTABLISHED)|identityservicesd                 10088 ekscrypto   70u  IPv6 0xad78dc409b63c006      0t0  TCP [fe80:17::a7c8:b8c:c9d0:25a]:1025->[fe80:17::f07e:bfd1:7f05:7332]:1028 (ESTABLISHED)
+BASELINE|10088|(ESTABLISHED)|identityservicesd                 10088 ekscrypto   71u  IPv6 0x786fa5e45f1cd57c      0t0  TCP [fe80:18::2445:b09d:89dd:22c1]:1025->[fe80:18::f923:a2bb:2972:e8d5]:1031 (ESTABLISHED)
+BASELINE|10088|(ESTABLISHED)|identityservicesd                 10088 ekscrypto   73u  IPv6 0xad78dc409b63c006      0t0  TCP [fe80:17::a7c8:b8c:c9d0:25a]:1025->[fe80:17::f07e:bfd1:7f05:7332]:1028 (ESTABLISHED)
+BASELINE|10088|*:*|identityservicesd                 10088 ekscrypto    7u  IPv4 0xf98234fd65565136      0t0  UDP *:*
+BASELINE|10088|*:*|identityservicesd                 10088 ekscrypto   16u  IPv4 0x2040321c47d5c603      0t0  UDP *:*
+BASELINE|10088|*:*|identityservicesd                 10088 ekscrypto   27u  IPv4 0xaa913b2a92fb311e      0t0  UDP *:*
+BASELINE|10088|*:*|identityservicesd                 10088 ekscrypto   57u  IPv4 0xa659b7b3b28f652b      0t0  UDP *:*
+BASELINE|10088|*:*|identityservicesd                 10088 ekscrypto   60u  IPv4 0x46c360949b8488d0      0t0  UDP *:*
+BASELINE|10088|*:*|identityservicesd                 10088 ekscrypto   64u  IPv4 0xf9d5638ad4145028      0t0  UDP *:*
+BASELINE|10088|*:*|identityservicesd                 10088 ekscrypto   68u  IPv4 0xe97dc76763cb69bb      0t0  UDP *:*
+BASELINE|10097|*:*|sharingd                          10097 ekscrypto    4u  IPv4 0x290edf3742846ad2      0t0  UDP *:*
+BASELINE|10097|*:58175|sharingd                          10097 ekscrypto   12u  IPv6 0x3445cb0072e8ba5f      0t0  UDP *:58175
+BASELINE|10403|(LISTEN)|ControlCenter                     10403 ekscrypto    9u  IPv4 0x25948660b3d7ac7e      0t0  TCP *:7000 (LISTEN)
+BASELINE|10403|(LISTEN)|ControlCenter                     10403 ekscrypto   10u  IPv6 0x1ec9e8dd07d28f45      0t0  TCP *:7000 (LISTEN)
+BASELINE|10403|(LISTEN)|ControlCenter                     10403 ekscrypto   11u  IPv4 0x54228c126cbe9407      0t0  TCP *:5000 (LISTEN)
+BASELINE|10403|(LISTEN)|ControlCenter                     10403 ekscrypto   12u  IPv6 0x63cc48f12e7b7a34      0t0  TCP *:5000 (LISTEN)
+BASELINE|10462|(LISTEN)|GitKraken                         10462 ekscrypto   60u  IPv4 0xa93f6750ecd2fad2      0t0  TCP 127.0.0.1:49263 (LISTEN)
+BASELINE|11076|*:59584|fitnessintelligenced              11076 ekscrypto    4u  IPv6 0xce92ec397f994d61      0t0  UDP *:59584
+BASELINE|12123|(LISTEN)|GitKraken\x20Helper\x20(Renderer) 12123 ekscrypto   25u  IPv4 0x4048df6d75b2fa8a      0t0  TCP 127.0.0.1:53231 (LISTEN)
+BASELINE|12153|(ESTABLISHED)|Discord\x20Helper                 12153 ekscrypto   26u  IPv4  0x8109ae947bf52d2      0t0  TCP 10.2.0.111:59078->162.159.134.234:443 (ESTABLISHED)
+BASELINE|12153|(ESTABLISHED)|Discord\x20Helper                 12153 ekscrypto   29u  IPv4 0x6f29e7d6673c4f96      0t0  TCP 10.2.0.111:59082->35.186.224.39:443 (ESTABLISHED)
+BASELINE|12178|(LISTEN)|Discord\x20Helper\x20(Renderer)   12178 ekscrypto   37u  IPv4  0x88d785db507e810      0t0  TCP 127.0.0.1:6463 (LISTEN)
+BASELINE|14437|(LISTEN)|Ollama                            14437 ekscrypto    5u  IPv4 0x498c4db9b81dce6f      0t0  TCP 127.0.0.1:49484 (LISTEN)
+BASELINE|14457|(LISTEN)|ollama                            14457 ekscrypto    3u  IPv4 0xafe282d99c04ce01      0t0  TCP 127.0.0.1:11434 (LISTEN)
+BASELINE|14852|(ESTABLISHED)|steam_osx                         14852 ekscrypto   87u  IPv4 0x58c562202c468806      0t0  TCP 127.0.0.1:49788->127.0.0.1:49803 (ESTABLISHED)
+BASELINE|14852|(ESTABLISHED)|steam_osx                         14852 ekscrypto  147u  IPv4 0x8c0ab3fede8a20c2      0t0  TCP 127.0.0.1:49787->127.0.0.1:49804 (ESTABLISHED)
+BASELINE|14852|(ESTABLISHED)|steam_osx                         14852 ekscrypto  166u  IPv4 0xa72cfaa8067a1e84      0t0  TCP 127.0.0.1:57343->127.0.0.1:49791 (ESTABLISHED)
+BASELINE|14852|(ESTABLISHED)|steam_osx                         14852 ekscrypto  219u  IPv4 0x3182f904840875de      0t0  TCP 10.2.0.111:59096->162.254.193.103:27018 (ESTABLISHED)
+BASELINE|14852|(LISTEN)|steam_osx                         14852 ekscrypto   18u  IPv4 0x12352e2290f113d8      0t0  TCP 127.0.0.1:57343 (LISTEN)
+BASELINE|14852|(LISTEN)|steam_osx                         14852 ekscrypto   27u  IPv4 0xca9c2e109cfef0d5      0t0  TCP 127.0.0.1:49787 (LISTEN)
+BASELINE|14852|(LISTEN)|steam_osx                         14852 ekscrypto  141u  IPv4 0x74d00ded03db29ed      0t0  TCP 127.0.0.1:49788 (LISTEN)
+BASELINE|14852|(LISTEN)|steam_osx                         14852 ekscrypto  196u  IPv4 0xc3182fb33a50d35b      0t0  TCP *:27036 (LISTEN)
+BASELINE|14852|*:27036|steam_osx                         14852 ekscrypto  194u  IPv4 0x3a0112968d8502b6      0t0  UDP *:27036
+BASELINE|14852|*:65534|steam_osx                         14852 ekscrypto  191u  IPv4 0xc8abffc3fa286a93      0t0  UDP *:65534
+BASELINE|14888|(ESTABLISHED)|Steam\x20Helper                   14888 ekscrypto   93u  IPv4 0x141d1254158bdc8a      0t0  TCP 127.0.0.1:49791->127.0.0.1:57343 (ESTABLISHED)
+BASELINE|14905|(ESTABLISHED)|Steam\x20Helper                   14905 ekscrypto   24u  IPv4 0xe7d9096fbbc7bdc2      0t0  TCP 127.0.0.1:49803->127.0.0.1:49788 (ESTABLISHED)
+BASELINE|14905|(ESTABLISHED)|Steam\x20Helper                   14905 ekscrypto   25u  IPv4 0xc1299179a895dd2d      0t0  TCP 127.0.0.1:49804->127.0.0.1:49787 (ESTABLISHED)
+BASELINE|16373|*:53995|fitnessintelligenced              16373 ekscrypto    4u  IPv6 0x700780e794ee6ce4      0t0  UDP *:53995
+BASELINE|18292|(ESTABLISHED)|IMTransferAgent                   18292 ekscrypto    6u  IPv4  0x21274dba0f30ff3      0t0  TCP 10.2.0.111:60689->17.250.102.61:443 (ESTABLISHED)
+BASELINE|18292|(ESTABLISHED)|IMTransferAgent                   18292 ekscrypto    7u  IPv4 0xb34ea82e10d2d764      0t0  TCP 10.2.0.111:60690->17.248.199.52:443 (ESTABLISHED)
+BASELINE|18292|(ESTABLISHED)|IMTransferAgent                   18292 ekscrypto   12u  IPv4 0x256f586feca1f3ea      0t0  TCP 10.2.0.111:60691->17.248.199.28:443 (ESTABLISHED)
+BASELINE|31857|(ESTABLISHED)|Codex\x20(Service)                31857 ekscrypto   28u  IPv4 0x7e3174824b3d11be      0t0  TCP 10.2.0.111:59211->64.233.178.188:5228 (ESTABLISHED)
+BASELINE|31857|(ESTABLISHED)|Codex\x20(Service)                31857 ekscrypto   30u  IPv4 0x8e10b645bcc804c8      0t0  TCP 10.2.0.111:59213->64.233.178.188:5228 (ESTABLISHED)
+BASELINE|31857|(ESTABLISHED)|Codex\x20(Service)                31857 ekscrypto   31u  IPv4 0x5e796eaa28ce0f59      0t0  TCP 10.2.0.111:59212->64.233.178.188:5228 (ESTABLISHED)
+BASELINE|31857|(ESTABLISHED)|Codex\x20(Service)                31857 ekscrypto   32u  IPv4 0xbb8af77240530eb7      0t0  TCP 10.2.0.111:60598->172.64.155.209:443 (ESTABLISHED)
+BASELINE|31857|(ESTABLISHED)|Codex\x20(Service)                31857 ekscrypto   38u  IPv4 0x224df9a22d389210      0t0  TCP 10.2.0.111:59239->172.64.150.28:443 (ESTABLISHED)
+BASELINE|31857|(ESTABLISHED)|Codex\x20(Service)                31857 ekscrypto   39u  IPv4 0xdc98f899a51b268e      0t0  TCP 10.2.0.111:59210->64.233.178.188:5228 (ESTABLISHED)
+BASELINE|31857|(ESTABLISHED)|Codex\x20(Service)                31857 ekscrypto   44u  IPv4 0x9db8207f632eda13      0t0  TCP 10.2.0.111:59099->172.64.148.235:443 (ESTABLISHED)
+BASELINE|31857|(ESTABLISHED)|Codex\x20(Service)                31857 ekscrypto   45u  IPv4 0xa90baee279bf9e6e      0t0  TCP 10.2.0.111:59240->172.64.155.209:443 (ESTABLISHED)
+BASELINE|31857|(ESTABLISHED)|Codex\x20(Service)                31857 ekscrypto   46u  IPv4 0xedf4c95eb9f7b815      0t0  TCP 10.2.0.111:60599->172.64.148.235:443 (ESTABLISHED)
+BASELINE|31857|(ESTABLISHED)|Codex\x20(Service)                31857 ekscrypto   48u  IPv4 0x7ca46731e2ce886b      0t0  TCP 10.2.0.111:60600->104.18.39.21:443 (ESTABLISHED)
+BASELINE|31857|*:5353|Codex\x20(Service)                31857 ekscrypto   59u  IPv4 0x30ac6b6b6300c05f      0t0  UDP *:5353
+BASELINE|31857|*:5353|Codex\x20(Service)                31857 ekscrypto   60u  IPv6 0x3ed337d89fcc1ce7      0t0  UDP *:5353
+BASELINE|31857|*:5353|Codex\x20(Service)                31857 ekscrypto   61u  IPv6 0x5dc9f109b4aa9aff      0t0  UDP *:5353
+BASELINE|31857|*:5353|Codex\x20(Service)                31857 ekscrypto   62u  IPv6 0x612baff0349d620c      0t0  UDP *:5353
+BASELINE|31857|*:5353|Codex\x20(Service)                31857 ekscrypto   63u  IPv6 0xd2448e334c5775ce      0t0  UDP *:5353
+BASELINE|31857|*:5353|Codex\x20(Service)                31857 ekscrypto   64u  IPv6 0xe32db84b41ae8e5a      0t0  UDP *:5353
+BASELINE|31857|*:5353|Codex\x20(Service)                31857 ekscrypto   65u  IPv6 0x51becf26d7b69e21      0t0  UDP *:5353
+BASELINE|31857|*:5353|Codex\x20(Service)                31857 ekscrypto   66u  IPv6  0xd84787645c20b28      0t0  UDP *:5353
+BASELINE|31857|*:5353|Codex\x20(Service)                31857 ekscrypto   67u  IPv6 0x20735d4848fa2f66      0t0  UDP *:5353
+BASELINE|31857|*:5353|Codex\x20(Service)                31857 ekscrypto   68u  IPv6 0xa52fc203ff64de4d      0t0  UDP *:5353
+BASELINE|31857|*:5353|Codex\x20(Service)                31857 ekscrypto   69u  IPv6 0x1ef76d177d38c1f3      0t0  UDP *:5353
+BASELINE|31857|*:5353|Codex\x20(Service)                31857 ekscrypto   70u  IPv6 0xd38f976b6b2b1015      0t0  UDP *:5353
+BASELINE|31857|*:5353|Codex\x20(Service)                31857 ekscrypto   71u  IPv4 0x1fb254f12191bd8f      0t0  UDP *:5353
+BASELINE|31857|*:5353|Codex\x20(Service)                31857 ekscrypto   72u  IPv6    0x5a84ca28c06b9      0t0  UDP *:5353
+BASELINE|31857|*:5353|Codex\x20(Service)                31857 ekscrypto   73u  IPv6 0x1a9254416ff5725d      0t0  UDP *:5353
+BASELINE|31857|*:5353|Codex\x20(Service)                31857 ekscrypto   74u  IPv4 0xbf669ef38a4e3b1b      0t0  UDP *:5353
+BASELINE|31857|*:5353|Codex\x20(Service)                31857 ekscrypto   75u  IPv6 0x1d4de2347de1f811      0t0  UDP *:5353
+BASELINE|31857|*:5353|Codex\x20(Service)                31857 ekscrypto   76u  IPv6 0xcb0152682fc330cb      0t0  UDP *:5353
+BASELINE|31857|*:5353|Codex\x20(Service)                31857 ekscrypto   77u  IPv6 0x5035e1b1b610f0fc      0t0  UDP *:5353
+BASELINE|31857|*:5353|Codex\x20(Service)                31857 ekscrypto   78u  IPv6 0x6d04611d3f1955d2      0t0  UDP *:5353
+BASELINE|32286|(ESTABLISHED)|codex                             32286 ekscrypto   42u  IPv4 0xbe3e2e9202ab4e7b      0t0  TCP 10.2.0.111:59384->172.64.155.209:443 (ESTABLISHED)
+BASELINE|32286|(ESTABLISHED)|codex                             32286 ekscrypto   44u  IPv4 0x942ee5e7d775634a      0t0  TCP 10.2.0.111:59388->172.64.155.209:443 (ESTABLISHED)
+BASELINE|32286|(ESTABLISHED)|codex                             32286 ekscrypto   59u  IPv4 0xec97a56a97e2d922      0t0  TCP 10.2.0.111:59394->172.64.155.209:443 (ESTABLISHED)
+BASELINE|32286|(ESTABLISHED)|codex                             32286 ekscrypto   67u  IPv4 0xd46f4bcac9e06ad9      0t0  TCP 10.2.0.111:59398->172.64.155.209:443 (ESTABLISHED)
+BASELINE|32286|(ESTABLISHED)|codex                             32286 ekscrypto  134u  IPv4 0xd0d448496ad33585      0t0  TCP 10.2.0.111:59618->172.64.155.209:443 (ESTABLISHED)
+BASELINE|32286|(ESTABLISHED)|codex                             32286 ekscrypto  199u  IPv4 0x6ac0401413ab4618      0t0  TCP 10.2.0.111:59339->172.64.155.209:443 (ESTABLISHED)
+BASELINE|32286|(ESTABLISHED)|codex                             32286 ekscrypto  224u  IPv4   0x17e158fa127e9b      0t0  TCP 10.2.0.111:59348->172.64.155.209:443 (ESTABLISHED)
+BASELINE|32286|(ESTABLISHED)|codex                             32286 ekscrypto  245u  IPv4 0x6a5a4ca71b2dc41e      0t0  TCP 10.2.0.111:59333->172.64.155.209:443 (ESTABLISHED)
+BASELINE|32286|(ESTABLISHED)|codex                             32286 ekscrypto  252u  IPv4 0xcc0d85a2281ceecc      0t0  TCP 10.2.0.111:59353->172.64.155.209:443 (ESTABLISHED)
+BASELINE|32286|(ESTABLISHED)|codex                             32286 ekscrypto  254u  IPv4 0xebf575a34c9f994d      0t0  TCP 10.2.0.111:59365->172.64.155.209:443 (ESTABLISHED)
+BASELINE|46118|(CLOSE_WAIT)|HomeWidgetExtension               46118 ekscrypto    7u  IPv4 0xc0893dcbff422fe8      0t0  TCP 10.2.0.111:63568->3.233.158.111:443 (CLOSE_WAIT)
+BASELINE|46118|10.2.0.111:50273->216.232.132.95:123|HomeWidgetExtension               46118 ekscrypto   16u  IPv4 0xdc053eaad76973b3      0t0  UDP 10.2.0.111:50273->216.232.132.95:123
+BASELINE|46118|10.2.0.111:59938->209.227.133.148:123|HomeWidgetExtension               46118 ekscrypto   13u  IPv4 0x857a4dd879178381      0t0  UDP 10.2.0.111:59938->209.227.133.148:123
+BASELINE|54479|(ESTABLISHED)|spacetimedb-standalone            54479 ekscrypto   15u  IPv4  0x6ffd445174b54e1      0t0  TCP 10.2.0.111:61323->125.253.87.87:443 (ESTABLISHED)
+BASELINE|54479|(LISTEN)|spacetimedb-standalone            54479 ekscrypto   16u  IPv4 0xe17d746b6b678b32      0t0  TCP 127.0.0.1:3150 (LISTEN)
+BASELINE|54479|(LISTEN)|spacetimedb-standalone            54479 ekscrypto   21u  IPv4  0x4f3f3b5fa7c3234      0t0  TCP 127.0.0.1:3151 (LISTEN)
+BASELINE|54610|(CLOSED)|lldb-rpc-server                   54610 ekscrypto    5u  IPv6 0x129dbbdde0b5a6c5      0t0  TCP [fd81:4f0c:f446::2]:64388->[fd81:4f0c:f446::1]:53429 (CLOSED)
+BASELINE|54610|(CLOSED)|lldb-rpc-server                   54610 ekscrypto    6u  IPv6 0x29343cf918cb93d3      0t0  TCP [fd85:dde5:a22b::2]:57176->[fd85:dde5:a22b::1]:63666 (CLOSED)
+BASELINE|54610|(CLOSED)|lldb-rpc-server                   54610 ekscrypto   11u  IPv6 0x75c635c1c2c65abb      0t0  TCP [fd7a:1d31:f1b9::2]:58917->[fd7a:1d31:f1b9::1]:57667 (CLOSED)
+BASELINE|54610|(CLOSED)|lldb-rpc-server                   54610 ekscrypto   12u  IPv6 0x986771da7e1d49d7      0t0  TCP [fd7a:1d31:f1b9::2]:61417->[fd7a:1d31:f1b9::1]:57667 (CLOSED)
+BASELINE|54610|(CLOSED)|lldb-rpc-server                   54610 ekscrypto   13u  IPv6 0x6eaf0012ee934e8a      0t0  TCP [fd7a:1d31:f1b9::2]:62469->[fd7a:1d31:f1b9::1]:57667 (CLOSED)
+BASELINE|54610|(CLOSED)|lldb-rpc-server                   54610 ekscrypto   14u  IPv6 0x2effc52bf47088b0      0t0  TCP [fd7a:1d31:f1b9::2]:62948->[fd7a:1d31:f1b9::1]:57667 (CLOSED)
+BASELINE|54610|(CLOSED)|lldb-rpc-server                   54610 ekscrypto   15u  IPv6 0x37f1a285a1dff32a      0t0  TCP [fd7a:1d31:f1b9::2]:63285->[fd7a:1d31:f1b9::1]:57667 (CLOSED)
+BASELINE|54610|(CLOSED)|lldb-rpc-server                   54610 ekscrypto   23u  IPv6 0x193d18a196e31be7      0t0  TCP [fd7a:1d31:f1b9::2]:59052->[fd7a:1d31:f1b9::1]:57667 (CLOSED)
+BASELINE|55608|(LISTEN)|adb                               55608 ekscrypto   10u  IPv4 0x947efa447bfcf1ea      0t0  TCP 127.0.0.1:5037 (LISTEN)
+BASELINE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x8e9fdb4709ab24c2      0t0  UDP *:5353
+BASELINE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xc604e8b300940d6c      0t0  UDP *:5353
+BASELINE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x5e8e0a48f483ec20      0t0  UDP *:5353
+BASELINE|55608|127.0.0.1:49361|adb                               55608 ekscrypto    6u  IPv4 0xe46a094b990d8e48      0t0  UDP 127.0.0.1:49361
+BASELINE|55608|127.0.0.1:55368->127.0.0.1:49361|adb                               55608 ekscrypto    7u  IPv4 0x120e598c67e85763      0t0  UDP 127.0.0.1:55368->127.0.0.1:49361
+BASELINE|59117|(LISTEN)|Python                            59117 ekscrypto    4u  IPv6 0xc8c23d5e389bf128      0t0  TCP *:8123 (LISTEN)
+BASELINE|59691|(ESTABLISHED)|Slack\x20Helper                   59691 ekscrypto   25u  IPv4 0x48484acb7ce211b1      0t0  TCP 10.2.0.111:60376->34.231.24.224:443 (ESTABLISHED)
+BASELINE|59691|(ESTABLISHED)|Slack\x20Helper                   59691 ekscrypto   26u  IPv4 0xb6c4b95495eea989      0t0  TCP 10.2.0.111:59127->3.14.34.68:443 (ESTABLISHED)
+BASELINE|59691|(ESTABLISHED)|Slack\x20Helper                   59691 ekscrypto   28u  IPv4  0xf2c4cba2279c289      0t0  TCP 10.2.0.111:60551->18.213.32.120:443 (ESTABLISHED)
+BASELINE|59691|10.2.0.111:62220->18.221.229.81:443|Slack\x20Helper                   59691 ekscrypto   24u  IPv4 0x104d2125f867c794      0t0  UDP 10.2.0.111:62220->18.221.229.81:443
+BASELINE|64127|*:*|configd_sim                       64127 ekscrypto   12u  IPv4 0x8bb1aace0a49ea70      0t0  UDP *:*
+BASELINE|64164|(ESTABLISHED)|apsd                              64164 ekscrypto   13u  IPv4 0x8b2b9b032327d9d5      0t0  TCP 10.2.0.111:60594->17.188.178.220:5223 (ESTABLISHED)
+BASELINE|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0xed801055419c1754      0t0  TCP 10.2.0.111:60693->8.130.222.161:443 (ESTABLISHED)
+BASELINE|67969|(ESTABLISHED)|ZCode\x20Helper                   67969 ekscrypto   23u  IPv4 0xe4bdda7aaf5a28a4      0t0  TCP 10.2.0.111:60584->8.48.85.242:443 (ESTABLISHED)
+BASELINE|68391|(LISTEN)|ZCode\x20Helper                   68391 ekscrypto   37u  IPv4 0x3ee8dbff7b9aff97      0t0  TCP 127.0.0.1:49320 (LISTEN)
+BASELINE|68431|(ESTABLISHED)|ZCode\x20Helper                   68431 ekscrypto   23u  IPv4 0x7a8f4f35d3c2ab23      0t0  TCP 10.2.0.111:60676->123.57.116.48:443 (ESTABLISHED)
+BASELINE|68431|(ESTABLISHED)|ZCode\x20Helper                   68431 ekscrypto   29u  IPv4 0xbbc075b90637aa17      0t0  TCP 10.2.0.111:60590->47.77.37.148:443 (ESTABLISHED)
+BASELINE|73347|(ESTABLISHED)|Mail                              73347 ekscrypto   34u  IPv4 0xd850eab231f05884      0t0  TCP 10.2.0.111:60181->74.125.197.108:993 (ESTABLISHED)
+BASELINE|73347|(ESTABLISHED)|Mail                              73347 ekscrypto   35u  IPv4 0xd850eab231f05884      0t0  TCP 10.2.0.111:60181->74.125.197.108:993 (ESTABLISHED)
+BASELINE|76615|(LISTEN)|siriactionsd                      76615 ekscrypto    7u  IPv6 0xcc592acea21b828e      0t0  TCP *:54791 (LISTEN)
+BASELINE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   21u  IPv6 0x90f250e21a7bf460      0t0  TCP [fd5d:8f9c:a309::2]:59112->[fd5d:8f9c:a309::1]:58907 (ESTABLISHED)
+BASELINE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   22u  IPv6 0xae1062d7defcc4f0      0t0  TCP [fd5d:8f9c:a309::2]:59110->[fd5d:8f9c:a309::1]:58924 (ESTABLISHED)
+BASELINE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   24u  IPv6 0x81de5a1df8e77c50      0t0  TCP [fd5d:8f9c:a309::2]:59116->[fd5d:8f9c:a309::1]:58907 (ESTABLISHED)
+BASELINE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   27u  IPv6 0xe10a1ac1142ac345      0t0  TCP [fd22:ddfe:18f2::2]:59172->[fd22:ddfe:18f2::1]:57569 (ESTABLISHED)
+BASELINE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   28u  IPv6 0x5b9a76fc40cb0265      0t0  TCP [fd5d:8f9c:a309::2]:59122->[fd5d:8f9c:a309::1]:58924 (ESTABLISHED)
+BASELINE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   31u  IPv6 0xb1d69dcf0b9ffa9f      0t0  TCP [fd22:ddfe:18f2::2]:59167->[fd22:ddfe:18f2::1]:57557 (ESTABLISHED)
+BASELINE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   32u  IPv6 0x4ca69b6ce67c4528      0t0  TCP [fd5d:8f9c:a309::2]:60667->[fd5d:8f9c:a309::1]:58887 (ESTABLISHED)
+BASELINE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   33u  IPv6 0x2d93775b744aa2ed      0t0  TCP [fd22:ddfe:18f2::2]:59175->[fd22:ddfe:18f2::1]:57557 (ESTABLISHED)
+BASELINE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   34u  IPv6 0xe690847084c088a3      0t0  TCP [fd22:ddfe:18f2::2]:59181->[fd22:ddfe:18f2::1]:57569 (ESTABLISHED)
+BASELINE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   35u  IPv6 0x179d7f6cc183d7ca      0t0  TCP [fd5d:8f9c:a309::2]:60668->[fd5d:8f9c:a309::1]:58887 (ESTABLISHED)
+BASELINE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   41u  IPv6 0x1a8b32f6a58acb82      0t0  TCP [fd22:ddfe:18f2::2]:60665->[fd22:ddfe:18f2::1]:57507 (ESTABLISHED)
+BASELINE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   42u  IPv6 0xc7d04a7cab9e2682      0t0  TCP [fd22:ddfe:18f2::2]:60666->[fd22:ddfe:18f2::1]:57507 (ESTABLISHED)
+BASELINE|77634|(ESTABLISHED)|remotepairingd                    77634 ekscrypto   15u  IPv6 0xb8446144c2737e8f      0t0  TCP [fe80:21::80f4:96ff:fe6a:2a27]:59154->[fe80:21::80f4:96ff:fe6a:2ad8]:57411 (ESTABLISHED)
+BASELINE|77634|*:*|remotepairingd                    77634 ekscrypto   14u  IPv4 0x7302a494ca2db08f      0t0  UDP *:*
+BASELINE|77634|*:*|remotepairingd                    77634 ekscrypto   25u  IPv4 0xea928459b617ef00      0t0  UDP *:*
+BASELINE|77634|*:3722|remotepairingd                    77634 ekscrypto   19u  IPv4  0xfd637c9b0db9c2e      0t0  UDP *:3722
+BASELINE|77634|*:3722|remotepairingd                    77634 ekscrypto   29u  IPv6 0xc946326cc352eca5      0t0  UDP *:3722
+BASELINE|79210|*:65372|replicatord                       79210 ekscrypto    9u  IPv6 0x95f5a718a2830ade      0t0  UDP *:65372
+BASELINE|83614|(ESTABLISHED)|Brave\x20Browser\x20Helper        83614 ekscrypto   31u  IPv4 0xf4df3eb796643484      0t0  TCP 10.2.0.111:60637->47.246.136.160:443 (ESTABLISHED)
+BASELINE|83614|*:5353|Brave\x20Browser\x20Helper        83614 ekscrypto  131u  IPv4 0xcd36c78be62236a9      0t0  UDP *:5353
+BASELINE|83614|*:5353|Brave\x20Browser\x20Helper        83614 ekscrypto  132u  IPv6    0x5b91867ff8bac      0t0  UDP *:5353
+BASELINE|83614|*:5353|Brave\x20Browser\x20Helper        83614 ekscrypto  133u  IPv6 0xc08a8d91724cc976      0t0  UDP *:5353
+BASELINE|83614|*:5353|Brave\x20Browser\x20Helper        83614 ekscrypto  134u  IPv6 0xdfaeb7948ea12423      0t0  UDP *:5353
+BASELINE|83614|*:5353|Brave\x20Browser\x20Helper        83614 ekscrypto  135u  IPv6 0x9811348500d882a2      0t0  UDP *:5353
+BASELINE|83614|*:5353|Brave\x20Browser\x20Helper        83614 ekscrypto  136u  IPv6 0x57cc716b38964259      0t0  UDP *:5353
+BASELINE|83614|*:5353|Brave\x20Browser\x20Helper        83614 ekscrypto  137u  IPv6 0xae24453adbb2eed0      0t0  UDP *:5353
+BASELINE|83614|*:5353|Brave\x20Browser\x20Helper        83614 ekscrypto  138u  IPv6 0xfd12dbf22a98db30      0t0  UDP *:5353
+BASELINE|83614|*:5353|Brave\x20Browser\x20Helper        83614 ekscrypto  139u  IPv6 0xda941892779e1f34      0t0  UDP *:5353
+BASELINE|83614|*:5353|Brave\x20Browser\x20Helper        83614 ekscrypto  140u  IPv6 0x6b9d4a22dd0a0834      0t0  UDP *:5353
+BASELINE|83614|*:5353|Brave\x20Browser\x20Helper        83614 ekscrypto  141u  IPv6 0xa7dacee6eb1dc155      0t0  UDP *:5353
+BASELINE|83614|*:5353|Brave\x20Browser\x20Helper        83614 ekscrypto  142u  IPv6 0x9bd43a97ccb1c7de      0t0  UDP *:5353
+BASELINE|83614|*:5353|Brave\x20Browser\x20Helper        83614 ekscrypto  145u  IPv6 0x1feb892fe30c1e30      0t0  UDP *:5353
+BASELINE|83614|*:5353|Brave\x20Browser\x20Helper        83614 ekscrypto  146u  IPv4 0xef050ae6efc9adaa      0t0  UDP *:5353
+BASELINE|83614|*:5353|Brave\x20Browser\x20Helper        83614 ekscrypto  147u  IPv6 0x5c4e4251af57a331      0t0  UDP *:5353
+BASELINE|83614|*:5353|Brave\x20Browser\x20Helper        83614 ekscrypto  148u  IPv6  0x357823921239dac      0t0  UDP *:5353
+BASELINE|87053|(ESTABLISHED)|Xcode                             87053 ekscrypto   51u  IPv6 0x180ea2a64471d1a7      0t0  TCP [fd22:ddfe:18f2::2]:59183->[fd22:ddfe:18f2::1]:57554 (ESTABLISHED)
+BASELINE|87053|(ESTABLISHED)|Xcode                             87053 ekscrypto   80u  IPv6 0x4faf6b81e9988ee0      0t0  TCP [fd5d:8f9c:a309::2]:59193->[fd5d:8f9c:a309::1]:58904 (ESTABLISHED)
+BASELINE|91391|*:57266|intelligenceflowd                 91391 ekscrypto   16u  IPv6 0x71f55f1b332c6357      0t0  UDP *:57266
+BASELINE|91391|*:65381|intelligenceflowd                 91391 ekscrypto   15u  IPv6 0xa47d77a3d1d7f99e      0t0  UDP *:65381
+BASELINE|95430|(ESTABLISHED)|DeviceHub                         95430 ekscrypto   18u  IPv6 0xfd9e0eee669dae54      0t0  TCP [fd5d:8f9c:a309::2]:59117->[fd5d:8f9c:a309::1]:58877 (ESTABLISHED)
+BASELINE|95430|(ESTABLISHED)|DeviceHub                         95430 ekscrypto   19u  IPv6 0x35c63d56a9e294c1      0t0  TCP [fd5d:8f9c:a309::2]:59119->[fd5d:8f9c:a309::1]:58865 (ESTABLISHED)
+BASELINE|95430|(ESTABLISHED)|DeviceHub                         95430 ekscrypto   20u  IPv6 0x97daf778751af97f      0t0  TCP [fd22:ddfe:18f2::2]:59180->[fd22:ddfe:18f2::1]:57569 (ESTABLISHED)
+BASELINE|95430|(ESTABLISHED)|DeviceHub                         95430 ekscrypto   21u  IPv6 0xe211a695e12c1b6b      0t0  TCP [fd22:ddfe:18f2::2]:59185->[fd22:ddfe:18f2::1]:57574 (ESTABLISHED)
+BASELINE|95430|(ESTABLISHED)|DeviceHub                         95430 ekscrypto   23u  IPv6 0x246b6317006e951a      0t0  TCP [fd22:ddfe:18f2::2]:59186->[fd22:ddfe:18f2::1]:57527 (ESTABLISHED)
+BASELINE|95872|*:*|configd_sim                       95872 ekscrypto   12u  IPv4 0xbc797d2dd120e661      0t0  UDP *:*
+BASELINE|95889|(ESTABLISHED)|apsd                              95889 ekscrypto   13u  IPv4 0xba065c4141c68c77      0t0  TCP 10.2.0.111:60595->17.188.178.220:5223 (ESTABLISHED)
+BASELINE|95985|*:52660|intelligenceflowd                 95985 ekscrypto   15u  IPv6 0x94c4e7608ce66a1a      0t0  UDP *:52660
+BASELINE|95985|*:65415|intelligenceflowd                 95985 ekscrypto   12u  IPv6 0xbb1ec081b6102585      0t0  UDP *:65415
+BASELINE|98971|*:*|configd_sim                       98971 ekscrypto    8u  IPv4 0x69a9fca69d59179c      0t0  UDP *:*
+BASELINE|98996|(ESTABLISHED)|apsd                              98996 ekscrypto   12u  IPv4 0x1f7b51db705e6c9b      0t0  TCP 10.2.0.111:59018->17.188.143.222:5223 (ESTABLISHED)
+2026-09-25 16:16:29|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x1f3dc4d397873144      0t0  UDP *:5353
+2026-09-25 16:16:29|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6  0x504702c7fd04a4d      0t0  UDP *:5353
+2026-09-25 16:16:29|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x3dfc024c66e9e2aa      0t0  UDP *:5353
+2026-09-25 16:16:29|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x8e9fdb4709ab24c2      0t0  UDP *:5353
+2026-09-25 16:16:29|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xc604e8b300940d6c      0t0  UDP *:5353
+2026-09-25 16:16:29|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x5e8e0a48f483ec20      0t0  UDP *:5353
+2026-09-25 16:16:35|NEW|83614|10.2.0.111:49250->142.251.150.4:443|Brave Browser Helper        83614 ekscrypto   29u  IPv4 0x51b15ae8dda00825      0t0  UDP 10.2.0.111:49250->142.251.150.4:443
+2026-09-25 16:16:39|GONE|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0xed801055419c1754      0t0  TCP 10.2.0.111:60693->8.130.222.161:443 (ESTABLISHED)
+2026-09-25 16:16:40|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xde0b791c59be437c      0t0  UDP *:5353
+2026-09-25 16:16:40|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x4b7e77509fbc7c88      0t0  UDP *:5353
+2026-09-25 16:16:40|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x28149b64c0f8fdeb      0t0  UDP *:5353
+2026-09-25 16:16:41|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x1f3dc4d397873144      0t0  UDP *:5353
+2026-09-25 16:16:41|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6  0x504702c7fd04a4d      0t0  UDP *:5353
+2026-09-25 16:16:41|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x3dfc024c66e9e2aa      0t0  UDP *:5353
+2026-09-25 16:16:41|GONE|59691|10.2.0.111:62220->18.221.229.81:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0x104d2125f867c794      0t0  UDP 10.2.0.111:62220->18.221.229.81:443
+2026-09-25 16:16:42|NEW|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4 0x422e5b6075e4523a      0t0  TCP 10.2.0.111:60694->140.82.113.6:443 (ESTABLISHED)
+2026-09-25 16:16:42|NEW|33716|(ESTABLISHED)|ssh                               33716 ekscrypto    4u  IPv4 0x7a8f4f35d3c2ab23      0t0  TCP 10.2.0.111:60695->140.82.114.4:22 (ESTABLISHED)
+2026-09-25 16:16:42|NEW|33716|(ESTABLISHED)|ssh                               33716 ekscrypto    5u  IPv4 0x7a8f4f35d3c2ab23      0t0  TCP 10.2.0.111:60695->140.82.114.4:22 (ESTABLISHED)
+2026-09-25 16:16:42|NEW|59691|10.2.0.111:56086->18.221.229.81:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0x3a7f0a03fa2d0a05      0t0  UDP 10.2.0.111:56086->18.221.229.81:443
+2026-09-25 16:16:42|GONE|68431|(ESTABLISHED)|ZCode Helper                   68431 ekscrypto   23u  IPv4 0x7a8f4f35d3c2ab23      0t0  TCP 10.2.0.111:60676->123.57.116.48:443 (ESTABLISHED)
+2026-09-25 16:16:44|GONE|33716|(ESTABLISHED)|ssh                               33716 ekscrypto    4u  IPv4 0x7a8f4f35d3c2ab23      0t0  TCP 10.2.0.111:60695->140.82.114.4:22 (ESTABLISHED)
+2026-09-25 16:16:44|GONE|33716|(ESTABLISHED)|ssh                               33716 ekscrypto    5u  IPv4 0x7a8f4f35d3c2ab23      0t0  TCP 10.2.0.111:60695->140.82.114.4:22 (ESTABLISHED)
+2026-09-25 16:16:46|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xc0a640e6ac7e52e9      0t0  UDP *:5353
+2026-09-25 16:16:46|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x6109c71128df4838      0t0  UDP *:5353
+2026-09-25 16:16:46|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x790b5f5e052b1cb4      0t0  UDP *:5353
+2026-09-25 16:16:46|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xde0b791c59be437c      0t0  UDP *:5353
+2026-09-25 16:16:46|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x4b7e77509fbc7c88      0t0  UDP *:5353
+2026-09-25 16:16:46|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x28149b64c0f8fdeb      0t0  UDP *:5353
+2026-09-25 16:16:47|GONE|18292|(ESTABLISHED)|IMTransferAgent                   18292 ekscrypto    7u  IPv4 0xb34ea82e10d2d764      0t0  TCP 10.2.0.111:60690->17.248.199.52:443 (ESTABLISHED)
+2026-09-25 16:16:51|GONE|18292|(ESTABLISHED)|IMTransferAgent                   18292 ekscrypto   12u  IPv4 0x256f586feca1f3ea      0t0  TCP 10.2.0.111:60691->17.248.199.28:443 (ESTABLISHED)
+2026-09-25 16:16:54|NEW|12153|10.2.0.111:50331->162.159.128.233:443|Discord Helper                 12153 ekscrypto   21u  IPv4 0xf54ce9eff99b010f      0t0  UDP 10.2.0.111:50331->162.159.128.233:443
+2026-09-25 16:16:59|NEW|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0xa09264f0cf0d3275      0t0  TCP 10.2.0.111:60697->123.57.116.48:443 (ESTABLISHED)
+2026-09-25 16:17:00|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x13df59b57155c683      0t0  UDP *:5353
+2026-09-25 16:17:00|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x373b5e8d8132b764      0t0  UDP *:5353
+2026-09-25 16:17:00|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xa5cb046010e7df8b      0t0  UDP *:5353
+2026-09-25 16:17:00|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xc0a640e6ac7e52e9      0t0  UDP *:5353
+2026-09-25 16:17:00|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x6109c71128df4838      0t0  UDP *:5353
+2026-09-25 16:17:00|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x790b5f5e052b1cb4      0t0  UDP *:5353
+2026-09-25 16:17:02|NEW|83614|10.2.0.111:49390->74.125.197.100:443|Brave Browser Helper        83614 ekscrypto   33u  IPv4 0x1f3dc4d397873144      0t0  UDP 10.2.0.111:49390->74.125.197.100:443
+2026-09-25 16:17:04|GONE|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0xa09264f0cf0d3275      0t0  TCP 10.2.0.111:60697->123.57.116.48:443 (ESTABLISHED)
+2026-09-25 16:17:05|GONE|83614|10.2.0.111:49250->142.251.150.4:443|Brave Browser Helper        83614 ekscrypto   29u  IPv4 0x51b15ae8dda00825      0t0  UDP 10.2.0.111:49250->142.251.150.4:443
+2026-09-25 16:17:07|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x98b706feca6350a6      0t0  UDP *:5353
+2026-09-25 16:17:07|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xf0c2e2b498f63d84      0t0  UDP *:5353
+2026-09-25 16:17:07|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x5ba71177af84900c      0t0  UDP *:5353
+2026-09-25 16:17:07|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x13df59b57155c683      0t0  UDP *:5353
+2026-09-25 16:17:07|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x373b5e8d8132b764      0t0  UDP *:5353
+2026-09-25 16:17:07|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xa5cb046010e7df8b      0t0  UDP *:5353
+2026-09-25 16:17:09|NEW|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   34u  IPv4 0xf93c8cfbac211594      0t0  TCP 10.2.0.111:60698->47.246.22.189:443 (ESTABLISHED)
+2026-09-25 16:17:10|GONE|59691|10.2.0.111:56086->18.221.229.81:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0x3a7f0a03fa2d0a05      0t0  UDP 10.2.0.111:56086->18.221.229.81:443
+2026-09-25 16:17:12|NEW|59691|10.2.0.111:58766->3.22.139.176:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0xa7fce7d301813ccc      0t0  UDP 10.2.0.111:58766->3.22.139.176:443
+2026-09-25 16:17:12|GONE|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4 0x422e5b6075e4523a      0t0  TCP 10.2.0.111:60694->140.82.113.6:443 (ESTABLISHED)
+2026-09-25 16:17:12|GONE|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   34u  IPv4 0xf93c8cfbac211594      0t0  TCP 10.2.0.111:60698->47.246.22.189:443 (ESTABLISHED)
+2026-09-25 16:17:13|NEW|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0x7a8f4f35d3c2ab23      0t0  TCP 10.2.0.111:60701->59.110.96.221:443 (ESTABLISHED)
+2026-09-25 16:17:13|GONE|68431|(ESTABLISHED)|ZCode Helper                   68431 ekscrypto   29u  IPv4 0xbbc075b90637aa17      0t0  TCP 10.2.0.111:60590->47.77.37.148:443 (ESTABLISHED)
+2026-09-25 16:17:16|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x992d92cb0069d795      0t0  UDP *:5353
+2026-09-25 16:17:16|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x153267c56adf0a2f      0t0  UDP *:5353
+2026-09-25 16:17:17|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x4d5d3bf573b2f746      0t0  UDP *:5353
+2026-09-25 16:17:17|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x98b706feca6350a6      0t0  UDP *:5353
+2026-09-25 16:17:17|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xf0c2e2b498f63d84      0t0  UDP *:5353
+2026-09-25 16:17:17|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x5ba71177af84900c      0t0  UDP *:5353
+2026-09-25 16:17:18|GONE|18292|(ESTABLISHED)|IMTransferAgent                   18292 ekscrypto    6u  IPv4  0x21274dba0f30ff3      0t0  TCP 10.2.0.111:60689->17.250.102.61:443 (ESTABLISHED)
+2026-09-25 16:17:18|GONE|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0x7a8f4f35d3c2ab23      0t0  TCP 10.2.0.111:60701->59.110.96.221:443 (ESTABLISHED)
+2026-09-25 16:17:23|GONE|12153|10.2.0.111:50331->162.159.128.233:443|Discord Helper                 12153 ekscrypto   21u  IPv4 0xf54ce9eff99b010f      0t0  UDP 10.2.0.111:50331->162.159.128.233:443
+2026-09-25 16:17:26|NEW|32286|(ESTABLISHED)|codex                             32286 ekscrypto   17u  IPv4 0x256f586feca1f3ea      0t0  TCP 10.2.0.111:60702->172.64.155.209:443 (ESTABLISHED)
+2026-09-25 16:17:32|GONE|83614|10.2.0.111:49390->74.125.197.100:443|Brave Browser Helper        83614 ekscrypto   33u  IPv4 0x1f3dc4d397873144      0t0  UDP 10.2.0.111:49390->74.125.197.100:443
+2026-09-25 16:17:37|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x8de376e51e6805dc      0t0  UDP *:5353
+2026-09-25 16:17:37|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x6feadc1573ebab98      0t0  UDP *:5353
+2026-09-25 16:17:37|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xf1d46a8e1bc22c02      0t0  UDP *:5353
+2026-09-25 16:17:37|NEW|59691|10.2.0.111:57686->18.221.229.81:443|Slack Helper                   59691 ekscrypto   30u  IPv4 0x3b3fd3932f3268c6      0t0  UDP 10.2.0.111:57686->18.221.229.81:443
+2026-09-25 16:17:37|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x992d92cb0069d795      0t0  UDP *:5353
+2026-09-25 16:17:37|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x153267c56adf0a2f      0t0  UDP *:5353
+2026-09-25 16:17:37|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x4d5d3bf573b2f746      0t0  UDP *:5353
+2026-09-25 16:17:42|NEW|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4 0xa09264f0cf0d3275      0t0  TCP 10.2.0.111:60703->140.82.113.6:443 (ESTABLISHED)
+2026-09-25 16:17:42|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xa4b1bc14d2fd0f8f      0t0  UDP *:5353
+2026-09-25 16:17:42|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x6a94d9fdac1533f0      0t0  UDP *:5353
+2026-09-25 16:17:42|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x48f55ee62619b719      0t0  UDP *:5353
+2026-09-25 16:17:42|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x8de376e51e6805dc      0t0  UDP *:5353
+2026-09-25 16:17:42|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x6feadc1573ebab98      0t0  UDP *:5353
+2026-09-25 16:17:42|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xf1d46a8e1bc22c02      0t0  UDP *:5353
+2026-09-25 16:17:42|GONE|59691|10.2.0.111:58766->3.22.139.176:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0xa7fce7d301813ccc      0t0  UDP 10.2.0.111:58766->3.22.139.176:443
+2026-09-25 16:17:43|NEW|59691|10.2.0.111:54070->3.22.139.176:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0xf963a2f3e574f686      0t0  UDP 10.2.0.111:54070->3.22.139.176:443
+2026-09-25 16:17:46|GONE|31857|(ESTABLISHED)|Codex (Service)                31857 ekscrypto   44u  IPv4 0x9db8207f632eda13      0t0  TCP 10.2.0.111:59099->172.64.148.235:443 (ESTABLISHED)
+2026-09-25 16:17:48|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4  0x660225bdd1252af      0t0  UDP *:5353
+2026-09-25 16:17:48|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xf5f0847e23204e3d      0t0  UDP *:5353
+2026-09-25 16:17:48|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x153267c56adf0a2f      0t0  UDP *:5353
+2026-09-25 16:17:48|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xa4b1bc14d2fd0f8f      0t0  UDP *:5353
+2026-09-25 16:17:48|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x6a94d9fdac1533f0      0t0  UDP *:5353
+2026-09-25 16:17:48|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x48f55ee62619b719      0t0  UDP *:5353
+2026-09-25 16:17:54|NEW|18292|(SYN_SENT)|IMTransferAgent                   18292 ekscrypto    7u  IPv4  0x21274dba0f30ff3      0t0  TCP 10.2.0.111:60707->17.250.102.61:443 (SYN_SENT)
+2026-09-25 16:17:54|NEW|31857|(ESTABLISHED)|Codex (Service)                31857 ekscrypto   44u  IPv4 0x7a8f4f35d3c2ab23      0t0  TCP 10.2.0.111:60708->172.64.148.235:443 (ESTABLISHED)
+2026-09-25 16:17:54|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x638b07faa12de397      0t0  UDP *:5353
+2026-09-25 16:17:54|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x2348fadeaa6b86fe      0t0  UDP *:5353
+2026-09-25 16:17:54|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xe1ae5bc26c38e08b      0t0  UDP *:5353
+2026-09-25 16:17:54|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4  0x660225bdd1252af      0t0  UDP *:5353
+2026-09-25 16:17:54|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xf5f0847e23204e3d      0t0  UDP *:5353
+2026-09-25 16:17:54|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x153267c56adf0a2f      0t0  UDP *:5353
+2026-09-25 16:17:56|NEW|18292|(ESTABLISHED)|IMTransferAgent                   18292 ekscrypto    6u  IPv4 0x824d48291fe6a0dc      0t0  TCP 10.2.0.111:60709->17.248.199.28:443 (ESTABLISHED)
+2026-09-25 16:17:56|NEW|18292|(ESTABLISHED)|IMTransferAgent                   18292 ekscrypto    7u  IPv4  0x21274dba0f30ff3      0t0  TCP 10.2.0.111:60707->17.250.102.61:443 (ESTABLISHED)
+2026-09-25 16:17:56|NEW|73264|(ESTABLISHED)|AMPDeviceDiscoveryAgent           73264 ekscrypto    9u  IPv6 0x78ab0c272a65bffd      0t0  TCP [fe80:e::1067:dc07:f749:27be]:60718->[fe80:e::189c:1120:a376:b3db]:62078 (ESTABLISHED)
+2026-09-25 16:17:56|GONE|18292|(SYN_SENT)|IMTransferAgent                   18292 ekscrypto    7u  IPv4  0x21274dba0f30ff3      0t0  TCP 10.2.0.111:60707->17.250.102.61:443 (SYN_SENT)
+2026-09-25 16:17:57|GONE|73264|(ESTABLISHED)|AMPDeviceDiscoveryAgent           73264 ekscrypto    9u  IPv6 0x78ab0c272a65bffd      0t0  TCP [fe80:e::1067:dc07:f749:27be]:60718->[fe80:e::189c:1120:a376:b3db]:62078 (ESTABLISHED)
+2026-09-25 16:18:00|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xe90b643e08b16e7c      0t0  UDP *:5353
+2026-09-25 16:18:00|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x2ef7ba3ae275e15f      0t0  UDP *:5353
+2026-09-25 16:18:00|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6  0x7a3c3ddbfaa66c6      0t0  UDP *:5353
+2026-09-25 16:18:00|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x638b07faa12de397      0t0  UDP *:5353
+2026-09-25 16:18:00|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x2348fadeaa6b86fe      0t0  UDP *:5353
+2026-09-25 16:18:00|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xe1ae5bc26c38e08b      0t0  UDP *:5353
+2026-09-25 16:18:02|NEW|18292|(ESTABLISHED)|IMTransferAgent                   18292 ekscrypto   12u  IPv4 0x4b58a26ee15fbd4c      0t0  TCP 10.2.0.111:60721->17.248.199.52:443 (ESTABLISHED)
+2026-09-25 16:18:03|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x90b57648264991f1      0t0  UDP *:5353
+2026-09-25 16:18:03|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x5033c5c708b7ca2e      0t0  UDP *:5353
+2026-09-25 16:18:03|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x400865eed7137f32      0t0  UDP *:5353
+2026-09-25 16:18:03|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xe90b643e08b16e7c      0t0  UDP *:5353
+2026-09-25 16:18:03|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x2ef7ba3ae275e15f      0t0  UDP *:5353
+2026-09-25 16:18:03|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6  0x7a3c3ddbfaa66c6      0t0  UDP *:5353
+2026-09-25 16:18:05|NEW|14888|10.2.0.111:51420|Steam Helper                   14888 ekscrypto   52u  IPv4 0xb4cc7b2b57cc383f      0t0  UDP 10.2.0.111:51420
+2026-09-25 16:18:05|NEW|14888|169.254.28.18:50364|Steam Helper                   14888 ekscrypto  200u  IPv4 0x24a58427f11d53d2      0t0  UDP 169.254.28.18:50364
+2026-09-25 16:18:07|NEW|68078|(ESTABLISHED)|NewsToday2                        68078 ekscrypto   19u  IPv4  0x3cb0b2de32571dd      0t0  TCP 10.2.0.111:60722->17.253.3.131:443 (ESTABLISHED)
+2026-09-25 16:18:07|NEW|68078|10.2.0.111:54563->17.248.199.60:443|NewsToday2                        68078 ekscrypto   20u  IPv4 0xf1d46a8e1bc22c02      0t0  UDP 10.2.0.111:54563->17.248.199.60:443
+2026-09-25 16:18:07|NEW|68078|10.2.0.111:60347->17.248.175.57:443|NewsToday2                        68078 ekscrypto   16u  IPv4 0x48f55ee62619b719      0t0  UDP 10.2.0.111:60347->17.248.175.57:443
+2026-09-25 16:18:07|GONE|14888|10.2.0.111:51420|Steam Helper                   14888 ekscrypto   52u  IPv4 0xb4cc7b2b57cc383f      0t0  UDP 10.2.0.111:51420
+2026-09-25 16:18:07|GONE|14888|169.254.28.18:50364|Steam Helper                   14888 ekscrypto  200u  IPv4 0x24a58427f11d53d2      0t0  UDP 169.254.28.18:50364
+2026-09-25 16:18:07|GONE|59691|10.2.0.111:57686->18.221.229.81:443|Slack Helper                   59691 ekscrypto   30u  IPv4 0x3b3fd3932f3268c6      0t0  UDP 10.2.0.111:57686->18.221.229.81:443
+2026-09-25 16:18:13|GONE|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4 0xa09264f0cf0d3275      0t0  TCP 10.2.0.111:60703->140.82.113.6:443 (ESTABLISHED)
+2026-09-25 16:18:13|GONE|59691|10.2.0.111:54070->3.22.139.176:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0xf963a2f3e574f686      0t0  UDP 10.2.0.111:54070->3.22.139.176:443
+2026-09-25 16:18:15|NEW|59691|10.2.0.111:56269->54.92.199.186:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0xbe39a34545c8fea5      0t0  UDP 10.2.0.111:56269->54.92.199.186:443
+2026-09-25 16:18:18|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xbeb8873cb633aadd      0t0  UDP *:5353
+2026-09-25 16:18:18|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x9996b1e29dc1d38c      0t0  UDP *:5353
+2026-09-25 16:18:18|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x17f4253570c53652      0t0  UDP *:5353
+2026-09-25 16:18:18|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x90b57648264991f1      0t0  UDP *:5353
+2026-09-25 16:18:18|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x5033c5c708b7ca2e      0t0  UDP *:5353
+2026-09-25 16:18:18|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x400865eed7137f32      0t0  UDP *:5353
+2026-09-25 16:18:24|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xdbe80fc94b0e6a2b      0t0  UDP *:5353
+2026-09-25 16:18:24|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x16a85e2891d32a5a      0t0  UDP *:5353
+2026-09-25 16:18:24|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x790b5f5e052b1cb4      0t0  UDP *:5353
+2026-09-25 16:18:24|NEW|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   34u  IPv4 0xf93c8cfbac211594      0t0  TCP 10.2.0.111:60723->8.48.85.207:443 (ESTABLISHED)
+2026-09-25 16:18:24|GONE|31857|(ESTABLISHED)|Codex (Service)                31857 ekscrypto   32u  IPv4 0xbb8af77240530eb7      0t0  TCP 10.2.0.111:60598->172.64.155.209:443 (ESTABLISHED)
+2026-09-25 16:18:24|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xbeb8873cb633aadd      0t0  UDP *:5353
+2026-09-25 16:18:24|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x9996b1e29dc1d38c      0t0  UDP *:5353
+2026-09-25 16:18:24|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x17f4253570c53652      0t0  UDP *:5353
+2026-09-25 16:18:26|NEW|12153|10.2.0.111:65206->162.159.133.233:443|Discord Helper                 12153 ekscrypto   21u  IPv4  0xeda70a60103ec8b      0t0  UDP 10.2.0.111:65206->162.159.133.233:443
+2026-09-25 16:18:26|GONE|18292|(ESTABLISHED)|IMTransferAgent                   18292 ekscrypto    6u  IPv4 0x824d48291fe6a0dc      0t0  TCP 10.2.0.111:60709->17.248.199.28:443 (ESTABLISHED)
+2026-09-25 16:18:29|GONE|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   34u  IPv4 0xf93c8cfbac211594      0t0  TCP 10.2.0.111:60723->8.48.85.207:443 (ESTABLISHED)
+2026-09-25 16:18:30|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4  0x5401d2d8220caab      0t0  UDP *:5353
+2026-09-25 16:18:30|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xfe2923be02564f66      0t0  UDP *:5353
+2026-09-25 16:18:30|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x1abc633d763a8fb5      0t0  UDP *:5353
+2026-09-25 16:18:30|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xdbe80fc94b0e6a2b      0t0  UDP *:5353
+2026-09-25 16:18:30|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x16a85e2891d32a5a      0t0  UDP *:5353
+2026-09-25 16:18:30|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x790b5f5e052b1cb4      0t0  UDP *:5353
+2026-09-25 16:18:32|GONE|18292|(ESTABLISHED)|IMTransferAgent                   18292 ekscrypto   12u  IPv4 0x4b58a26ee15fbd4c      0t0  TCP 10.2.0.111:60721->17.248.199.52:443 (ESTABLISHED)
+2026-09-25 16:18:37|GONE|68078|10.2.0.111:54563->17.248.199.60:443|NewsToday2                        68078 ekscrypto   20u  IPv4 0xf1d46a8e1bc22c02      0t0  UDP 10.2.0.111:54563->17.248.199.60:443
+2026-09-25 16:18:37|GONE|68078|10.2.0.111:60347->17.248.175.57:443|NewsToday2                        68078 ekscrypto   16u  IPv4 0x48f55ee62619b719      0t0  UDP 10.2.0.111:60347->17.248.175.57:443
+2026-09-25 16:18:38|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xf8b4f375780a15e3      0t0  UDP *:5353
+2026-09-25 16:18:38|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x9996b1e29dc1d38c      0t0  UDP *:5353
+2026-09-25 16:18:38|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x8d1284c7aef5b826      0t0  UDP *:5353
+2026-09-25 16:18:38|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4  0x5401d2d8220caab      0t0  UDP *:5353
+2026-09-25 16:18:38|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xfe2923be02564f66      0t0  UDP *:5353
+2026-09-25 16:18:38|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x1abc633d763a8fb5      0t0  UDP *:5353
+2026-09-25 16:18:41|NEW|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4 0xf99fb9d4f81d0878      0t0  TCP 10.2.0.111:60724->140.82.112.5:443 (ESTABLISHED)
+2026-09-25 16:18:43|GONE|59691|10.2.0.111:56269->54.92.199.186:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0xbe39a34545c8fea5      0t0  UDP 10.2.0.111:56269->54.92.199.186:443
+2026-09-25 16:18:45|NEW|59691|10.2.0.111:59872->54.92.199.186:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0xe600dec28345c8bb      0t0  UDP 10.2.0.111:59872->54.92.199.186:443
+2026-09-25 16:18:46|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x8e2f716804f7fd42      0t0  UDP *:5353
+2026-09-25 16:18:46|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xa5cb046010e7df8b      0t0  UDP *:5353
+2026-09-25 16:18:46|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xaa8990de65847c23      0t0  UDP *:5353
+2026-09-25 16:18:46|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xf8b4f375780a15e3      0t0  UDP *:5353
+2026-09-25 16:18:46|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x9996b1e29dc1d38c      0t0  UDP *:5353
+2026-09-25 16:18:46|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x8d1284c7aef5b826      0t0  UDP *:5353
+2026-09-25 16:18:49|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xe2ca54192910f7b2      0t0  UDP *:5353
+2026-09-25 16:18:49|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6  0x7f640502a7a3799      0t0  UDP *:5353
+2026-09-25 16:18:49|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6  0x5dc24a8b936ea24      0t0  UDP *:5353
+2026-09-25 16:18:49|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x8e2f716804f7fd42      0t0  UDP *:5353
+2026-09-25 16:18:49|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xa5cb046010e7df8b      0t0  UDP *:5353
+2026-09-25 16:18:49|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xaa8990de65847c23      0t0  UDP *:5353
+2026-09-25 16:18:54|GONE|12153|10.2.0.111:65206->162.159.133.233:443|Discord Helper                 12153 ekscrypto   21u  IPv4  0xeda70a60103ec8b      0t0  UDP 10.2.0.111:65206->162.159.133.233:443
+2026-09-25 16:18:56|GONE|18292|(ESTABLISHED)|IMTransferAgent                   18292 ekscrypto    7u  IPv4  0x21274dba0f30ff3      0t0  TCP 10.2.0.111:60707->17.250.102.61:443 (ESTABLISHED)
+2026-09-25 16:19:07|NEW|30749|(ESTABLISHED)|node                              30749 ekscrypto   15u  IPv4 0xbb8af77240530eb7      0t0  TCP 10.2.0.111:60727->172.217.116.4:443 (ESTABLISHED)
+2026-09-25 16:19:07|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x31f702fea037059e      0t0  UDP *:5353
+2026-09-25 16:19:07|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x4a6d2e66c0d89a98      0t0  UDP *:5353
+2026-09-25 16:19:07|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x51b15ae8dda00825      0t0  UDP *:5353
+2026-09-25 16:19:07|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xe2ca54192910f7b2      0t0  UDP *:5353
+2026-09-25 16:19:07|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6  0x7f640502a7a3799      0t0  UDP *:5353
+2026-09-25 16:19:07|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6  0x5dc24a8b936ea24      0t0  UDP *:5353
+2026-09-25 16:19:10|NEW|67969|(CLOSE_WAIT)|ZCode Helper                   67969 ekscrypto   23u  IPv4 0xe4bdda7aaf5a28a4      0t0  TCP 10.2.0.111:60584->8.48.85.242:443 (CLOSE_WAIT)
+2026-09-25 16:19:10|GONE|67969|(ESTABLISHED)|ZCode Helper                   67969 ekscrypto   23u  IPv4 0xe4bdda7aaf5a28a4      0t0  TCP 10.2.0.111:60584->8.48.85.242:443 (ESTABLISHED)
+2026-09-25 16:19:11|GONE|30749|(ESTABLISHED)|node                              30749 ekscrypto   15u  IPv4 0xbb8af77240530eb7      0t0  TCP 10.2.0.111:60727->172.217.116.4:443 (ESTABLISHED)
+2026-09-25 16:19:13|GONE|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4 0xf99fb9d4f81d0878      0t0  TCP 10.2.0.111:60724->140.82.112.5:443 (ESTABLISHED)
+2026-09-25 16:19:14|NEW|59691|10.2.0.111:53920->3.91.140.69:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0xecbd26e1e67d9a86      0t0  UDP 10.2.0.111:53920->3.91.140.69:443
+2026-09-25 16:19:14|GONE|59691|10.2.0.111:59872->54.92.199.186:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0xe600dec28345c8bb      0t0  UDP 10.2.0.111:59872->54.92.199.186:443
+2026-09-25 16:19:16|NEW|59691|10.2.0.111:62164->3.134.44.134:443|Slack Helper                   59691 ekscrypto   27u  IPv4 0x63be7e566c00d78b      0t0  UDP 10.2.0.111:62164->3.134.44.134:443
+2026-09-25 16:19:19|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x38f96bc5632a8705      0t0  UDP *:5353
+2026-09-25 16:19:19|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xbeb8873cb633aadd      0t0  UDP *:5353
+2026-09-25 16:19:19|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xc13f3fbda5811efb      0t0  UDP *:5353
+2026-09-25 16:19:19|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x31f702fea037059e      0t0  UDP *:5353
+2026-09-25 16:19:19|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x4a6d2e66c0d89a98      0t0  UDP *:5353
+2026-09-25 16:19:19|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x51b15ae8dda00825      0t0  UDP *:5353
+2026-09-25 16:19:25|NEW|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   25u  IPv6 0xcc4ec6c7197dc774      0t0  TCP [fd5d:8f9c:a309::2]:60729->[fd5d:8f9c:a309::1]:58873 (ESTABLISHED)
+2026-09-25 16:19:25|NEW|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   29u  IPv6 0x78ab0c272a65bffd      0t0  TCP [fd5d:8f9c:a309::2]:60731->[fd5d:8f9c:a309::1]:58873 (ESTABLISHED)
+2026-09-25 16:19:25|NEW|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   30u  IPv6 0xcc4ec6c7197dc774      0t0  TCP [fd5d:8f9c:a309::2]:60729->[fd5d:8f9c:a309::1]:58873 (ESTABLISHED)
+2026-09-25 16:19:25|NEW|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   38u  IPv6 0x78ab0c272a65bffd      0t0  TCP [fd5d:8f9c:a309::2]:60731->[fd5d:8f9c:a309::1]:58873 (ESTABLISHED)
+2026-09-25 16:19:25|NEW|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   39u  IPv6 0x1f075ba01411fb0d      0t0  TCP [fd22:ddfe:18f2::2]:60732->[fd22:ddfe:18f2::1]:57507 (ESTABLISHED)
+2026-09-25 16:19:25|NEW|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   40u  IPv6 0x4b58a26ee15fbd4c      0t0  TCP [fd22:ddfe:18f2::2]:60733->[fd22:ddfe:18f2::1]:57507 (ESTABLISHED)
+2026-09-25 16:19:25|GONE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   41u  IPv6 0x1a8b32f6a58acb82      0t0  TCP [fd22:ddfe:18f2::2]:60665->[fd22:ddfe:18f2::1]:57507 (ESTABLISHED)
+2026-09-25 16:19:25|GONE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   42u  IPv6 0xc7d04a7cab9e2682      0t0  TCP [fd22:ddfe:18f2::2]:60666->[fd22:ddfe:18f2::1]:57507 (ESTABLISHED)
+2026-09-25 16:19:27|NEW|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   36u  IPv6  0x21274dba0f30ff3      0t0  TCP [fd5d:8f9c:a309::2]:60734->[fd5d:8f9c:a309::1]:58887 (ESTABLISHED)
+2026-09-25 16:19:27|NEW|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   37u  IPv6 0xbb18bd167e082cb5      0t0  TCP [fd5d:8f9c:a309::2]:60735->[fd5d:8f9c:a309::1]:58887 (ESTABLISHED)
+2026-09-25 16:19:27|GONE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   25u  IPv6 0xcc4ec6c7197dc774      0t0  TCP [fd5d:8f9c:a309::2]:60729->[fd5d:8f9c:a309::1]:58873 (ESTABLISHED)
+2026-09-25 16:19:27|GONE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   29u  IPv6 0x78ab0c272a65bffd      0t0  TCP [fd5d:8f9c:a309::2]:60731->[fd5d:8f9c:a309::1]:58873 (ESTABLISHED)
+2026-09-25 16:19:27|GONE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   30u  IPv6 0xcc4ec6c7197dc774      0t0  TCP [fd5d:8f9c:a309::2]:60729->[fd5d:8f9c:a309::1]:58873 (ESTABLISHED)
+2026-09-25 16:19:27|GONE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   32u  IPv6 0x4ca69b6ce67c4528      0t0  TCP [fd5d:8f9c:a309::2]:60667->[fd5d:8f9c:a309::1]:58887 (ESTABLISHED)
+2026-09-25 16:19:27|GONE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   35u  IPv6 0x179d7f6cc183d7ca      0t0  TCP [fd5d:8f9c:a309::2]:60668->[fd5d:8f9c:a309::1]:58887 (ESTABLISHED)
+2026-09-25 16:19:27|GONE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   38u  IPv6 0x78ab0c272a65bffd      0t0  TCP [fd5d:8f9c:a309::2]:60731->[fd5d:8f9c:a309::1]:58873 (ESTABLISHED)
+2026-09-25 16:19:29|NEW|18292|(ESTABLISHED)|IMTransferAgent                   18292 ekscrypto    6u  IPv4 0xbbc075b90637aa17      0t0  TCP 10.2.0.111:60737->17.248.199.12:443 (ESTABLISHED)
+2026-09-25 16:19:29|NEW|18292|(ESTABLISHED)|IMTransferAgent                   18292 ekscrypto    7u  IPv4 0x353d6c4b06742524      0t0  TCP 10.2.0.111:60736->17.250.102.61:443 (ESTABLISHED)
+2026-09-25 16:19:33|NEW|18292|(ESTABLISHED)|IMTransferAgent                   18292 ekscrypto   12u  IPv4  0x98bedaa1e4c3d32      0t0  TCP 10.2.0.111:60738->17.248.199.76:443 (ESTABLISHED)
+2026-09-25 16:19:38|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x599deedfa6f723e3      0t0  UDP *:5353
+2026-09-25 16:19:38|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x4a6d2e66c0d89a98      0t0  UDP *:5353
+2026-09-25 16:19:38|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xff81eb60d71db808      0t0  UDP *:5353
+2026-09-25 16:19:38|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x38f96bc5632a8705      0t0  UDP *:5353
+2026-09-25 16:19:38|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xbeb8873cb633aadd      0t0  UDP *:5353
+2026-09-25 16:19:38|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xc13f3fbda5811efb      0t0  UDP *:5353
+2026-09-25 16:19:41|NEW|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4 0x824d48291fe6a0dc      0t0  TCP 10.2.0.111:60739->140.82.112.5:443 (ESTABLISHED)
+2026-09-25 16:19:44|NEW|73347|(ESTABLISHED)|Mail                              73347 ekscrypto   12u  IPv4 0x422e5b6075e4523a      0t0  TCP 10.2.0.111:60742->74.125.197.108:993 (ESTABLISHED)
+2026-09-25 16:19:44|NEW|73347|(ESTABLISHED)|Mail                              73347 ekscrypto   31u  IPv4 0x422e5b6075e4523a      0t0  TCP 10.2.0.111:60742->74.125.197.108:993 (ESTABLISHED)
+2026-09-25 16:19:44|GONE|59691|10.2.0.111:53920->3.91.140.69:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0xecbd26e1e67d9a86      0t0  UDP 10.2.0.111:53920->3.91.140.69:443
+2026-09-25 16:19:44|GONE|59691|10.2.0.111:62164->3.134.44.134:443|Slack Helper                   59691 ekscrypto   27u  IPv4 0x63be7e566c00d78b      0t0  UDP 10.2.0.111:62164->3.134.44.134:443
+2026-09-25 16:19:46|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x398d7962f911b721      0t0  UDP *:5353
+2026-09-25 16:19:46|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x994e8aa2a351b2a2      0t0  UDP *:5353
+2026-09-25 16:19:46|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x61671c35f5b25260      0t0  UDP *:5353
+2026-09-25 16:19:46|NEW|59691|10.2.0.111:53555->3.134.44.134:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0xbda2e098866c1547      0t0  UDP 10.2.0.111:53555->3.134.44.134:443
+2026-09-25 16:19:46|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x599deedfa6f723e3      0t0  UDP *:5353
+2026-09-25 16:19:46|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x4a6d2e66c0d89a98      0t0  UDP *:5353
+2026-09-25 16:19:46|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xff81eb60d71db808      0t0  UDP *:5353
+2026-09-25 16:19:46|GONE|73347|(ESTABLISHED)|Mail                              73347 ekscrypto   12u  IPv4 0x422e5b6075e4523a      0t0  TCP 10.2.0.111:60742->74.125.197.108:993 (ESTABLISHED)
+2026-09-25 16:19:46|GONE|73347|(ESTABLISHED)|Mail                              73347 ekscrypto   31u  IPv4 0x422e5b6075e4523a      0t0  TCP 10.2.0.111:60742->74.125.197.108:993 (ESTABLISHED)
+2026-09-25 16:19:51|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xbe5b050c9f5d8448      0t0  UDP *:5353
+2026-09-25 16:19:51|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x289a7c9d02329e32      0t0  UDP *:5353
+2026-09-25 16:19:51|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x1dcf59c472b98bbc      0t0  UDP *:5353
+2026-09-25 16:19:51|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x398d7962f911b721      0t0  UDP *:5353
+2026-09-25 16:19:51|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x994e8aa2a351b2a2      0t0  UDP *:5353
+2026-09-25 16:19:51|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x61671c35f5b25260      0t0  UDP *:5353
+2026-09-25 16:19:55|NEW|59691|10.2.0.111:61663->18.221.229.81:443|Slack Helper                   59691 ekscrypto   30u  IPv4 0xd6dc6e300d4ebe98      0t0  UDP 10.2.0.111:61663->18.221.229.81:443
+2026-09-25 16:19:55|NEW|67969|(CLOSED)|ZCode Helper                   67969 ekscrypto   23u  IPv4 0xe4bdda7aaf5a28a4      0t0  TCP 10.2.0.111:60584->8.48.85.242:443 (CLOSED)
+2026-09-25 16:19:55|GONE|67969|(CLOSE_WAIT)|ZCode Helper                   67969 ekscrypto   23u  IPv4 0xe4bdda7aaf5a28a4      0t0  TCP 10.2.0.111:60584->8.48.85.242:443 (CLOSE_WAIT)
+2026-09-25 16:19:59|GONE|18292|(ESTABLISHED)|IMTransferAgent                   18292 ekscrypto    6u  IPv4 0xbbc075b90637aa17      0t0  TCP 10.2.0.111:60737->17.248.199.12:443 (ESTABLISHED)
+2026-09-25 16:20:00|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xbb40caf441f395f1      0t0  UDP *:5353
+2026-09-25 16:20:00|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xa06848a11a678e9e      0t0  UDP *:5353
+2026-09-25 16:20:00|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xd3b3486541f8bc48      0t0  UDP *:5353
+2026-09-25 16:20:00|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xbe5b050c9f5d8448      0t0  UDP *:5353
+2026-09-25 16:20:00|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x289a7c9d02329e32      0t0  UDP *:5353
+2026-09-25 16:20:00|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x1dcf59c472b98bbc      0t0  UDP *:5353
+2026-09-25 16:20:03|GONE|68078|(ESTABLISHED)|NewsToday2                        68078 ekscrypto   19u  IPv4  0x3cb0b2de32571dd      0t0  TCP 10.2.0.111:60722->17.253.3.131:443 (ESTABLISHED)
+2026-09-25 16:20:05|GONE|18292|(ESTABLISHED)|IMTransferAgent                   18292 ekscrypto   12u  IPv4  0x98bedaa1e4c3d32      0t0  TCP 10.2.0.111:60738->17.248.199.76:443 (ESTABLISHED)
+2026-09-25 16:20:13|GONE|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4 0x824d48291fe6a0dc      0t0  TCP 10.2.0.111:60739->140.82.112.5:443 (ESTABLISHED)
+2026-09-25 16:20:16|GONE|59691|10.2.0.111:53555->3.134.44.134:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0xbda2e098866c1547      0t0  UDP 10.2.0.111:53555->3.134.44.134:443
+2026-09-25 16:20:17|NEW|59691|10.2.0.111:63158->34.204.109.226:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0xf0b224e70474d4aa      0t0  UDP 10.2.0.111:63158->34.204.109.226:443
+2026-09-25 16:20:19|NEW|12153|10.2.0.111:57068->162.159.128.233:443|Discord Helper                 12153 ekscrypto   21u  IPv4 0x29ed5ea11057f615      0t0  UDP 10.2.0.111:57068->162.159.128.233:443
+2026-09-25 16:20:23|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xb3037275c09db6c3      0t0  UDP *:5353
+2026-09-25 16:20:23|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x224d082fed74d8d3      0t0  UDP *:5353
+2026-09-25 16:20:23|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x831d91d6e05bb824      0t0  UDP *:5353
+2026-09-25 16:20:23|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xbb40caf441f395f1      0t0  UDP *:5353
+2026-09-25 16:20:23|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xa06848a11a678e9e      0t0  UDP *:5353
+2026-09-25 16:20:23|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xd3b3486541f8bc48      0t0  UDP *:5353
+2026-09-25 16:20:25|GONE|32286|(ESTABLISHED)|codex                             32286 ekscrypto   17u  IPv4 0x256f586feca1f3ea      0t0  TCP 10.2.0.111:60702->172.64.155.209:443 (ESTABLISHED)
+2026-09-25 16:20:25|GONE|59691|10.2.0.111:61663->18.221.229.81:443|Slack Helper                   59691 ekscrypto   30u  IPv4 0xd6dc6e300d4ebe98      0t0  UDP 10.2.0.111:61663->18.221.229.81:443
+2026-09-25 16:20:30|NEW|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0xed801055419c1754      0t0  TCP 10.2.0.111:60743->8.130.222.161:443 (ESTABLISHED)
+2026-09-25 16:20:30|GONE|18292|(ESTABLISHED)|IMTransferAgent                   18292 ekscrypto    7u  IPv4 0x353d6c4b06742524      0t0  TCP 10.2.0.111:60736->17.250.102.61:443 (ESTABLISHED)
+2026-09-25 16:20:33|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x2c8080474a727114      0t0  UDP *:5353
+2026-09-25 16:20:33|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x256a4fe9c434b321      0t0  UDP *:5353
+2026-09-25 16:20:33|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x77e3f6db986c9bc6      0t0  UDP *:5353
+2026-09-25 16:20:33|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xb3037275c09db6c3      0t0  UDP *:5353
+2026-09-25 16:20:33|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x224d082fed74d8d3      0t0  UDP *:5353
+2026-09-25 16:20:33|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x831d91d6e05bb824      0t0  UDP *:5353
+2026-09-25 16:20:34|GONE|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0xed801055419c1754      0t0  TCP 10.2.0.111:60743->8.130.222.161:443 (ESTABLISHED)
+2026-09-25 16:20:36|NEW|68431|(ESTABLISHED)|ZCode Helper                   68431 ekscrypto   21u  IPv4 0x824d48291fe6a0dc      0t0  TCP 10.2.0.111:60744->123.57.116.48:443 (ESTABLISHED)
+2026-09-25 16:20:37|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x51b15ae8dda00825      0t0  UDP *:5353
+2026-09-25 16:20:37|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x5defeaf1d01a63fe      0t0  UDP *:5353
+2026-09-25 16:20:37|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xc17c40791653d0ca      0t0  UDP *:5353
+2026-09-25 16:20:37|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x2c8080474a727114      0t0  UDP *:5353
+2026-09-25 16:20:37|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x256a4fe9c434b321      0t0  UDP *:5353
+2026-09-25 16:20:37|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x77e3f6db986c9bc6      0t0  UDP *:5353
+2026-09-25 16:20:42|NEW|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4  0x3cb0b2de32571dd      0t0  TCP 10.2.0.111:60745->140.82.113.6:443 (ESTABLISHED)
+2026-09-25 16:20:42|NEW|41760|(ESTABLISHED)|ssh                               41760 ekscrypto    4u  IPv4 0xbbc075b90637aa17      0t0  TCP 10.2.0.111:60746->140.82.113.3:22 (ESTABLISHED)
+2026-09-25 16:20:42|NEW|41760|(ESTABLISHED)|ssh                               41760 ekscrypto    5u  IPv4 0xbbc075b90637aa17      0t0  TCP 10.2.0.111:60746->140.82.113.3:22 (ESTABLISHED)
+2026-09-25 16:20:44|GONE|41760|(ESTABLISHED)|ssh                               41760 ekscrypto    4u  IPv4 0xbbc075b90637aa17      0t0  TCP 10.2.0.111:60746->140.82.113.3:22 (ESTABLISHED)
+2026-09-25 16:20:44|GONE|41760|(ESTABLISHED)|ssh                               41760 ekscrypto    5u  IPv4 0xbbc075b90637aa17      0t0  TCP 10.2.0.111:60746->140.82.113.3:22 (ESTABLISHED)
+2026-09-25 16:20:45|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xcbcd6f07b53b8ffe      0t0  UDP *:5353
+2026-09-25 16:20:45|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x3b159347ce30f788      0t0  UDP *:5353
+2026-09-25 16:20:45|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xdbf96dbb5aabb089      0t0  UDP *:5353
+2026-09-25 16:20:45|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x51b15ae8dda00825      0t0  UDP *:5353
+2026-09-25 16:20:45|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x5defeaf1d01a63fe      0t0  UDP *:5353
+2026-09-25 16:20:45|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xc17c40791653d0ca      0t0  UDP *:5353
+2026-09-25 16:20:47|GONE|59691|10.2.0.111:63158->34.204.109.226:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0xf0b224e70474d4aa      0t0  UDP 10.2.0.111:63158->34.204.109.226:443
+2026-09-25 16:20:49|NEW|59691|10.2.0.111:54069->34.204.109.226:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0x966341e9cba0c75c      0t0  UDP 10.2.0.111:54069->34.204.109.226:443
+2026-09-25 16:20:49|GONE|12153|10.2.0.111:57068->162.159.128.233:443|Discord Helper                 12153 ekscrypto   21u  IPv4 0x29ed5ea11057f615      0t0  UDP 10.2.0.111:57068->162.159.128.233:443
+2026-09-25 16:20:52|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xf49d22b1059f4948      0t0  UDP *:5353
+2026-09-25 16:20:52|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x965e8d8b8a70377d      0t0  UDP *:5353
+2026-09-25 16:20:52|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xf5f0847e23204e3d      0t0  UDP *:5353
+2026-09-25 16:20:52|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xcbcd6f07b53b8ffe      0t0  UDP *:5353
+2026-09-25 16:20:52|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x3b159347ce30f788      0t0  UDP *:5353
+2026-09-25 16:20:52|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xdbf96dbb5aabb089      0t0  UDP *:5353
+2026-09-25 16:20:58|NEW|59691|10.2.0.111:62413->3.143.19.65:443|Slack Helper                   59691 ekscrypto   30u  IPv4 0xe0bc691a40b8844b      0t0  UDP 10.2.0.111:62413->3.143.19.65:443
+2026-09-25 16:21:03|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xcb44f09be0d3cc60      0t0  UDP *:5353
+2026-09-25 16:21:03|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x3f6528b1c795ec8e      0t0  UDP *:5353
+2026-09-25 16:21:03|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xd33e920f8a536f7a      0t0  UDP *:5353
+2026-09-25 16:21:03|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xf49d22b1059f4948      0t0  UDP *:5353
+2026-09-25 16:21:03|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x965e8d8b8a70377d      0t0  UDP *:5353
+2026-09-25 16:21:03|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xf5f0847e23204e3d      0t0  UDP *:5353
+2026-09-25 16:21:04|NEW|59691|10.2.0.111:57750->34.196.46.202:443|Slack Helper                   59691 ekscrypto   31u  IPv4 0x599deedfa6f723e3      0t0  UDP 10.2.0.111:57750->34.196.46.202:443
+2026-09-25 16:21:09|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xcde4bb3b1d418238      0t0  UDP *:5353
+2026-09-25 16:21:09|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x812c3bc1f895df62      0t0  UDP *:5353
+2026-09-25 16:21:09|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x78bb1c901b39cdaf      0t0  UDP *:5353
+2026-09-25 16:21:09|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xcb44f09be0d3cc60      0t0  UDP *:5353
+2026-09-25 16:21:09|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x3f6528b1c795ec8e      0t0  UDP *:5353
+2026-09-25 16:21:09|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xd33e920f8a536f7a      0t0  UDP *:5353
+2026-09-25 16:21:12|GONE|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4  0x3cb0b2de32571dd      0t0  TCP 10.2.0.111:60745->140.82.113.6:443 (ESTABLISHED)
+2026-09-25 16:21:17|GONE|59691|10.2.0.111:54069->34.204.109.226:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0x966341e9cba0c75c      0t0  UDP 10.2.0.111:54069->34.204.109.226:443
+2026-09-25 16:21:19|NEW|59691|10.2.0.111:51673->3.143.19.65:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0x13df59b57155c683      0t0  UDP 10.2.0.111:51673->3.143.19.65:443
+2026-09-25 16:21:23|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xc6eb1ba0f19c6ed4      0t0  UDP *:5353
+2026-09-25 16:21:23|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6  0x5b524cdbd5e2748      0t0  UDP *:5353
+2026-09-25 16:21:23|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x19b3c3d1df20e683      0t0  UDP *:5353
+2026-09-25 16:21:23|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xcde4bb3b1d418238      0t0  UDP *:5353
+2026-09-25 16:21:23|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x812c3bc1f895df62      0t0  UDP *:5353
+2026-09-25 16:21:23|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x78bb1c901b39cdaf      0t0  UDP *:5353
+2026-09-25 16:21:28|NEW|59691|(ESTABLISHED)|Slack Helper                   59691 ekscrypto   28u  IPv4  0x3cb0b2de32571dd      0t0  TCP 10.2.0.111:60748->13.58.249.194:443 (ESTABLISHED)
+2026-09-25 16:21:28|NEW|59691|10.2.0.111:53757->13.58.249.194:443|Slack Helper                   59691 ekscrypto   27u  IPv4 0x96e549324bff6c17      0t0  UDP 10.2.0.111:53757->13.58.249.194:443
+2026-09-25 16:21:28|GONE|59691|(ESTABLISHED)|Slack Helper                   59691 ekscrypto   28u  IPv4  0xf2c4cba2279c289      0t0  TCP 10.2.0.111:60551->18.213.32.120:443 (ESTABLISHED)
+2026-09-25 16:21:28|GONE|59691|10.2.0.111:62413->3.143.19.65:443|Slack Helper                   59691 ekscrypto   30u  IPv4 0xe0bc691a40b8844b      0t0  UDP 10.2.0.111:62413->3.143.19.65:443
+2026-09-25 16:21:33|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x222a44feb5ab586a      0t0  UDP *:5353
+2026-09-25 16:21:33|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x6b5a93a5122329b1      0t0  UDP *:5353
+2026-09-25 16:21:33|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x373b5e8d8132b764      0t0  UDP *:5353
+2026-09-25 16:21:33|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xc6eb1ba0f19c6ed4      0t0  UDP *:5353
+2026-09-25 16:21:33|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6  0x5b524cdbd5e2748      0t0  UDP *:5353
+2026-09-25 16:21:33|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x19b3c3d1df20e683      0t0  UDP *:5353
+2026-09-25 16:21:34|GONE|59691|10.2.0.111:57750->34.196.46.202:443|Slack Helper                   59691 ekscrypto   31u  IPv4 0x599deedfa6f723e3      0t0  UDP 10.2.0.111:57750->34.196.46.202:443
+2026-09-25 16:21:37|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xd3a210f214a85581      0t0  UDP *:5353
+2026-09-25 16:21:37|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x6c29f93e42705bd4      0t0  UDP *:5353
+2026-09-25 16:21:37|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x19d5f6497f8ce7a8      0t0  UDP *:5353
+2026-09-25 16:21:37|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x222a44feb5ab586a      0t0  UDP *:5353
+2026-09-25 16:21:37|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x6b5a93a5122329b1      0t0  UDP *:5353
+2026-09-25 16:21:37|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x373b5e8d8132b764      0t0  UDP *:5353
+2026-09-25 16:21:39|NEW|59691|10.2.0.111:54520->34.196.46.202:443|Slack Helper                   59691 ekscrypto   31u  IPv4  0xa769f25585b4a09      0t0  UDP 10.2.0.111:54520->34.196.46.202:443
+2026-09-25 16:21:42|NEW|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4 0xbbc075b90637aa17      0t0  TCP 10.2.0.111:60749->140.82.113.6:443 (ESTABLISHED)
+2026-09-25 16:21:42|NEW|43775|(SYN_SENT)|ssh                               43775 ekscrypto    4u  IPv4  0x98bedaa1e4c3d32      0t0  TCP 10.2.0.111:60750->140.82.112.4:22 (SYN_SENT)
+2026-09-25 16:21:42|GONE|68431|(ESTABLISHED)|ZCode Helper                   68431 ekscrypto   21u  IPv4 0x824d48291fe6a0dc      0t0  TCP 10.2.0.111:60744->123.57.116.48:443 (ESTABLISHED)
+2026-09-25 16:21:44|GONE|43775|(SYN_SENT)|ssh                               43775 ekscrypto    4u  IPv4  0x98bedaa1e4c3d32      0t0  TCP 10.2.0.111:60750->140.82.112.4:22 (SYN_SENT)
+2026-09-25 16:21:47|NEW|18292|(ESTABLISHED)|IMTransferAgent                   18292 ekscrypto    7u  IPv4 0x824d48291fe6a0dc      0t0  TCP 10.2.0.111:60752->17.250.102.61:443 (ESTABLISHED)
+2026-09-25 16:21:47|NEW|18292|(ESTABLISHED)|IMTransferAgent                   18292 ekscrypto    9u  IPv4 0x353d6c4b06742524      0t0  TCP 10.2.0.111:60753->17.248.199.12:443 (ESTABLISHED)
+2026-09-25 16:21:47|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4  0xefb7e34133c6494      0t0  UDP *:5353
+2026-09-25 16:21:47|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6  0xde5aaaf606266de      0t0  UDP *:5353
+2026-09-25 16:21:47|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x4d5d3bf573b2f746      0t0  UDP *:5353
+2026-09-25 16:21:47|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xd3a210f214a85581      0t0  UDP *:5353
+2026-09-25 16:21:47|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x6c29f93e42705bd4      0t0  UDP *:5353
+2026-09-25 16:21:47|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x19d5f6497f8ce7a8      0t0  UDP *:5353
+2026-09-25 16:21:53|NEW|12022|(ESTABLISHED)|Discord                           12022 ekscrypto   99u  IPv4  0xf2c4cba2279c289      0t0  TCP 10.2.0.111:60754->162.159.136.232:443 (ESTABLISHED)
+2026-09-25 16:21:53|NEW|12153|10.2.0.111:51259->162.159.128.233:443|Discord Helper                 12153 ekscrypto   25u  IPv4 0x3bdba8fb3c0e7204      0t0  UDP 10.2.0.111:51259->162.159.128.233:443
+2026-09-25 16:21:57|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x5ba71177af84900c      0t0  UDP *:5353
+2026-09-25 16:21:57|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xe74f8605f7ab4b14      0t0  UDP *:5353
+2026-09-25 16:21:57|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xa08a6adab58737f2      0t0  UDP *:5353
+2026-09-25 16:21:57|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4  0xefb7e34133c6494      0t0  UDP *:5353
+2026-09-25 16:21:57|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6  0xde5aaaf606266de      0t0  UDP *:5353
+2026-09-25 16:21:57|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x4d5d3bf573b2f746      0t0  UDP *:5353
+2026-09-25 16:21:57|GONE|59691|10.2.0.111:53757->13.58.249.194:443|Slack Helper                   59691 ekscrypto   27u  IPv4 0x96e549324bff6c17      0t0  UDP 10.2.0.111:53757->13.58.249.194:443
+2026-09-25 16:22:05|NEW|14888|10.2.0.111:65112|Steam Helper                   14888 ekscrypto   52u  IPv4 0x6c29f93e42705bd4      0t0  UDP 10.2.0.111:65112
+2026-09-25 16:22:05|NEW|14888|169.254.28.18:54945|Steam Helper                   14888 ekscrypto  200u  IPv4  0x82575fdfa3f7d45      0t0  UDP 169.254.28.18:54945
+2026-09-25 16:22:07|GONE|14888|10.2.0.111:65112|Steam Helper                   14888 ekscrypto   52u  IPv4 0x6c29f93e42705bd4      0t0  UDP 10.2.0.111:65112
+2026-09-25 16:22:07|GONE|14888|169.254.28.18:54945|Steam Helper                   14888 ekscrypto  200u  IPv4  0x82575fdfa3f7d45      0t0  UDP 169.254.28.18:54945
+2026-09-25 16:22:08|GONE|59691|10.2.0.111:54520->34.196.46.202:443|Slack Helper                   59691 ekscrypto   31u  IPv4  0xa769f25585b4a09      0t0  UDP 10.2.0.111:54520->34.196.46.202:443
+2026-09-25 16:22:11|GONE|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4 0xbbc075b90637aa17      0t0  TCP 10.2.0.111:60749->140.82.113.6:443 (ESTABLISHED)
+2026-09-25 16:22:19|GONE|59691|10.2.0.111:51673->3.143.19.65:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0x13df59b57155c683      0t0  UDP 10.2.0.111:51673->3.143.19.65:443
+2026-09-25 16:22:21|NEW|59691|10.2.0.111:63618->34.202.253.6:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0xde0b791c59be437c      0t0  UDP 10.2.0.111:63618->34.202.253.6:443
+2026-09-25 16:22:22|GONE|12153|10.2.0.111:51259->162.159.128.233:443|Discord Helper                 12153 ekscrypto   25u  IPv4 0x3bdba8fb3c0e7204      0t0  UDP 10.2.0.111:51259->162.159.128.233:443
+2026-09-25 16:22:24|NEW|12153|(ESTABLISHED)|Discord Helper                 12153 ekscrypto   21u  IPv4  0x98bedaa1e4c3d32      0t0  TCP 10.2.0.111:60756->162.159.137.234:443 (ESTABLISHED)
+2026-09-25 16:22:25|NEW|32286|(ESTABLISHED)|codex                             32286 ekscrypto   17u  IPv4 0xbbc075b90637aa17      0t0  TCP 10.2.0.111:60757->104.18.32.47:443 (ESTABLISHED)
+2026-09-25 16:22:27|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x812c3bc1f895df62      0t0  UDP *:5353
+2026-09-25 16:22:27|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x493d9e9dae64e8a1      0t0  UDP *:5353
+2026-09-25 16:22:27|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x8d1284c7aef5b826      0t0  UDP *:5353
+2026-09-25 16:22:27|NEW|73264|(ESTABLISHED)|AMPDeviceDiscoveryAgent           73264 ekscrypto    9u  IPv6 0x256f586feca1f3ea      0t0  TCP [fe80:e::1067:dc07:f749:27be]:60766->[fe80:e::189c:1120:a376:b3db]:62078 (ESTABLISHED)
+2026-09-25 16:22:27|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x5ba71177af84900c      0t0  UDP *:5353
+2026-09-25 16:22:27|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xe74f8605f7ab4b14      0t0  UDP *:5353
+2026-09-25 16:22:27|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xa08a6adab58737f2      0t0  UDP *:5353
+2026-09-25 16:22:29|GONE|73264|(ESTABLISHED)|AMPDeviceDiscoveryAgent           73264 ekscrypto    9u  IPv6 0x256f586feca1f3ea      0t0  TCP [fe80:e::1067:dc07:f749:27be]:60766->[fe80:e::189c:1120:a376:b3db]:62078 (ESTABLISHED)
+2026-09-25 16:22:39|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4  0x8d4e31d2cc6d54b      0t0  UDP *:5353
+2026-09-25 16:22:39|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xc6eb1ba0f19c6ed4      0t0  UDP *:5353
+2026-09-25 16:22:39|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xd3a210f214a85581      0t0  UDP *:5353
+2026-09-25 16:22:39|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x812c3bc1f895df62      0t0  UDP *:5353
+2026-09-25 16:22:39|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x493d9e9dae64e8a1      0t0  UDP *:5353
+2026-09-25 16:22:39|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x8d1284c7aef5b826      0t0  UDP *:5353
+2026-09-25 16:22:43|NEW|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4 0xc7d04a7cab9e2682      0t0  TCP 10.2.0.111:60769->140.82.112.5:443 (ESTABLISHED)
+2026-09-25 16:22:46|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x812c3bc1f895df62      0t0  UDP *:5353
+2026-09-25 16:22:46|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x493d9e9dae64e8a1      0t0  UDP *:5353
+2026-09-25 16:22:46|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x8d1284c7aef5b826      0t0  UDP *:5353
+2026-09-25 16:22:46|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4  0x8d4e31d2cc6d54b      0t0  UDP *:5353
+2026-09-25 16:22:46|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xc6eb1ba0f19c6ed4      0t0  UDP *:5353
+2026-09-25 16:22:46|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xd3a210f214a85581      0t0  UDP *:5353
+2026-09-25 16:22:47|GONE|18292|(ESTABLISHED)|IMTransferAgent                   18292 ekscrypto    7u  IPv4 0x824d48291fe6a0dc      0t0  TCP 10.2.0.111:60752->17.250.102.61:443 (ESTABLISHED)
+2026-09-25 16:22:47|GONE|18292|(ESTABLISHED)|IMTransferAgent                   18292 ekscrypto    9u  IPv4 0x353d6c4b06742524      0t0  TCP 10.2.0.111:60753->17.248.199.12:443 (ESTABLISHED)
+2026-09-25 16:22:51|GONE|59691|10.2.0.111:63618->34.202.253.6:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0xde0b791c59be437c      0t0  UDP 10.2.0.111:63618->34.202.253.6:443
+2026-09-25 16:22:52|NEW|59691|10.2.0.111:52040->34.202.253.6:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0x896a81292a128977      0t0  UDP 10.2.0.111:52040->34.202.253.6:443
+2026-09-25 16:22:55|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xc8997f20754f12a4      0t0  UDP *:5353
+2026-09-25 16:22:55|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x550dc177954edaec      0t0  UDP *:5353
+2026-09-25 16:22:55|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x104d2125f867c794      0t0  UDP *:5353
+2026-09-25 16:22:55|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x812c3bc1f895df62      0t0  UDP *:5353
+2026-09-25 16:22:55|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x493d9e9dae64e8a1      0t0  UDP *:5353
+2026-09-25 16:22:55|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x8d1284c7aef5b826      0t0  UDP *:5353
+2026-09-25 16:23:08|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xf1d46a8e1bc22c02      0t0  UDP *:5353
+2026-09-25 16:23:08|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xf0c2e2b498f63d84      0t0  UDP *:5353
+2026-09-25 16:23:08|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xdbf96dbb5aabb089      0t0  UDP *:5353
+2026-09-25 16:23:08|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xc8997f20754f12a4      0t0  UDP *:5353
+2026-09-25 16:23:08|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x550dc177954edaec      0t0  UDP *:5353
+2026-09-25 16:23:08|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x104d2125f867c794      0t0  UDP *:5353
+2026-09-25 16:23:13|GONE|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4 0xc7d04a7cab9e2682      0t0  TCP 10.2.0.111:60769->140.82.112.5:443 (ESTABLISHED)
+2026-09-25 16:23:14|NEW|31857|10.2.0.111:64399->142.250.69.110:443|Codex (Service)                31857 ekscrypto   43u  IPv4 0xc5af999f44b5b6a3      0t0  UDP 10.2.0.111:64399->142.250.69.110:443
+2026-09-25 16:23:19|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x39c02bee298b4c96      0t0  UDP *:5353
+2026-09-25 16:23:19|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x65990cefc5262233      0t0  UDP *:5353
+2026-09-25 16:23:19|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x153267c56adf0a2f      0t0  UDP *:5353
+2026-09-25 16:23:19|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xf1d46a8e1bc22c02      0t0  UDP *:5353
+2026-09-25 16:23:19|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xf0c2e2b498f63d84      0t0  UDP *:5353
+2026-09-25 16:23:19|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xdbf96dbb5aabb089      0t0  UDP *:5353
+2026-09-25 16:23:20|GONE|59691|10.2.0.111:52040->34.202.253.6:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0x896a81292a128977      0t0  UDP 10.2.0.111:52040->34.202.253.6:443
+2026-09-25 16:23:22|NEW|14905|(ESTABLISHED)|Steam Helper                   14905 ekscrypto   27u  IPv4 0x824d48291fe6a0dc      0t0  TCP 10.2.0.111:60783->23.58.127.154:443 (ESTABLISHED)
+2026-09-25 16:23:22|NEW|59691|10.2.0.111:13382->10.2.0.1:53|Slack Helper                   59691 ekscrypto   27u  IPv4 0xe5ea62124fcdb423      0t0  UDP 10.2.0.111:13382->10.2.0.1:53
+2026-09-25 16:23:22|NEW|59691|10.2.0.111:47513->10.2.0.1:53|Slack Helper                   59691 ekscrypto   24u  IPv4 0xfe45f4cafb7d32c2      0t0  UDP 10.2.0.111:47513->10.2.0.1:53
+2026-09-25 16:23:24|NEW|59691|10.2.0.111:64385->34.196.46.202:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0x373b5e8d8132b764      0t0  UDP 10.2.0.111:64385->34.196.46.202:443
+2026-09-25 16:23:24|NEW|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   34u  IPv4 0x353d6c4b06742524      0t0  TCP 10.2.0.111:60784->8.48.85.207:443 (ESTABLISHED)
+2026-09-25 16:23:24|GONE|59691|10.2.0.111:13382->10.2.0.1:53|Slack Helper                   59691 ekscrypto   27u  IPv4 0xe5ea62124fcdb423      0t0  UDP 10.2.0.111:13382->10.2.0.1:53
+2026-09-25 16:23:24|GONE|59691|10.2.0.111:47513->10.2.0.1:53|Slack Helper                   59691 ekscrypto   24u  IPv4 0xfe45f4cafb7d32c2      0t0  UDP 10.2.0.111:47513->10.2.0.1:53
+2026-09-25 16:23:29|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x40246134a676bcc7      0t0  UDP *:5353
+2026-09-25 16:23:29|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x31f702fea037059e      0t0  UDP *:5353
+2026-09-25 16:23:29|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6  0x49cab27fc04058a      0t0  UDP *:5353
+2026-09-25 16:23:29|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x39c02bee298b4c96      0t0  UDP *:5353
+2026-09-25 16:23:29|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x65990cefc5262233      0t0  UDP *:5353
+2026-09-25 16:23:29|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x153267c56adf0a2f      0t0  UDP *:5353
+2026-09-25 16:23:29|GONE|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   34u  IPv4 0x353d6c4b06742524      0t0  TCP 10.2.0.111:60784->8.48.85.207:443 (ESTABLISHED)
+2026-09-25 16:23:31|NEW|14852|(ESTABLISHED)|steam_osx                         14852 ekscrypto  209u  IPv4 0xa09264f0cf0d3275      0t0  TCP 10.2.0.111:60785->23.58.127.146:443 (ESTABLISHED)
+2026-09-25 16:23:34|NEW|14905|(ESTABLISHED)|Steam Helper                   14905 ekscrypto   26u  IPv4 0xc7d04a7cab9e2682      0t0  TCP 10.2.0.111:60786->2.20.153.213:443 (ESTABLISHED)
+2026-09-25 16:23:36|NEW|14905|(ESTABLISHED)|Steam Helper                   14905 ekscrypto   29u  IPv4 0x1a8b32f6a58acb82      0t0  TCP 10.2.0.111:60787->2.20.152.226:443 (ESTABLISHED)
+2026-09-25 16:23:42|NEW|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4 0xf99fb9d4f81d0878      0t0  TCP 10.2.0.111:60793->140.82.112.5:443 (ESTABLISHED)
+2026-09-25 16:23:42|NEW|12153|10.2.0.111:58948->162.159.138.232:443|Discord Helper                 12153 ekscrypto   25u  IPv4 0x7b549478864328c9      0t0  UDP 10.2.0.111:58948->162.159.138.232:443
+2026-09-25 16:23:42|NEW|14852|(ESTABLISHED)|steam_osx                         14852 ekscrypto  214u  IPv4 0x4ca69b6ce67c4528      0t0  TCP 127.0.0.1:57343->127.0.0.1:60789 (ESTABLISHED)
+2026-09-25 16:23:42|NEW|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto   72u  IPv4 0x78ab0c272a65bffd      0t0  TCP 10.2.0.111:60788->104.18.41.99:443 (ESTABLISHED)
+2026-09-25 16:23:42|NEW|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto   80u  IPv4 0xed801055419c1754      0t0  TCP 127.0.0.1:60789->127.0.0.1:57343 (ESTABLISHED)
+2026-09-25 16:23:42|NEW|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto   86u  IPv4 0xb34ea82e10d2d764      0t0  TCP 10.2.0.111:60790->34.111.113.40:443 (ESTABLISHED)
+2026-09-25 16:23:42|NEW|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto  112u  IPv4 0x256f586feca1f3ea      0t0  TCP 10.2.0.111:60791->34.107.172.168:443 (ESTABLISHED)
+2026-09-25 16:23:42|NEW|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto  114u  IPv4 0xcc4ec6c7197dc774      0t0  TCP 10.2.0.111:60792->172.64.145.29:443 (ESTABLISHED)
+2026-09-25 16:23:42|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xe1ae5bc26c38e08b      0t0  UDP *:5353
+2026-09-25 16:23:42|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x685b6edf4822708b      0t0  UDP *:5353
+2026-09-25 16:23:42|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x3b159347ce30f788      0t0  UDP *:5353
+2026-09-25 16:23:42|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x40246134a676bcc7      0t0  UDP *:5353
+2026-09-25 16:23:42|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x31f702fea037059e      0t0  UDP *:5353
+2026-09-25 16:23:42|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6  0x49cab27fc04058a      0t0  UDP *:5353
+2026-09-25 16:23:46|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x6db426c023137b0b      0t0  UDP *:5353
+2026-09-25 16:23:46|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x3b30f910012dfc66      0t0  UDP *:5353
+2026-09-25 16:23:46|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x2f0e5e307532d8cc      0t0  UDP *:5353
+2026-09-25 16:23:46|GONE|31857|10.2.0.111:64399->142.250.69.110:443|Codex (Service)                31857 ekscrypto   43u  IPv4 0xc5af999f44b5b6a3      0t0  UDP 10.2.0.111:64399->142.250.69.110:443
+2026-09-25 16:23:46|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xe1ae5bc26c38e08b      0t0  UDP *:5353
+2026-09-25 16:23:46|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x685b6edf4822708b      0t0  UDP *:5353
+2026-09-25 16:23:46|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x3b159347ce30f788      0t0  UDP *:5353
+2026-09-25 16:23:49|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xc13f3fbda5811efb      0t0  UDP *:5353
+2026-09-25 16:23:49|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x914f76f61af528b4      0t0  UDP *:5353
+2026-09-25 16:23:49|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xa97b50248a86c2a2      0t0  UDP *:5353
+2026-09-25 16:23:49|NEW|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   34u  IPv4 0xf93c8cfbac211594      0t0  TCP 10.2.0.111:60796->8.48.85.242:443 (ESTABLISHED)
+2026-09-25 16:23:49|NEW|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   35u  IPv4 0x422e5b6075e4523a      0t0  TCP 10.2.0.111:60797->8.48.85.242:443 (ESTABLISHED)
+2026-09-25 16:23:49|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x6db426c023137b0b      0t0  UDP *:5353
+2026-09-25 16:23:49|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x3b30f910012dfc66      0t0  UDP *:5353
+2026-09-25 16:23:49|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x2f0e5e307532d8cc      0t0  UDP *:5353
+2026-09-25 16:23:52|NEW|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0x8d8f4eb663d97952      0t0  TCP 10.2.0.111:60800->8.130.222.175:443 (ESTABLISHED)
+2026-09-25 16:23:52|GONE|59691|10.2.0.111:64385->34.196.46.202:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0x373b5e8d8132b764      0t0  UDP 10.2.0.111:64385->34.196.46.202:443
+2026-09-25 16:23:52|GONE|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   35u  IPv4 0x422e5b6075e4523a      0t0  TCP 10.2.0.111:60797->8.48.85.242:443 (ESTABLISHED)
+2026-09-25 16:23:53|NEW|59691|10.2.0.111:52317->34.196.46.202:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0x48f55ee62619b719      0t0  UDP 10.2.0.111:52317->34.196.46.202:443
+2026-09-25 16:23:53|GONE|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   34u  IPv4 0xf93c8cfbac211594      0t0  TCP 10.2.0.111:60796->8.48.85.242:443 (ESTABLISHED)
+2026-09-25 16:23:57|NEW|59691|10.2.0.111:59703->18.216.36.190:443|Slack Helper                   59691 ekscrypto   30u  IPv4 0x289a7c9d02329e32      0t0  UDP 10.2.0.111:59703->18.216.36.190:443
+2026-09-25 16:23:57|GONE|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0x8d8f4eb663d97952      0t0  TCP 10.2.0.111:60800->8.130.222.175:443 (ESTABLISHED)
+2026-09-25 16:23:58|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xc3596cad775db21c      0t0  UDP *:5353
+2026-09-25 16:23:58|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x6dea7322d95cd2a8      0t0  UDP *:5353
+2026-09-25 16:23:58|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x73d62988f9026d67      0t0  UDP *:5353
+2026-09-25 16:23:58|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xc13f3fbda5811efb      0t0  UDP *:5353
+2026-09-25 16:23:58|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x914f76f61af528b4      0t0  UDP *:5353
+2026-09-25 16:23:58|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xa97b50248a86c2a2      0t0  UDP *:5353
+2026-09-25 16:24:02|NEW|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto  118u  IPv4 0x353d6c4b06742524      0t0  TCP 10.2.0.111:60801->165.227.240.184:443 (ESTABLISHED)
+2026-09-25 16:24:02|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x9496b601a087afc2      0t0  UDP *:5353
+2026-09-25 16:24:02|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x28149b64c0f8fdeb      0t0  UDP *:5353
+2026-09-25 16:24:02|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x86672766133ec675      0t0  UDP *:5353
+2026-09-25 16:24:02|GONE|14852|(ESTABLISHED)|steam_osx                         14852 ekscrypto  209u  IPv4 0xa09264f0cf0d3275      0t0  TCP 10.2.0.111:60785->23.58.127.146:443 (ESTABLISHED)
+2026-09-25 16:24:02|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xc3596cad775db21c      0t0  UDP *:5353
+2026-09-25 16:24:02|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x6dea7322d95cd2a8      0t0  UDP *:5353
+2026-09-25 16:24:02|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x73d62988f9026d67      0t0  UDP *:5353
+2026-09-25 16:24:06|NEW|14888|10.2.0.111:59012|Steam Helper                   14888 ekscrypto   52u  IPv4 0x430009ea99027817      0t0  UDP 10.2.0.111:59012
+2026-09-25 16:24:06|NEW|14888|169.254.28.18:51102|Steam Helper                   14888 ekscrypto  200u  IPv4 0x51b15ae8dda00825      0t0  UDP 169.254.28.18:51102
+2026-09-25 16:24:06|NEW|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto  119u  IPv4 0xa09264f0cf0d3275      0t0  TCP 10.2.0.111:60802->125.253.89.29:443 (ESTABLISHED)
+2026-09-25 16:24:06|NEW|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto  123u  IPv4 0xba32daf1f476d985      0t0  TCP 10.2.0.111:60803->125.253.89.29:443 (ESTABLISHED)
+2026-09-25 16:24:06|NEW|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto  124u  IPv4 0xf3573a7a061f19ec      0t0  TCP 10.2.0.111:60804->131.153.154.11:443 (ESTABLISHED)
+2026-09-25 16:24:09|GONE|14888|10.2.0.111:59012|Steam Helper                   14888 ekscrypto   52u  IPv4 0x430009ea99027817      0t0  UDP 10.2.0.111:59012
+2026-09-25 16:24:09|GONE|14888|169.254.28.18:51102|Steam Helper                   14888 ekscrypto  200u  IPv4 0x51b15ae8dda00825      0t0  UDP 169.254.28.18:51102
+2026-09-25 16:24:13|GONE|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4 0xf99fb9d4f81d0878      0t0  TCP 10.2.0.111:60793->140.82.112.5:443 (ESTABLISHED)
+2026-09-25 16:24:16|NEW|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto  125u  IPv4 0x29b951fa7014edc3      0t0  TCP 10.2.0.111:60805->104.18.42.227:443 (ESTABLISHED)
+2026-09-25 16:24:16|NEW|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto  126u  IPv4 0x1505abaa83c9a139      0t0  TCP 10.2.0.111:60806->104.18.42.227:443 (ESTABLISHED)
+2026-09-25 16:24:16|NEW|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto  127u  IPv4 0x1f88d4080c0f0584      0t0  TCP 10.2.0.111:60807->104.18.42.227:443 (ESTABLISHED)
+2026-09-25 16:24:16|GONE|12022|(ESTABLISHED)|Discord                           12022 ekscrypto   99u  IPv4  0xf2c4cba2279c289      0t0  TCP 10.2.0.111:60754->162.159.136.232:443 (ESTABLISHED)
+2026-09-25 16:24:16|GONE|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto   86u  IPv4 0xb34ea82e10d2d764      0t0  TCP 10.2.0.111:60790->34.111.113.40:443 (ESTABLISHED)
+2026-09-25 16:24:20|NEW|96115|(ESTABLISHED)|NewsToday2                        96115 ekscrypto   16u  IPv4 0xbb8af77240530eb7      0t0  TCP 10.2.0.111:60808->17.253.3.146:443 (ESTABLISHED)
+2026-09-25 16:24:20|NEW|96115|10.2.0.111:58319->17.248.199.60:443|NewsToday2                        96115 ekscrypto   17u  IPv4  0x4c8b8f99c1039a3      0t0  UDP 10.2.0.111:58319->17.248.199.60:443
+2026-09-25 16:24:20|NEW|96115|10.2.0.111:59951->17.248.175.55:443|NewsToday2                        96115 ekscrypto   15u  IPv4 0x4b7e77509fbc7c88      0t0  UDP 10.2.0.111:59951->17.248.175.55:443
+2026-09-25 16:24:20|GONE|12153|10.2.0.111:58948->162.159.138.232:443|Discord Helper                 12153 ekscrypto   25u  IPv4 0x7b549478864328c9      0t0  UDP 10.2.0.111:58948->162.159.138.232:443
+2026-09-25 16:24:20|GONE|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto  112u  IPv4 0x256f586feca1f3ea      0t0  TCP 10.2.0.111:60791->34.107.172.168:443 (ESTABLISHED)
+2026-09-25 16:24:20|GONE|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto  114u  IPv4 0xcc4ec6c7197dc774      0t0  TCP 10.2.0.111:60792->172.64.145.29:443 (ESTABLISHED)
+2026-09-25 16:24:22|NEW|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   34u  IPv4 0x179d7f6cc183d7ca      0t0  TCP 10.2.0.111:60809->8.48.85.207:443 (ESTABLISHED)
+2026-09-25 16:24:22|NEW|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   35u  IPv4 0xf99fb9d4f81d0878      0t0  TCP 10.2.0.111:60810->8.48.85.207:443 (ESTABLISHED)
+2026-09-25 16:24:23|NEW|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0x422e5b6075e4523a      0t0  TCP 10.2.0.111:60811->59.110.96.221:443 (ESTABLISHED)
+2026-09-25 16:24:23|GONE|59691|10.2.0.111:52317->34.196.46.202:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0x48f55ee62619b719      0t0  UDP 10.2.0.111:52317->34.196.46.202:443
+2026-09-25 16:24:25|NEW|59691|10.2.0.111:65209->3.142.111.40:443|Slack Helper                   59691 ekscrypto   27u  IPv4 0xfa88b24a3f33617f      0t0  UDP 10.2.0.111:65209->3.142.111.40:443
+2026-09-25 16:24:25|NEW|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   32u  IPv6 0x4b695e4abd5d61b5      0t0  TCP [fd5d:8f9c:a309::2]:60818->[fd5d:8f9c:a309::1]:58887 (ESTABLISHED)
+2026-09-25 16:24:25|NEW|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   35u  IPv6 0xc2a2c3c156873f90      0t0  TCP [fd5d:8f9c:a309::2]:60819->[fd5d:8f9c:a309::1]:58887 (ESTABLISHED)
+2026-09-25 16:24:25|NEW|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   41u  IPv6  0x107701cb75d9582      0t0  TCP [fd22:ddfe:18f2::2]:60816->[fd22:ddfe:18f2::1]:57507 (ESTABLISHED)
+2026-09-25 16:24:25|NEW|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   42u  IPv6 0x81491e57e36e659e      0t0  TCP [fd22:ddfe:18f2::2]:60817->[fd22:ddfe:18f2::1]:57507 (ESTABLISHED)
+2026-09-25 16:24:25|GONE|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   34u  IPv4 0x179d7f6cc183d7ca      0t0  TCP 10.2.0.111:60809->8.48.85.207:443 (ESTABLISHED)
+2026-09-25 16:24:25|GONE|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   35u  IPv4 0xf99fb9d4f81d0878      0t0  TCP 10.2.0.111:60810->8.48.85.207:443 (ESTABLISHED)
+2026-09-25 16:24:25|GONE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   36u  IPv6  0x21274dba0f30ff3      0t0  TCP [fd5d:8f9c:a309::2]:60734->[fd5d:8f9c:a309::1]:58887 (ESTABLISHED)
+2026-09-25 16:24:25|GONE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   37u  IPv6 0xbb18bd167e082cb5      0t0  TCP [fd5d:8f9c:a309::2]:60735->[fd5d:8f9c:a309::1]:58887 (ESTABLISHED)
+2026-09-25 16:24:25|GONE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   39u  IPv6 0x1f075ba01411fb0d      0t0  TCP [fd22:ddfe:18f2::2]:60732->[fd22:ddfe:18f2::1]:57507 (ESTABLISHED)
+2026-09-25 16:24:25|GONE|77629|(ESTABLISHED)|CoreDeviceService                 77629 ekscrypto   40u  IPv6 0x4b58a26ee15fbd4c      0t0  TCP [fd22:ddfe:18f2::2]:60733->[fd22:ddfe:18f2::1]:57507 (ESTABLISHED)
+2026-09-25 16:24:27|NEW|73264|(ESTABLISHED)|AMPDeviceDiscoveryAgent           73264 ekscrypto    9u  IPv6 0x9d6727591d9bf115      0t0  TCP [fe80:e::1067:dc07:f749:27be]:60828->[fe80:e::189c:1120:a376:b3db]:62078 (ESTABLISHED)
+2026-09-25 16:24:27|GONE|59691|10.2.0.111:59703->18.216.36.190:443|Slack Helper                   59691 ekscrypto   30u  IPv4 0x289a7c9d02329e32      0t0  UDP 10.2.0.111:59703->18.216.36.190:443
+2026-09-25 16:24:29|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x790b5f5e052b1cb4      0t0  UDP *:5353
+2026-09-25 16:24:29|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xff04142d339f1f65      0t0  UDP *:5353
+2026-09-25 16:24:29|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6  0xa769f25585b4a09      0t0  UDP *:5353
+2026-09-25 16:24:29|NEW|67959|(SYN_SENT)|ZCode                             67959 ekscrypto   39u  IPv4 0xd1416c212f957f46      0t0  TCP 10.2.0.111:60834->123.57.116.48:443 (SYN_SENT)
+2026-09-25 16:24:29|NEW|67969|(ESTABLISHED)|ZCode Helper                   67969 ekscrypto   23u  IPv4 0xae9c3e64953b0a2c      0t0  TCP 10.2.0.111:60833->8.48.85.207:443 (ESTABLISHED)
+2026-09-25 16:24:29|NEW|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   34u  IPv4 0x8d8f4eb663d97952      0t0  TCP 10.2.0.111:60831->8.48.85.207:443 (ESTABLISHED)
+2026-09-25 16:24:29|NEW|68431|(ESTABLISHED)|ZCode Helper                   68431 ekscrypto   21u  IPv4 0x21d600ab007fc346      0t0  TCP 10.2.0.111:60832->8.48.85.207:443 (ESTABLISHED)
+2026-09-25 16:24:29|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x9496b601a087afc2      0t0  UDP *:5353
+2026-09-25 16:24:29|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x28149b64c0f8fdeb      0t0  UDP *:5353
+2026-09-25 16:24:29|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x86672766133ec675      0t0  UDP *:5353
+2026-09-25 16:24:29|GONE|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0x422e5b6075e4523a      0t0  TCP 10.2.0.111:60811->59.110.96.221:443 (ESTABLISHED)
+2026-09-25 16:24:29|GONE|67969|(CLOSED)|ZCode Helper                   67969 ekscrypto   23u  IPv4 0xe4bdda7aaf5a28a4      0t0  TCP 10.2.0.111:60584->8.48.85.242:443 (CLOSED)
+2026-09-25 16:24:29|GONE|73264|(ESTABLISHED)|AMPDeviceDiscoveryAgent           73264 ekscrypto    9u  IPv6 0x9d6727591d9bf115      0t0  TCP [fe80:e::1067:dc07:f749:27be]:60828->[fe80:e::189c:1120:a376:b3db]:62078 (ESTABLISHED)
+2026-09-25 16:24:31|NEW|48966|10.2.0.111:54197->140.248.159.6:443|itunescloudd                      48966 ekscrypto   24u  IPv4 0x48d31030e6661ccc      0t0  UDP 10.2.0.111:54197->140.248.159.6:443
+2026-09-25 16:24:31|NEW|59691|(CLOSE_WAIT)|Slack Helper                   59691 ekscrypto   28u  IPv4  0x3cb0b2de32571dd      0t0  TCP 10.2.0.111:60748->13.58.249.194:443 (CLOSE_WAIT)
+2026-09-25 16:24:31|NEW|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0xd1416c212f957f46      0t0  TCP 10.2.0.111:60834->123.57.116.48:443 (ESTABLISHED)
+2026-09-25 16:24:31|NEW|67959|(SYN_SENT)|ZCode                             67959 ekscrypto   40u  IPv4 0xbbc68ae857eb7fb2      0t0  TCP 10.2.0.111:60838->39.97.141.140:443 (SYN_SENT)
+2026-09-25 16:24:31|NEW|68431|(ESTABLISHED)|ZCode Helper                   68431 ekscrypto   23u  IPv4 0x2fb2e1ef8e030746      0t0  TCP 10.2.0.111:60835->47.77.37.148:443 (ESTABLISHED)
+2026-09-25 16:24:31|GONE|59691|(ESTABLISHED)|Slack Helper                   59691 ekscrypto   28u  IPv4  0x3cb0b2de32571dd      0t0  TCP 10.2.0.111:60748->13.58.249.194:443 (ESTABLISHED)
+2026-09-25 16:24:31|GONE|67959|(SYN_SENT)|ZCode                             67959 ekscrypto   39u  IPv4 0xd1416c212f957f46      0t0  TCP 10.2.0.111:60834->123.57.116.48:443 (SYN_SENT)
+2026-09-25 16:24:32|NEW|49001|10.2.0.111:60179->140.248.159.6:443|itunescloudd                      49001 ekscrypto   23u  IPv4 0x13e74dff5a0820e6      0t0  UDP 10.2.0.111:60179->140.248.159.6:443
+2026-09-25 16:24:32|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xa4b1bc14d2fd0f8f      0t0  UDP *:5353
+2026-09-25 16:24:32|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xb15a910a1ef09ad4      0t0  UDP *:5353
+2026-09-25 16:24:32|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xa97b50248a86c2a2      0t0  UDP *:5353
+2026-09-25 16:24:32|NEW|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   40u  IPv4 0xe4bdda7aaf5a28a4      0t0  TCP 10.2.0.111:60839->8.130.222.211:443 (ESTABLISHED)
+2026-09-25 16:24:32|NEW|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   67u  IPv4 0xc66d34a63b2875fd      0t0  TCP 10.2.0.111:60842->39.97.141.140:443 (ESTABLISHED)
+2026-09-25 16:24:32|NEW|80533|10.2.0.111:58189->17.248.199.52:443|NewsToday2                        80533 ekscrypto   13u  IPv4 0x4e69238d994de0a5      0t0  UDP 10.2.0.111:58189->17.248.199.52:443
+2026-09-25 16:24:32|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x790b5f5e052b1cb4      0t0  UDP *:5353
+2026-09-25 16:24:32|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xff04142d339f1f65      0t0  UDP *:5353
+2026-09-25 16:24:32|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6  0xa769f25585b4a09      0t0  UDP *:5353
+2026-09-25 16:24:32|GONE|67959|(SYN_SENT)|ZCode                             67959 ekscrypto   40u  IPv4 0xbbc68ae857eb7fb2      0t0  TCP 10.2.0.111:60838->39.97.141.140:443 (SYN_SENT)
+2026-09-25 16:24:34|GONE|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   34u  IPv4 0x8d8f4eb663d97952      0t0  TCP 10.2.0.111:60831->8.48.85.207:443 (ESTABLISHED)
+2026-09-25 16:24:34|GONE|68431|(ESTABLISHED)|ZCode Helper                   68431 ekscrypto   21u  IPv4 0x21d600ab007fc346      0t0  TCP 10.2.0.111:60832->8.48.85.207:443 (ESTABLISHED)
+2026-09-25 16:24:38|GONE|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   67u  IPv4 0xc66d34a63b2875fd      0t0  TCP 10.2.0.111:60842->39.97.141.140:443 (ESTABLISHED)
+2026-09-25 16:24:40|NEW|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   67u  IPv4 0xe0c56d8a06e4c225      0t0  TCP 10.2.0.111:60843->8.130.222.161:443 (ESTABLISHED)
+2026-09-25 16:24:41|NEW|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4 0xbbc68ae857eb7fb2      0t0  TCP 10.2.0.111:60844->140.82.112.5:443 (ESTABLISHED)
+2026-09-25 16:24:41|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x790b5f5e052b1cb4      0t0  UDP *:5353
+2026-09-25 16:24:41|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x224d082fed74d8d3      0t0  UDP *:5353
+2026-09-25 16:24:41|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xf1d46a8e1bc22c02      0t0  UDP *:5353
+2026-09-25 16:24:41|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xa4b1bc14d2fd0f8f      0t0  UDP *:5353
+2026-09-25 16:24:41|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xb15a910a1ef09ad4      0t0  UDP *:5353
+2026-09-25 16:24:41|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xa97b50248a86c2a2      0t0  UDP *:5353
+2026-09-25 16:24:45|NEW|73347|(ESTABLISHED)|Mail                              73347 ekscrypto   12u  IPv4  0xf2c4cba2279c289      0t0  TCP 10.2.0.111:60847->74.125.197.108:993 (ESTABLISHED)
+2026-09-25 16:24:45|NEW|73347|(ESTABLISHED)|Mail                              73347 ekscrypto   31u  IPv4  0xf2c4cba2279c289      0t0  TCP 10.2.0.111:60847->74.125.197.108:993 (ESTABLISHED)
+2026-09-25 16:24:47|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xe0bc691a40b8844b      0t0  UDP *:5353
+2026-09-25 16:24:47|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6  0x5dc24a8b936ea24      0t0  UDP *:5353
+2026-09-25 16:24:47|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6  0x2552b134c068c4a      0t0  UDP *:5353
+2026-09-25 16:24:47|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x790b5f5e052b1cb4      0t0  UDP *:5353
+2026-09-25 16:24:47|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x224d082fed74d8d3      0t0  UDP *:5353
+2026-09-25 16:24:47|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xf1d46a8e1bc22c02      0t0  UDP *:5353
+2026-09-25 16:24:47|GONE|73347|(ESTABLISHED)|Mail                              73347 ekscrypto   12u  IPv4  0xf2c4cba2279c289      0t0  TCP 10.2.0.111:60847->74.125.197.108:993 (ESTABLISHED)
+2026-09-25 16:24:47|GONE|73347|(ESTABLISHED)|Mail                              73347 ekscrypto   31u  IPv4  0xf2c4cba2279c289      0t0  TCP 10.2.0.111:60847->74.125.197.108:993 (ESTABLISHED)
+2026-09-25 16:24:49|GONE|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   67u  IPv4 0xe0c56d8a06e4c225      0t0  TCP 10.2.0.111:60843->8.130.222.161:443 (ESTABLISHED)
+2026-09-25 16:24:49|GONE|96115|10.2.0.111:58319->17.248.199.60:443|NewsToday2                        96115 ekscrypto   17u  IPv4  0x4c8b8f99c1039a3      0t0  UDP 10.2.0.111:58319->17.248.199.60:443
+2026-09-25 16:24:49|GONE|96115|10.2.0.111:59951->17.248.175.55:443|NewsToday2                        96115 ekscrypto   15u  IPv4 0x4b7e77509fbc7c88      0t0  UDP 10.2.0.111:59951->17.248.175.55:443
+2026-09-25 16:24:54|GONE|59691|10.2.0.111:65209->3.142.111.40:443|Slack Helper                   59691 ekscrypto   27u  IPv4 0xfa88b24a3f33617f      0t0  UDP 10.2.0.111:65209->3.142.111.40:443
+2026-09-25 16:24:56|NEW|59691|10.2.0.111:57576->3.142.111.40:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0xcb44f09be0d3cc60      0t0  UDP 10.2.0.111:57576->3.142.111.40:443
+2026-09-25 16:25:02|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xa08a6adab58737f2      0t0  UDP *:5353
+2026-09-25 16:25:02|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x2bd45f84dc672946      0t0  UDP *:5353
+2026-09-25 16:25:02|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x398d7962f911b721      0t0  UDP *:5353
+2026-09-25 16:25:02|NEW|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   67u  IPv4 0x422e5b6075e4523a      0t0  TCP 10.2.0.111:60852->59.110.96.221:443 (ESTABLISHED)
+2026-09-25 16:25:02|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xe0bc691a40b8844b      0t0  UDP *:5353
+2026-09-25 16:25:02|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6  0x5dc24a8b936ea24      0t0  UDP *:5353
+2026-09-25 16:25:02|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6  0x2552b134c068c4a      0t0  UDP *:5353
+2026-09-25 16:25:02|GONE|68431|(ESTABLISHED)|ZCode Helper                   68431 ekscrypto   23u  IPv4 0x2fb2e1ef8e030746      0t0  TCP 10.2.0.111:60835->47.77.37.148:443 (ESTABLISHED)
+2026-09-25 16:25:02|GONE|80533|10.2.0.111:58189->17.248.199.52:443|NewsToday2                        80533 ekscrypto   13u  IPv4 0x4e69238d994de0a5      0t0  UDP 10.2.0.111:58189->17.248.199.52:443
+2026-09-25 16:25:09|NEW|68431|(ESTABLISHED)|ZCode Helper                   68431 ekscrypto   21u  IPv4 0x21d600ab007fc346      0t0  TCP 10.2.0.111:60853->47.77.37.53:443 (ESTABLISHED)
+2026-09-25 16:25:11|NEW|67959|(SYN_SENT)|ZCode                             67959 ekscrypto   67u  IPv4 0x8d8f4eb663d97952      0t0  TCP 10.2.0.111:60855->59.110.96.118:443 (SYN_SENT)
+2026-09-25 16:25:11|GONE|48966|10.2.0.111:54197->140.248.159.6:443|itunescloudd                      48966 ekscrypto   24u  IPv4 0x48d31030e6661ccc      0t0  UDP 10.2.0.111:54197->140.248.159.6:443
+2026-09-25 16:25:11|GONE|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   67u  IPv4 0x422e5b6075e4523a      0t0  TCP 10.2.0.111:60852->59.110.96.221:443 (ESTABLISHED)
+2026-09-25 16:25:13|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x91a3befad51cef41      0t0  UDP *:5353
+2026-09-25 16:25:13|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xfefdd099fd638b52      0t0  UDP *:5353
+2026-09-25 16:25:13|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xfe45f4cafb7d32c2      0t0  UDP *:5353
+2026-09-25 16:25:13|NEW|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   67u  IPv4 0x9d6727591d9bf115      0t0  TCP 10.2.0.111:60857->8.130.222.161:443 (ESTABLISHED)
+2026-09-25 16:25:13|GONE|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4 0xbbc68ae857eb7fb2      0t0  TCP 10.2.0.111:60844->140.82.112.5:443 (ESTABLISHED)
+2026-09-25 16:25:13|GONE|49001|10.2.0.111:60179->140.248.159.6:443|itunescloudd                      49001 ekscrypto   23u  IPv4 0x13e74dff5a0820e6      0t0  UDP 10.2.0.111:60179->140.248.159.6:443
+2026-09-25 16:25:13|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xa08a6adab58737f2      0t0  UDP *:5353
+2026-09-25 16:25:13|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x2bd45f84dc672946      0t0  UDP *:5353
+2026-09-25 16:25:13|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x398d7962f911b721      0t0  UDP *:5353
+2026-09-25 16:25:13|GONE|67959|(SYN_SENT)|ZCode                             67959 ekscrypto   67u  IPv4 0x8d8f4eb663d97952      0t0  TCP 10.2.0.111:60855->59.110.96.118:443 (SYN_SENT)
+2026-09-25 16:25:17|NEW|59691|(CLOSED)|Slack Helper                   59691 ekscrypto   28u  IPv4  0x3cb0b2de32571dd      0t0  TCP 10.2.0.111:60748->13.58.249.194:443 (CLOSED)
+2026-09-25 16:25:17|GONE|59691|(CLOSE_WAIT)|Slack Helper                   59691 ekscrypto   28u  IPv4  0x3cb0b2de32571dd      0t0  TCP 10.2.0.111:60748->13.58.249.194:443 (CLOSE_WAIT)
+2026-09-25 16:25:17|GONE|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   67u  IPv4 0x9d6727591d9bf115      0t0  TCP 10.2.0.111:60857->8.130.222.161:443 (ESTABLISHED)
+2026-09-25 16:25:20|NEW|47599|(CLOSE_WAIT)|BitCraft                          47599 ekscrypto  124u  IPv4 0xf3573a7a061f19ec      0t0  TCP 10.2.0.111:60804->131.153.154.11:443 (CLOSE_WAIT)
+2026-09-25 16:25:20|GONE|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto  118u  IPv4 0x353d6c4b06742524      0t0  TCP 10.2.0.111:60801->165.227.240.184:443 (ESTABLISHED)
+2026-09-25 16:25:20|GONE|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto  124u  IPv4 0xf3573a7a061f19ec      0t0  TCP 10.2.0.111:60804->131.153.154.11:443 (ESTABLISHED)
+2026-09-25 16:25:24|GONE|14905|(ESTABLISHED)|Steam Helper                   14905 ekscrypto   27u  IPv4 0x824d48291fe6a0dc      0t0  TCP 10.2.0.111:60783->23.58.127.154:443 (ESTABLISHED)
+2026-09-25 16:25:27|NEW|50635|10.2.0.111:53789->140.248.159.6:443|itunescloudd                      50635 ekscrypto   20u  IPv4 0x5bc876543042c7d6      0t0  UDP 10.2.0.111:53789->140.248.159.6:443
+2026-09-25 16:25:27|NEW|59691|10.2.0.111:55560->18.216.36.190:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0x6e7bc58853c690c4      0t0  UDP 10.2.0.111:55560->18.216.36.190:443
+2026-09-25 16:25:27|NEW|67969|(ESTABLISHED)|ZCode Helper                   67969 ekscrypto   24u  IPv4 0xe0c56d8a06e4c225      0t0  TCP 10.2.0.111:60858->47.246.22.189:443 (ESTABLISHED)
+2026-09-25 16:25:27|GONE|59691|10.2.0.111:57576->3.142.111.40:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0xcb44f09be0d3cc60      0t0  UDP 10.2.0.111:57576->3.142.111.40:443
+2026-09-25 16:25:30|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x5e62f8529b003055      0t0  UDP *:5353
+2026-09-25 16:25:30|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x2f0e5e307532d8cc      0t0  UDP *:5353
+2026-09-25 16:25:30|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x8d1284c7aef5b826      0t0  UDP *:5353
+2026-09-25 16:25:30|NEW|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   67u  IPv4 0xbbc68ae857eb7fb2      0t0  TCP 10.2.0.111:60860->123.56.37.46:443 (ESTABLISHED)
+2026-09-25 16:25:30|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x91a3befad51cef41      0t0  UDP *:5353
+2026-09-25 16:25:30|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xfefdd099fd638b52      0t0  UDP *:5353
+2026-09-25 16:25:30|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xfe45f4cafb7d32c2      0t0  UDP *:5353
+2026-09-25 16:25:35|NEW|68431|(SYN_SENT)|ZCode Helper                   68431 ekscrypto   23u  IPv4 0x2fb2e1ef8e030746      0t0  TCP 10.2.0.111:60861->59.110.96.118:443 (SYN_SENT)
+2026-09-25 16:25:36|GONE|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   67u  IPv4 0xbbc68ae857eb7fb2      0t0  TCP 10.2.0.111:60860->123.56.37.46:443 (ESTABLISHED)
+2026-09-25 16:25:39|NEW|67959|(SYN_SENT)|ZCode                             67959 ekscrypto   67u  IPv4 0xc66d34a63b2875fd      0t0  TCP 10.2.0.111:60870->39.97.141.140:443 (SYN_SENT)
+2026-09-25 16:25:39|NEW|68431|(ESTABLISHED)|ZCode Helper                   68431 ekscrypto   23u  IPv4 0xccc4b634e620320e      0t0  TCP 10.2.0.111:60867->59.110.96.221:443 (ESTABLISHED)
+2026-09-25 16:25:39|GONE|68431|(SYN_SENT)|ZCode Helper                   68431 ekscrypto   23u  IPv4 0x2fb2e1ef8e030746      0t0  TCP 10.2.0.111:60861->59.110.96.118:443 (SYN_SENT)
+2026-09-25 16:25:42|NEW|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4 0x422e5b6075e4523a      0t0  TCP 10.2.0.111:60872->140.82.114.6:443 (ESTABLISHED)
+2026-09-25 16:25:42|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xcde4bb3b1d418238      0t0  UDP *:5353
+2026-09-25 16:25:42|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x98b706feca6350a6      0t0  UDP *:5353
+2026-09-25 16:25:42|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xcb44f09be0d3cc60      0t0  UDP *:5353
+2026-09-25 16:25:42|NEW|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   67u  IPv4 0x2fb2e1ef8e030746      0t0  TCP 10.2.0.111:60871->8.130.222.161:443 (ESTABLISHED)
+2026-09-25 16:25:42|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x5e62f8529b003055      0t0  UDP *:5353
+2026-09-25 16:25:42|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x2f0e5e307532d8cc      0t0  UDP *:5353
+2026-09-25 16:25:42|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x8d1284c7aef5b826      0t0  UDP *:5353
+2026-09-25 16:25:42|GONE|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0xd1416c212f957f46      0t0  TCP 10.2.0.111:60834->123.57.116.48:443 (ESTABLISHED)
+2026-09-25 16:25:42|GONE|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   40u  IPv4 0xe4bdda7aaf5a28a4      0t0  TCP 10.2.0.111:60839->8.130.222.211:443 (ESTABLISHED)
+2026-09-25 16:25:42|GONE|67959|(SYN_SENT)|ZCode                             67959 ekscrypto   67u  IPv4 0xc66d34a63b2875fd      0t0  TCP 10.2.0.111:60870->39.97.141.140:443 (SYN_SENT)
+2026-09-25 16:25:45|NEW|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   34u  IPv4 0xe4bdda7aaf5a28a4      0t0  TCP 10.2.0.111:60874->47.246.22.189:443 (ESTABLISHED)
+2026-09-25 16:25:45|NEW|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   35u  IPv4 0x8d8f4eb663d97952      0t0  TCP 10.2.0.111:60875->47.246.22.189:443 (ESTABLISHED)
+2026-09-25 16:25:45|GONE|47599|(CLOSE_WAIT)|BitCraft                          47599 ekscrypto  124u  IPv4 0xf3573a7a061f19ec      0t0  TCP 10.2.0.111:60804->131.153.154.11:443 (CLOSE_WAIT)
+2026-09-25 16:25:45|GONE|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   67u  IPv4 0x2fb2e1ef8e030746      0t0  TCP 10.2.0.111:60871->8.130.222.161:443 (ESTABLISHED)
+2026-09-25 16:25:47|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xcdd2564da9b1423e      0t0  UDP *:5353
+2026-09-25 16:25:47|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x41dbaa5b4c9fbd72      0t0  UDP *:5353
+2026-09-25 16:25:47|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x6a1d5fe87af15213      0t0  UDP *:5353
+2026-09-25 16:25:47|NEW|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0xf3573a7a061f19ec      0t0  TCP 10.2.0.111:60877->59.110.96.118:443 (ESTABLISHED)
+2026-09-25 16:25:47|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xcde4bb3b1d418238      0t0  UDP *:5353
+2026-09-25 16:25:47|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x98b706feca6350a6      0t0  UDP *:5353
+2026-09-25 16:25:47|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xcb44f09be0d3cc60      0t0  UDP *:5353
+2026-09-25 16:25:49|GONE|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   34u  IPv4 0xe4bdda7aaf5a28a4      0t0  TCP 10.2.0.111:60874->47.246.22.189:443 (ESTABLISHED)
+2026-09-25 16:25:49|GONE|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   35u  IPv4 0x8d8f4eb663d97952      0t0  TCP 10.2.0.111:60875->47.246.22.189:443 (ESTABLISHED)
+2026-09-25 16:25:50|NEW|12153|10.2.0.111:56304->162.159.138.232:443|Discord Helper                 12153 ekscrypto   25u  IPv4  0x4bad1c4a66bc88d      0t0  UDP 10.2.0.111:56304->162.159.138.232:443
+2026-09-25 16:25:52|GONE|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0xf3573a7a061f19ec      0t0  TCP 10.2.0.111:60877->59.110.96.118:443 (ESTABLISHED)
+2026-09-25 16:25:54|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4  0x660225bdd1252af      0t0  UDP *:5353
+2026-09-25 16:25:54|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x5f6c273cbeb30752      0t0  UDP *:5353
+2026-09-25 16:25:54|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x65990cefc5262233      0t0  UDP *:5353
+2026-09-25 16:25:54|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xcdd2564da9b1423e      0t0  UDP *:5353
+2026-09-25 16:25:54|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x41dbaa5b4c9fbd72      0t0  UDP *:5353
+2026-09-25 16:25:54|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x6a1d5fe87af15213      0t0  UDP *:5353
+2026-09-25 16:25:56|GONE|59691|10.2.0.111:55560->18.216.36.190:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0x6e7bc58853c690c4      0t0  UDP 10.2.0.111:55560->18.216.36.190:443
+2026-09-25 16:25:58|NEW|59691|10.2.0.111:57279->18.216.36.190:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0xba91bda9f1ba5ea2      0t0  UDP 10.2.0.111:57279->18.216.36.190:443
+2026-09-25 16:26:03|NEW|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0x824d48291fe6a0dc      0t0  TCP 10.2.0.111:60878->123.57.116.48:443 (ESTABLISHED)
+2026-09-25 16:26:03|GONE|50635|10.2.0.111:53789->140.248.159.6:443|itunescloudd                      50635 ekscrypto   20u  IPv4 0x5bc876543042c7d6      0t0  UDP 10.2.0.111:53789->140.248.159.6:443
+2026-09-25 16:26:07|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x5fcfe8a97bdea586      0t0  UDP *:5353
+2026-09-25 16:26:07|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xdfee0cbe2fbafe43      0t0  UDP *:5353
+2026-09-25 16:26:07|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xb15a910a1ef09ad4      0t0  UDP *:5353
+2026-09-25 16:26:07|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4  0x660225bdd1252af      0t0  UDP *:5353
+2026-09-25 16:26:07|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x5f6c273cbeb30752      0t0  UDP *:5353
+2026-09-25 16:26:07|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x65990cefc5262233      0t0  UDP *:5353
+2026-09-25 16:26:09|GONE|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0x824d48291fe6a0dc      0t0  TCP 10.2.0.111:60878->123.57.116.48:443 (ESTABLISHED)
+2026-09-25 16:26:12|GONE|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4 0x422e5b6075e4523a      0t0  TCP 10.2.0.111:60872->140.82.114.6:443 (ESTABLISHED)
+2026-09-25 16:26:14|GONE|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto  126u  IPv4 0x1505abaa83c9a139      0t0  TCP 10.2.0.111:60806->104.18.42.227:443 (ESTABLISHED)
+2026-09-25 16:26:14|GONE|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto  127u  IPv4 0x1f88d4080c0f0584      0t0  TCP 10.2.0.111:60807->104.18.42.227:443 (ESTABLISHED)
+2026-09-25 16:26:14|GONE|96115|(ESTABLISHED)|NewsToday2                        96115 ekscrypto   16u  IPv4 0xbb8af77240530eb7      0t0  TCP 10.2.0.111:60808->17.253.3.146:443 (ESTABLISHED)
+2026-09-25 16:26:16|NEW|59691|(ESTABLISHED)|Slack Helper                   59691 ekscrypto   28u  IPv4 0x2fb2e1ef8e030746      0t0  TCP 10.2.0.111:60879->3.142.111.40:443 (ESTABLISHED)
+2026-09-25 16:26:16|NEW|59691|10.2.0.111:50550->3.142.111.40:443|Slack Helper                   59691 ekscrypto   27u  IPv4 0x8a4f84e5827f926d      0t0  UDP 10.2.0.111:50550->3.142.111.40:443
+2026-09-25 16:26:16|GONE|59691|(CLOSED)|Slack Helper                   59691 ekscrypto   28u  IPv4  0x3cb0b2de32571dd      0t0  TCP 10.2.0.111:60748->13.58.249.194:443 (CLOSED)
+2026-09-25 16:26:17|GONE|14905|(ESTABLISHED)|Steam Helper                   14905 ekscrypto   26u  IPv4 0xc7d04a7cab9e2682      0t0  TCP 10.2.0.111:60786->2.20.153.213:443 (ESTABLISHED)
+2026-09-25 16:26:17|GONE|14905|(ESTABLISHED)|Steam Helper                   14905 ekscrypto   29u  IPv4 0x1a8b32f6a58acb82      0t0  TCP 10.2.0.111:60787->2.20.152.226:443 (ESTABLISHED)
+2026-09-25 16:26:21|GONE|12153|10.2.0.111:56304->162.159.138.232:443|Discord Helper                 12153 ekscrypto   25u  IPv4  0x4bad1c4a66bc88d      0t0  UDP 10.2.0.111:56304->162.159.138.232:443
+2026-09-25 16:26:23|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x966341e9cba0c75c      0t0  UDP *:5353
+2026-09-25 16:26:23|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x94569a2cfe533f93      0t0  UDP *:5353
+2026-09-25 16:26:23|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xf421919c2a4f279d      0t0  UDP *:5353
+2026-09-25 16:26:23|NEW|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   34u  IPv4 0x8d8f4eb663d97952      0t0  TCP 10.2.0.111:60880->47.246.22.189:443 (ESTABLISHED)
+2026-09-25 16:26:23|NEW|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   35u  IPv4 0xe4bdda7aaf5a28a4      0t0  TCP 10.2.0.111:60881->47.246.22.189:443 (ESTABLISHED)
+2026-09-25 16:26:23|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x5fcfe8a97bdea586      0t0  UDP *:5353
+2026-09-25 16:26:23|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xdfee0cbe2fbafe43      0t0  UDP *:5353
+2026-09-25 16:26:23|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xb15a910a1ef09ad4      0t0  UDP *:5353
+2026-09-25 16:26:25|NEW|67959|(SYN_SENT)|ZCode                             67959 ekscrypto   39u  IPv4 0xf3573a7a061f19ec      0t0  TCP 10.2.0.111:60882->39.97.141.140:443 (SYN_SENT)
+2026-09-25 16:26:25|GONE|32286|(ESTABLISHED)|codex                             32286 ekscrypto   17u  IPv4 0xbbc075b90637aa17      0t0  TCP 10.2.0.111:60757->104.18.32.47:443 (ESTABLISHED)
+2026-09-25 16:26:27|NEW|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4  0x3cb0b2de32571dd      0t0  TCP 10.2.0.111:60884->8.130.222.211:443 (ESTABLISHED)
+2026-09-25 16:26:27|GONE|59691|10.2.0.111:57279->18.216.36.190:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0xba91bda9f1ba5ea2      0t0  UDP 10.2.0.111:57279->18.216.36.190:443
+2026-09-25 16:26:27|GONE|67959|(SYN_SENT)|ZCode                             67959 ekscrypto   39u  IPv4 0xf3573a7a061f19ec      0t0  TCP 10.2.0.111:60882->39.97.141.140:443 (SYN_SENT)
+2026-09-25 16:26:27|GONE|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   34u  IPv4 0x8d8f4eb663d97952      0t0  TCP 10.2.0.111:60880->47.246.22.189:443 (ESTABLISHED)
+2026-09-25 16:26:27|GONE|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   35u  IPv4 0xe4bdda7aaf5a28a4      0t0  TCP 10.2.0.111:60881->47.246.22.189:443 (ESTABLISHED)
+2026-09-25 16:26:28|NEW|59691|10.2.0.111:64608->3.143.19.65:443|Slack Helper                   59691 ekscrypto   24u  IPv4  0xf12c60361a25910      0t0  UDP 10.2.0.111:64608->3.143.19.65:443
+2026-09-25 16:26:32|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x992d92cb0069d795      0t0  UDP *:5353
+2026-09-25 16:26:32|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x36e83119ab0a712e      0t0  UDP *:5353
+2026-09-25 16:26:32|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6  0x1801c98e0929688      0t0  UDP *:5353
+2026-09-25 16:26:32|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x966341e9cba0c75c      0t0  UDP *:5353
+2026-09-25 16:26:32|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x94569a2cfe533f93      0t0  UDP *:5353
+2026-09-25 16:26:32|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xf421919c2a4f279d      0t0  UDP *:5353
+2026-09-25 16:26:34|NEW|67969|10.2.0.111:15600->10.2.0.1:53|ZCode Helper                   67969 ekscrypto   27u  IPv4 0x5d1470bc5f68a2ea      0t0  UDP 10.2.0.111:15600->10.2.0.1:53
+2026-09-25 16:26:34|NEW|67969|10.2.0.111:43511->10.2.0.1:53|ZCode Helper                   67969 ekscrypto   25u  IPv4 0x91a3befad51cef41      0t0  UDP 10.2.0.111:43511->10.2.0.1:53
+2026-09-25 16:26:34|GONE|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4  0x3cb0b2de32571dd      0t0  TCP 10.2.0.111:60884->8.130.222.211:443 (ESTABLISHED)
+2026-09-25 16:26:36|GONE|67969|10.2.0.111:15600->10.2.0.1:53|ZCode Helper                   67969 ekscrypto   27u  IPv4 0x5d1470bc5f68a2ea      0t0  UDP 10.2.0.111:15600->10.2.0.1:53
+2026-09-25 16:26:36|GONE|67969|10.2.0.111:43511->10.2.0.1:53|ZCode Helper                   67969 ekscrypto   25u  IPv4 0x91a3befad51cef41      0t0  UDP 10.2.0.111:43511->10.2.0.1:53
+2026-09-25 16:26:39|NEW|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0xf3573a7a061f19ec      0t0  TCP 10.2.0.111:60886->8.130.222.175:443 (ESTABLISHED)
+2026-09-25 16:26:41|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xbb40caf441f395f1      0t0  UDP *:5353
+2026-09-25 16:26:41|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x8440afbad35d18f1      0t0  UDP *:5353
+2026-09-25 16:26:41|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xc13f3fbda5811efb      0t0  UDP *:5353
+2026-09-25 16:26:41|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x992d92cb0069d795      0t0  UDP *:5353
+2026-09-25 16:26:41|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x36e83119ab0a712e      0t0  UDP *:5353
+2026-09-25 16:26:41|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6  0x1801c98e0929688      0t0  UDP *:5353
+2026-09-25 16:26:43|NEW|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4 0x824d48291fe6a0dc      0t0  TCP 10.2.0.111:60887->140.82.114.6:443 (ESTABLISHED)
+2026-09-25 16:26:43|GONE|68431|(ESTABLISHED)|ZCode Helper                   68431 ekscrypto   23u  IPv4 0xccc4b634e620320e      0t0  TCP 10.2.0.111:60867->59.110.96.221:443 (ESTABLISHED)
+2026-09-25 16:26:45|GONE|59691|10.2.0.111:50550->3.142.111.40:443|Slack Helper                   59691 ekscrypto   27u  IPv4 0x8a4f84e5827f926d      0t0  UDP 10.2.0.111:50550->3.142.111.40:443
+2026-09-25 16:26:45|GONE|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0xf3573a7a061f19ec      0t0  TCP 10.2.0.111:60886->8.130.222.175:443 (ESTABLISHED)
+2026-09-25 16:26:46|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xe604d3c1a495ad14      0t0  UDP *:5353
+2026-09-25 16:26:46|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x546042c2dc84275a      0t0  UDP *:5353
+2026-09-25 16:26:47|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xe2ca54192910f7b2      0t0  UDP *:5353
+2026-09-25 16:26:47|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xbb40caf441f395f1      0t0  UDP *:5353
+2026-09-25 16:26:47|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x8440afbad35d18f1      0t0  UDP *:5353
+2026-09-25 16:26:47|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xc13f3fbda5811efb      0t0  UDP *:5353
+2026-09-25 16:26:50|NEW|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   34u  IPv4 0x1505abaa83c9a139      0t0  TCP 10.2.0.111:60891->8.48.85.179:443 (ESTABLISHED)
+2026-09-25 16:26:53|NEW|12153|10.2.0.111:64113->162.159.138.232:443|Discord Helper                 12153 ekscrypto   25u  IPv4  0x6559c6141bd7957      0t0  UDP 10.2.0.111:64113->162.159.138.232:443
+2026-09-25 16:26:53|NEW|67959|(SYN_SENT)|ZCode                             67959 ekscrypto   39u  IPv4 0xcc1e66a67a7f5f30      0t0  TCP 10.2.0.111:60897->8.130.222.211:443 (SYN_SENT)
+2026-09-25 16:26:53|NEW|83614|(ESTABLISHED)|Brave Browser Helper        83614 ekscrypto   29u  IPv4 0x1f88d4080c0f0584      0t0  TCP 10.2.0.111:60895->54.201.62.95:443 (ESTABLISHED)
+2026-09-25 16:26:53|GONE|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   34u  IPv4 0x1505abaa83c9a139      0t0  TCP 10.2.0.111:60891->8.48.85.179:443 (ESTABLISHED)
+2026-09-25 16:26:53|GONE|68431|(ESTABLISHED)|ZCode Helper                   68431 ekscrypto   21u  IPv4 0x21d600ab007fc346      0t0  TCP 10.2.0.111:60853->47.77.37.53:443 (ESTABLISHED)
+2026-09-25 16:26:55|NEW|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0xc66d34a63b2875fd      0t0  TCP 10.2.0.111:60898->123.56.37.46:443 (ESTABLISHED)
+2026-09-25 16:26:55|GONE|67959|(SYN_SENT)|ZCode                             67959 ekscrypto   39u  IPv4 0xcc1e66a67a7f5f30      0t0  TCP 10.2.0.111:60897->8.130.222.211:443 (SYN_SENT)
+2026-09-25 16:26:57|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4  0x7f2554a292a309f      0t0  UDP *:5353
+2026-09-25 16:26:57|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xe5ea62124fcdb423      0t0  UDP *:5353
+2026-09-25 16:26:57|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x73d62988f9026d67      0t0  UDP *:5353
+2026-09-25 16:26:57|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xe604d3c1a495ad14      0t0  UDP *:5353
+2026-09-25 16:26:57|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x546042c2dc84275a      0t0  UDP *:5353
+2026-09-25 16:26:57|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xe2ca54192910f7b2      0t0  UDP *:5353
+2026-09-25 16:26:57|GONE|59691|10.2.0.111:64608->3.143.19.65:443|Slack Helper                   59691 ekscrypto   24u  IPv4  0xf12c60361a25910      0t0  UDP 10.2.0.111:64608->3.143.19.65:443
+2026-09-25 16:26:59|NEW|59691|10.2.0.111:54038->3.143.19.65:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0x9cd59342ffbb3a57      0t0  UDP 10.2.0.111:54038->3.143.19.65:443
+2026-09-25 16:26:59|GONE|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0xc66d34a63b2875fd      0t0  TCP 10.2.0.111:60898->123.56.37.46:443 (ESTABLISHED)
+2026-09-25 16:27:04|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xc68a7b058237efd7      0t0  UDP *:5353
+2026-09-25 16:27:04|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x6e7616d6a16d9d32      0t0  UDP *:5353
+2026-09-25 16:27:04|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xf236af799e6227e6      0t0  UDP *:5353
+2026-09-25 16:27:04|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4  0x7f2554a292a309f      0t0  UDP *:5353
+2026-09-25 16:27:04|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xe5ea62124fcdb423      0t0  UDP *:5353
+2026-09-25 16:27:04|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x73d62988f9026d67      0t0  UDP *:5353
+2026-09-25 16:27:04|GONE|83614|(ESTABLISHED)|Brave Browser Helper        83614 ekscrypto   29u  IPv4 0x1f88d4080c0f0584      0t0  TCP 10.2.0.111:60895->54.201.62.95:443 (ESTABLISHED)
+2026-09-25 16:27:05|NEW|83614|10.2.0.111:64090->74.125.197.102:443|Brave Browser Helper        83614 ekscrypto   29u  IPv4 0xeb6298aa2be3032f      0t0  UDP 10.2.0.111:64090->74.125.197.102:443
+2026-09-25 16:27:10|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x937fce3680cb4384      0t0  UDP *:5353
+2026-09-25 16:27:10|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xc51117286fc424e6      0t0  UDP *:5353
+2026-09-25 16:27:10|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x8d1284c7aef5b826      0t0  UDP *:5353
+2026-09-25 16:27:10|NEW|59691|10.2.0.111:64163->3.91.140.69:443|Slack Helper                   59691 ekscrypto   27u  IPv4 0xbda2e098866c1547      0t0  UDP 10.2.0.111:64163->3.91.140.69:443
+2026-09-25 16:27:10|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xc68a7b058237efd7      0t0  UDP *:5353
+2026-09-25 16:27:10|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x6e7616d6a16d9d32      0t0  UDP *:5353
+2026-09-25 16:27:10|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xf236af799e6227e6      0t0  UDP *:5353
+2026-09-25 16:27:12|GONE|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4 0x824d48291fe6a0dc      0t0  TCP 10.2.0.111:60887->140.82.114.6:443 (ESTABLISHED)
+2026-09-25 16:27:15|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xbe5b050c9f5d8448      0t0  UDP *:5353
+2026-09-25 16:27:15|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x5f7a6515e33d23de      0t0  UDP *:5353
+2026-09-25 16:27:15|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x31f702fea037059e      0t0  UDP *:5353
+2026-09-25 16:27:15|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x937fce3680cb4384      0t0  UDP *:5353
+2026-09-25 16:27:15|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xc51117286fc424e6      0t0  UDP *:5353
+2026-09-25 16:27:15|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x8d1284c7aef5b826      0t0  UDP *:5353
+2026-09-25 16:27:23|GONE|12153|10.2.0.111:64113->162.159.138.232:443|Discord Helper                 12153 ekscrypto   25u  IPv4  0x6559c6141bd7957      0t0  UDP 10.2.0.111:64113->162.159.138.232:443
+2026-09-25 16:27:25|NEW|59691|10.2.0.111:55256->3.95.117.96:443|Slack Helper                   59691 ekscrypto   34u  IPv4 0xdb8644d98f7bde58      0t0  UDP 10.2.0.111:55256->3.95.117.96:443
+2026-09-25 16:27:26|NEW|32286|(ESTABLISHED)|codex                             32286 ekscrypto   17u  IPv4 0x21d600ab007fc346      0t0  TCP 10.2.0.111:60899->104.18.32.47:443 (ESTABLISHED)
+2026-09-25 16:27:26|NEW|67969|(CLOSE_WAIT)|ZCode Helper                   67969 ekscrypto   24u  IPv4 0xe0c56d8a06e4c225      0t0  TCP 10.2.0.111:60858->47.246.22.189:443 (CLOSE_WAIT)
+2026-09-25 16:27:26|GONE|67969|(ESTABLISHED)|ZCode Helper                   67969 ekscrypto   24u  IPv4 0xe0c56d8a06e4c225      0t0  TCP 10.2.0.111:60858->47.246.22.189:443 (ESTABLISHED)
+2026-09-25 16:27:28|GONE|59691|10.2.0.111:54038->3.143.19.65:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0x9cd59342ffbb3a57      0t0  UDP 10.2.0.111:54038->3.143.19.65:443
+2026-09-25 16:27:29|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x6a94d9fdac1533f0      0t0  UDP *:5353
+2026-09-25 16:27:29|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xff81eb60d71db808      0t0  UDP *:5353
+2026-09-25 16:27:29|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x4a6d2e66c0d89a98      0t0  UDP *:5353
+2026-09-25 16:27:29|NEW|59691|10.2.0.111:58616->18.216.36.190:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0x104d2125f867c794      0t0  UDP 10.2.0.111:58616->18.216.36.190:443
+2026-09-25 16:27:29|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0xbe5b050c9f5d8448      0t0  UDP *:5353
+2026-09-25 16:27:29|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x5f7a6515e33d23de      0t0  UDP *:5353
+2026-09-25 16:27:29|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x31f702fea037059e      0t0  UDP *:5353
+2026-09-25 16:27:34|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x18ea60049ab9f9e4      0t0  UDP *:5353
+2026-09-25 16:27:34|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x4b9450c1bc2419d9      0t0  UDP *:5353
+2026-09-25 16:27:34|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xdbf96dbb5aabb089      0t0  UDP *:5353
+2026-09-25 16:27:34|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x6a94d9fdac1533f0      0t0  UDP *:5353
+2026-09-25 16:27:34|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xff81eb60d71db808      0t0  UDP *:5353
+2026-09-25 16:27:34|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x4a6d2e66c0d89a98      0t0  UDP *:5353
+2026-09-25 16:27:34|GONE|83614|10.2.0.111:64090->74.125.197.102:443|Brave Browser Helper        83614 ekscrypto   29u  IPv4 0xeb6298aa2be3032f      0t0  UDP 10.2.0.111:64090->74.125.197.102:443
+2026-09-25 16:27:37|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4  0x7f640502a7a3799      0t0  UDP *:5353
+2026-09-25 16:27:37|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xe95d15cafdc1a78d      0t0  UDP *:5353
+2026-09-25 16:27:37|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x8d1284c7aef5b826      0t0  UDP *:5353
+2026-09-25 16:27:37|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x18ea60049ab9f9e4      0t0  UDP *:5353
+2026-09-25 16:27:37|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x4b9450c1bc2419d9      0t0  UDP *:5353
+2026-09-25 16:27:37|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xdbf96dbb5aabb089      0t0  UDP *:5353
+2026-09-25 16:27:39|GONE|59691|10.2.0.111:64163->3.91.140.69:443|Slack Helper                   59691 ekscrypto   27u  IPv4 0xbda2e098866c1547      0t0  UDP 10.2.0.111:64163->3.91.140.69:443
+2026-09-25 16:27:41|NEW|59691|10.2.0.111:54231->3.91.140.69:443|Slack Helper                   59691 ekscrypto   27u  IPv4 0xbeb8873cb633aadd      0t0  UDP 10.2.0.111:54231->3.91.140.69:443
+2026-09-25 16:27:42|NEW|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4 0xccc4b634e620320e      0t0  TCP 10.2.0.111:60900->140.82.113.5:443 (ESTABLISHED)
+2026-09-25 16:27:47|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x4c9e35928060d2df      0t0  UDP *:5353
+2026-09-25 16:27:47|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xff7cf026f7a4d1f3      0t0  UDP *:5353
+2026-09-25 16:27:47|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6  0xc8e83fee37ef921      0t0  UDP *:5353
+2026-09-25 16:27:47|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4  0x7f640502a7a3799      0t0  UDP *:5353
+2026-09-25 16:27:47|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xe95d15cafdc1a78d      0t0  UDP *:5353
+2026-09-25 16:27:47|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x8d1284c7aef5b826      0t0  UDP *:5353
+2026-09-25 16:27:55|GONE|59691|10.2.0.111:55256->3.95.117.96:443|Slack Helper                   59691 ekscrypto   34u  IPv4 0xdb8644d98f7bde58      0t0  UDP 10.2.0.111:55256->3.95.117.96:443
+2026-09-25 16:27:58|GONE|59691|10.2.0.111:58616->18.216.36.190:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0x104d2125f867c794      0t0  UDP 10.2.0.111:58616->18.216.36.190:443
+2026-09-25 16:28:01|NEW|59691|10.2.0.111:59020->18.216.36.190:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0x943ef39018290ec2      0t0  UDP 10.2.0.111:59020->18.216.36.190:443
+2026-09-25 16:28:05|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x19b3c3d1df20e683      0t0  UDP *:5353
+2026-09-25 16:28:05|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x256a4fe9c434b321      0t0  UDP *:5353
+2026-09-25 16:28:05|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x224d082fed74d8d3      0t0  UDP *:5353
+2026-09-25 16:28:05|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x4c9e35928060d2df      0t0  UDP *:5353
+2026-09-25 16:28:05|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0xff7cf026f7a4d1f3      0t0  UDP *:5353
+2026-09-25 16:28:05|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6  0xc8e83fee37ef921      0t0  UDP *:5353
+2026-09-25 16:28:09|GONE|14852|(ESTABLISHED)|steam_osx                         14852 ekscrypto  214u  IPv4 0x4ca69b6ce67c4528      0t0  TCP 127.0.0.1:57343->127.0.0.1:60789 (ESTABLISHED)
+2026-09-25 16:28:09|GONE|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto   80u  IPv4 0xed801055419c1754      0t0  TCP 127.0.0.1:60789->127.0.0.1:57343 (ESTABLISHED)
+2026-09-25 16:28:11|NEW|12153|10.2.0.111:62804->162.159.128.233:443|Discord Helper                 12153 ekscrypto   25u  IPv4 0xdfee0cbe2fbafe43      0t0  UDP 10.2.0.111:62804->162.159.128.233:443
+2026-09-25 16:28:11|NEW|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   34u  IPv4 0xa09264f0cf0d3275      0t0  TCP 10.2.0.111:60903->47.246.22.207:443 (ESTABLISHED)
+2026-09-25 16:28:11|NEW|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   35u  IPv4 0x4ca69b6ce67c4528      0t0  TCP 10.2.0.111:60904->47.246.22.207:443 (ESTABLISHED)
+2026-09-25 16:28:11|GONE|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto   72u  IPv4 0x78ab0c272a65bffd      0t0  TCP 10.2.0.111:60788->104.18.41.99:443 (ESTABLISHED)
+2026-09-25 16:28:11|GONE|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto  119u  IPv4 0xa09264f0cf0d3275      0t0  TCP 10.2.0.111:60802->125.253.89.29:443 (ESTABLISHED)
+2026-09-25 16:28:11|GONE|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto  123u  IPv4 0xba32daf1f476d985      0t0  TCP 10.2.0.111:60803->125.253.89.29:443 (ESTABLISHED)
+2026-09-25 16:28:11|GONE|47599|(ESTABLISHED)|BitCraft                          47599 ekscrypto  125u  IPv4 0x29b951fa7014edc3      0t0  TCP 10.2.0.111:60805->104.18.42.227:443 (ESTABLISHED)
+2026-09-25 16:28:11|GONE|59691|10.2.0.111:54231->3.91.140.69:443|Slack Helper                   59691 ekscrypto   27u  IPv4 0xbeb8873cb633aadd      0t0  UDP 10.2.0.111:54231->3.91.140.69:443
+2026-09-25 16:28:12|NEW|67959|(SYN_SENT)|ZCode                             67959 ekscrypto   39u  IPv4 0xccc4b634e620320e      0t0  TCP 10.2.0.111:60905->8.130.222.161:443 (SYN_SENT)
+2026-09-25 16:28:12|NEW|67969|(CLOSED)|ZCode Helper                   67969 ekscrypto   24u  IPv4 0xe0c56d8a06e4c225      0t0  TCP 10.2.0.111:60858->47.246.22.189:443 (CLOSED)
+2026-09-25 16:28:12|GONE|11456|(ESTABLISHED)|GitKraken Helper               11456 ekscrypto   22u  IPv4 0xccc4b634e620320e      0t0  TCP 10.2.0.111:60900->140.82.113.5:443 (ESTABLISHED)
+2026-09-25 16:28:12|GONE|67969|(CLOSE_WAIT)|ZCode Helper                   67969 ekscrypto   24u  IPv4 0xe0c56d8a06e4c225      0t0  TCP 10.2.0.111:60858->47.246.22.189:443 (CLOSE_WAIT)
+2026-09-25 16:28:14|NEW|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0xccc4b634e620320e      0t0  TCP 10.2.0.111:60905->8.130.222.161:443 (ESTABLISHED)
+2026-09-25 16:28:14|GONE|67959|(SYN_SENT)|ZCode                             67959 ekscrypto   39u  IPv4 0xccc4b634e620320e      0t0  TCP 10.2.0.111:60905->8.130.222.161:443 (SYN_SENT)
+2026-09-25 16:28:14|GONE|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   34u  IPv4 0xa09264f0cf0d3275      0t0  TCP 10.2.0.111:60903->47.246.22.207:443 (ESTABLISHED)
+2026-09-25 16:28:14|GONE|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   35u  IPv4 0x4ca69b6ce67c4528      0t0  TCP 10.2.0.111:60904->47.246.22.207:443 (ESTABLISHED)
+2026-09-25 16:28:15|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x13df59b57155c683      0t0  UDP *:5353
+2026-09-25 16:28:15|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x6a94d9fdac1533f0      0t0  UDP *:5353
+2026-09-25 16:28:15|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x5e8e0a48f483ec20      0t0  UDP *:5353
+2026-09-25 16:28:15|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x19b3c3d1df20e683      0t0  UDP *:5353
+2026-09-25 16:28:15|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x256a4fe9c434b321      0t0  UDP *:5353
+2026-09-25 16:28:15|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x224d082fed74d8d3      0t0  UDP *:5353
+2026-09-25 16:28:17|GONE|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0xccc4b634e620320e      0t0  TCP 10.2.0.111:60905->8.130.222.161:443 (ESTABLISHED)
+2026-09-25 16:28:19|NEW|59691|10.2.0.111:58465->3.91.140.69:443|Slack Helper                   59691 ekscrypto   27u  IPv4 0x39c02bee298b4c96      0t0  UDP 10.2.0.111:58465->3.91.140.69:443
+2026-09-25 16:28:19|NEW|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   39u  IPv4 0xd1416c212f957f46      0t0  TCP 10.2.0.111:60907->123.57.116.48:443 (ESTABLISHED)
+2026-09-25 16:28:19|NEW|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   34u  IPv4 0xc7d04a7cab9e2682      0t0  TCP 10.2.0.111:60906->47.246.22.207:443 (ESTABLISHED)
+2026-09-25 16:28:19|NEW|68431|(ESTABLISHED)|ZCode Helper                   68431 ekscrypto   21u  IPv4 0x824d48291fe6a0dc      0t0  TCP 10.2.0.111:60908->47.77.37.148:443 (ESTABLISHED)
+2026-09-25 16:28:20|NEW|31857|10.2.0.111:61765->35.190.80.1:443|Codex (Service)                31857 ekscrypto   32u  IPv4 0xdc5c1ce5a9ac570c      0t0  UDP 10.2.0.111:61765->35.190.80.1:443
+2026-09-25 16:28:20|NEW|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   40u  IPv4 0x1f88d4080c0f0584      0t0  TCP 10.2.0.111:60909->8.130.222.175:443 (ESTABLISHED)
+2026-09-25 16:28:22|NEW|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   67u  IPv4 0xe4bdda7aaf5a28a4      0t0  TCP 10.2.0.111:60911->123.56.37.46:443 (ESTABLISHED)
+2026-09-25 16:28:22|GONE|68391|(ESTABLISHED)|ZCode Helper                   68391 ekscrypto   34u  IPv4 0xc7d04a7cab9e2682      0t0  TCP 10.2.0.111:60906->47.246.22.207:443 (ESTABLISHED)
+2026-09-25 16:28:25|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x896a81292a128977      0t0  UDP *:5353
+2026-09-25 16:28:25|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x6feadc1573ebab98      0t0  UDP *:5353
+2026-09-25 16:28:25|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6  0x7f2554a292a309f      0t0  UDP *:5353
+2026-09-25 16:28:25|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x13df59b57155c683      0t0  UDP *:5353
+2026-09-25 16:28:25|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x6a94d9fdac1533f0      0t0  UDP *:5353
+2026-09-25 16:28:25|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0x5e8e0a48f483ec20      0t0  UDP *:5353
+2026-09-25 16:28:27|NEW|73264|(ESTABLISHED)|AMPDeviceDiscoveryAgent           73264 ekscrypto    9u  IPv6 0x9d6727591d9bf115      0t0  TCP [fe80:e::1067:dc07:f749:27be]:60920->[fe80:e::189c:1120:a376:b3db]:62078 (ESTABLISHED)
+2026-09-25 16:28:27|GONE|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   67u  IPv4 0xe4bdda7aaf5a28a4      0t0  TCP 10.2.0.111:60911->123.56.37.46:443 (ESTABLISHED)
+2026-09-25 16:28:29|GONE|59691|10.2.0.111:59020->18.216.36.190:443|Slack Helper                   59691 ekscrypto   24u  IPv4 0x943ef39018290ec2      0t0  UDP 10.2.0.111:59020->18.216.36.190:443
+2026-09-25 16:28:29|GONE|73264|(ESTABLISHED)|AMPDeviceDiscoveryAgent           73264 ekscrypto    9u  IPv6 0x9d6727591d9bf115      0t0  TCP [fe80:e::1067:dc07:f749:27be]:60920->[fe80:e::189c:1120:a376:b3db]:62078 (ESTABLISHED)
+2026-09-25 16:28:30|NEW|59691|10.2.0.111:24446->10.2.0.1:53|Slack Helper                   59691 ekscrypto   24u  IPv4 0xf1d46a8e1bc22c02      0t0  UDP 10.2.0.111:24446->10.2.0.1:53
+2026-09-25 16:28:31|NEW|59691|10.2.0.111:5545->10.2.0.1:53|Slack Helper                   59691 ekscrypto   30u  IPv4 0x67c24a8f3fbcec50      0t0  UDP 10.2.0.111:5545->10.2.0.1:53
+2026-09-25 16:28:32|NEW|59691|10.2.0.111:52267->34.196.46.202:443|Slack Helper                   59691 ekscrypto   24u  IPv4  0xe508ccc3da99f21      0t0  UDP 10.2.0.111:52267->34.196.46.202:443
+2026-09-25 16:28:32|GONE|59691|10.2.0.111:24446->10.2.0.1:53|Slack Helper                   59691 ekscrypto   24u  IPv4 0xf1d46a8e1bc22c02      0t0  UDP 10.2.0.111:24446->10.2.0.1:53
+2026-09-25 16:28:32|GONE|59691|10.2.0.111:5545->10.2.0.1:53|Slack Helper                   59691 ekscrypto   30u  IPv4 0x67c24a8f3fbcec50      0t0  UDP 10.2.0.111:5545->10.2.0.1:53
+2026-09-25 16:28:34|NEW|67959|(ESTABLISHED)|ZCode                             67959 ekscrypto   67u  IPv4 0xf3573a7a061f19ec      0t0  TCP 10.2.0.111:60924->8.130.222.211:443 (ESTABLISHED)
+2026-09-25 16:28:37|NEW|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x256a4fe9c434b321      0t0  UDP *:5353
+2026-09-25 16:28:37|NEW|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x4a6d2e66c0d89a98      0t0  UDP *:5353
+2026-09-25 16:28:37|NEW|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6 0xbb4758e5883f8f5b      0t0  UDP *:5353
+2026-09-25 16:28:37|GONE|55608|*:5353|adb                               55608 ekscrypto    4u  IPv4 0x896a81292a128977      0t0  UDP *:5353
+2026-09-25 16:28:37|GONE|55608|*:5353|adb                               55608 ekscrypto   11u  IPv6 0x6feadc1573ebab98      0t0  UDP *:5353
+2026-09-25 16:28:37|GONE|55608|*:5353|adb                               55608 ekscrypto   12u  IPv6  0x7f2554a292a309f      0t0  UDP *:5353
