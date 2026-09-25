@@ -273,7 +273,7 @@ for (const conn of conns) {
   if (tables.length) {
     console.log(`\n-- tables touched (${tables.length}) --`);
     for (const [name, t] of tables)
-      console.log(`${name}: ins=${t.inserts} del=${t.deletes} ev=${t.events} bytes=${t.bytes}`);
+      console.log(`${name}: rows=${t.rows} bytes=${t.bytes}`);
   }
   if (scanText) {
     console.log(`\n-- scan for '${scanText}': ${searchHits.length} hits --`);

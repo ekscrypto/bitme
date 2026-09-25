@@ -229,7 +229,12 @@ function handleUpgrade(req, socket, head) {
   const framesBin = fs.openSync(path.join(connDir, 'frames.bin'), 'a');
   const indexStream = fs.createWriteStream(path.join(connDir, 'index.jsonl'), { flags: 'a' });
   let frameOffset = 0;
+  let finished = false;
   const recordFrame = (dir, data, isBinary) => {
+    // finish() closes framesBin on the FIRST close event; the other leg can
+    // still deliver a buffered frame afterward — drop those rather than
+    // writing to a dead descriptor (EBADF took the whole process down once).
+    if (finished) return;
     const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
     const entry = {
       ts: new Date().toISOString(), dir,
@@ -242,6 +247,8 @@ function handleUpgrade(req, socket, head) {
     indexStream.write(JSON.stringify(entry) + '\n');
   };
   const finish = (why, code, reason) => {
+    if (finished) return;
+    finished = true;
     try { fs.writeFileSync(path.join(connDir, 'close.json'), JSON.stringify({ ts: new Date().toISOString(), why, code, reason: String(reason || '') }, null, 2)); } catch {}
     try { fs.closeSync(framesBin); } catch {}
     indexStream.end();
@@ -359,6 +366,8 @@ wsServer.listen(CFG.wsPort, CFG.host, () =>
   log(`tap WS forward ws://${CFG.host}:${CFG.wsPort} -> wss://${CFG.upstreamWsHost}`));
 log(`capture dir: ${capDir}`);
 
-if (!argv.has('--keep')) {
-  // Long-lived server; nothing to do on exit for now.
-}
+// A capture harness must survive its own bugs mid-session: log loudly and
+// keep serving rather than tearing down every active connection.
+process.on('uncaughtException', (e) => {
+  log(`UNCAUGHT (survived): ${e.stack || e}`);
+});

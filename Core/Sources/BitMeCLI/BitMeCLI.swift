@@ -53,6 +53,8 @@ struct BitMeCLI {
                         print("exit: resolve failed")
                         exit(1)
                     }
+                case .bitCraftSignIn:
+                    break // the CLI never drives the sign-in flow
                 case .session(let session):
                     if command == "resolve" {
                         // Wait for the first poll so signed_in is live.

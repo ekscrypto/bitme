@@ -68,6 +68,7 @@ struct ActivityScreen: View {
                 .foregroundStyle(.secondary)
             }
             Spacer()
+            accountMenu
             Button {
                 showMap = true
             } label: {
@@ -79,6 +80,39 @@ struct ActivityScreen: View {
             .accessibilityLabel("Resource map")
             ConnectionPill(connection: session.connection)
         }
+    }
+
+    /// Account + character controls. The BitCraft entry opens the emailed-code
+    /// sign-in screen (signed in or not — a second sign-in switches accounts);
+    /// "Switch character" forgets the resolved character and stops the session.
+    private var accountMenu: some View {
+        Menu {
+            if let email = session.bitCraftAccountEmail {
+                Button {
+                    Task { await ingest(Intent.ShowBitCraftSignIn()) }
+                } label: {
+                    Label("BitCraft account: \(email)", systemImage: "person.crop.circle")
+                }
+            } else {
+                Button {
+                    Task { await ingest(Intent.ShowBitCraftSignIn()) }
+                } label: {
+                    Label("Sign in with BitCraft", systemImage: "person.crop.circle")
+                }
+            }
+            Divider()
+            Button(role: .destructive) {
+                Task { await ingest(Intent.SignOut()) }
+            } label: {
+                Label("Switch character", systemImage: "arrow.uturn.backward")
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.subheadline.bold())
+                .padding(8)
+                .background(Color(white: 0.18), in: Circle())
+        }
+        .accessibilityLabel("Account and settings")
     }
 
     // MARK: - Bush countdown

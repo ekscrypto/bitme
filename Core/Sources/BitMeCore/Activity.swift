@@ -5,6 +5,7 @@ import os
 enum Activity {}
 
 let coreLog = Logger(subsystem: "life.encoded.bitme.ios", category: "core")
+let authLog = Logger(subsystem: "life.encoded.bitme.ios", category: "auth")
 
 // MARK: - Bootstrap
 
@@ -14,8 +15,81 @@ extension Activity {
 
 extension Activity.Bootstrap: AsyncActivity {
     func start(ingestor: IntentIngestor, adapters: Adapters) async {
-        let identity = await adapters.restoreIdentity()
-        await ingestor.ingest(Intent.BootstrapCompleted(identity: identity))
+        async let identity = adapters.restoreIdentity()
+        async let account = adapters.restoreBitCraftAccount()
+        await ingestor.ingest(Intent.BootstrapCompleted(
+            identity: await identity, bitCraftAccount: await account
+        ))
+    }
+}
+
+// MARK: - BitCraft sign-in
+
+extension Activity {
+    /// POST /authentication/request-access-code — emails the code.
+    struct RequestAccessCode: Sendable {
+        let email: String
+    }
+}
+
+extension Activity.RequestAccessCode: AsyncActivity {
+    func start(ingestor: IntentIngestor, adapters: Adapters) async {
+        authLog.info("requesting BitCraft access code for \(email, privacy: .private)")
+        do {
+            try await adapters.bitCraft.requestAccessCode(email)
+            authLog.info("BitCraft access code emailed to \(email, privacy: .private)")
+            await ingestor.ingest(Intent.AccessCodeRequested(email: email))
+        } catch is CancellationError {
+            // Shutdown — no feedback intent.
+        } catch BitCraftAuthError.badRequest(let message) {
+            authLog.error("access code request rejected: \(message, privacy: .public)")
+            await ingestor.ingest(Intent.AccessCodeRequestFailed(
+                message: message.isEmpty ? "That email was rejected — check it and try again." : message
+            ))
+        } catch {
+            authLog.error("access code request failed: \(String(describing: error), privacy: .public)")
+            await ingestor.ingest(Intent.AccessCodeRequestFailed(
+                message: "BitCraft unreachable — check your connection and try again."
+            ))
+        }
+    }
+}
+
+extension Activity {
+    /// POST /authentication/authenticate — code for the SpacetimeDB token.
+    struct Authenticate: Sendable {
+        let email: String
+        let code: String
+    }
+}
+
+extension Activity.Authenticate: AsyncActivity {
+    func start(ingestor: IntentIngestor, adapters: Adapters) async {
+        authLog.info("authenticating BitCraft access code for \(email, privacy: .private)")
+        do {
+            let token = try await adapters.bitCraft.authenticate(email, code)
+            let account = BitCraftAccount(email: email, token: token)
+            if let identity = account.identityHex {
+                authLog.info("BitCraft authenticated \(email, privacy: .private) identity 0x\(identity.prefix(8), privacy: .public)… subject \(account.subject ?? "?", privacy: .public)")
+            } else {
+                authLog.info("BitCraft authenticated \(email, privacy: .private) (token payload undecoded)")
+            }
+            await ingestor.ingest(Intent.BitCraftAuthenticated(account: account))
+        } catch is CancellationError {
+            // Shutdown — no feedback intent.
+        } catch BitCraftAuthError.badRequest(let message) {
+            authLog.error("authentication rejected: \(message, privacy: .public)")
+            await ingestor.ingest(Intent.BitCraftAuthenticationFailed(
+                email: email,
+                message: message.isEmpty ? "That code was rejected — codes expire quickly; request a new one." : message
+            ))
+        } catch {
+            authLog.error("authentication failed: \(String(describing: error), privacy: .public)")
+            await ingestor.ingest(Intent.BitCraftAuthenticationFailed(
+                email: email,
+                message: "BitCraft unreachable — check your connection and try again."
+            ))
+        }
     }
 }
 

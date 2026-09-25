@@ -17,6 +17,46 @@ public enum Intent {
     public struct SignOut: Sendable {
         public init() {}
     }
+
+    // MARK: - BitCraft account sign-in
+
+    /// User opened the sign-in screen (from onboarding).
+    public struct ShowBitCraftSignIn: Sendable {
+        public init() {}
+    }
+
+    /// User left the sign-in screen without completing it.
+    public struct DismissBitCraftSignIn: Sendable {
+        public init() {}
+    }
+
+    /// User submitted an email — request the access code.
+    public struct StartBitCraftSignIn: Sendable {
+        public let email: String
+
+        public init(email: String) {
+            self.email = email
+        }
+    }
+
+    /// User submitted the emailed code.
+    public struct SubmitAccessCode: Sendable {
+        public let code: String
+
+        public init(code: String) {
+            self.code = code
+        }
+    }
+
+    /// User tapped "use a different email" — back to email entry.
+    public struct EditSignInEmail: Sendable {
+        public init() {}
+    }
+
+    /// User asked to forget the signed-in BitCraft account (deletes token).
+    public struct ForgetBitCraftAccount: Sendable {
+        public init() {}
+    }
 }
 
 // MARK: - Internal feedback intents (activities → machine)
@@ -25,6 +65,26 @@ extension Intent {
     /// Bootstrap activity finished restoring persisted identity.
     struct BootstrapCompleted: Sendable {
         let identity: StoredIdentity?
+        let bitCraftAccount: BitCraftAccount?
+    }
+
+    // BitCraft sign-in feedback (activities → machine)
+
+    struct AccessCodeRequested: Sendable {
+        let email: String
+    }
+
+    struct AccessCodeRequestFailed: Sendable {
+        let message: String
+    }
+
+    struct BitCraftAuthenticated: Sendable {
+        let account: BitCraftAccount
+    }
+
+    struct BitCraftAuthenticationFailed: Sendable {
+        let email: String
+        let message: String
     }
 
     struct ResolveSucceeded: Sendable {
@@ -202,6 +262,10 @@ extension Intent.BootstrapCompleted: StateMutator {
                 cancellable: streamLoop
             ))
         }
+        // The account restore has no races to guard: sign-in never runs
+        // before bootstrap finishes (the machine processes intents serially,
+        // and the screen is reachable only after the first rep).
+        persistent.bitCraftAccount = bitCraftAccount
         return StateChange(persistent: persistent, ephemeral: ephemeral, activities: activities)
     }
 }
@@ -471,5 +535,125 @@ extension Intent.SignOut: StateMutator {
         ephemeral.session = nil
         persistent.identity = nil
         return StateChange(persistent: persistent, ephemeral: ephemeral)
+    }
+}
+
+// MARK: - BitCraft sign-in mutations
+
+extension Intent.ShowBitCraftSignIn: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        ephemeral.signInVisible = true
+        return StateChange(ephemeral: ephemeral)
+    }
+}
+
+extension Intent.DismissBitCraftSignIn: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        // An in-flight code request or authentication is allowed to finish;
+        // its feedback intents tolerate the screen being closed (an
+        // authentication that completes while hidden still stores the
+        // account — that is the user's signed-in outcome, not presentation).
+        ephemeral.signInVisible = false
+        return StateChange(ephemeral: ephemeral)
+    }
+}
+
+extension Intent.StartBitCraftSignIn: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        let email = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        // Cheap local validation; the server is the authority.
+        guard email.contains("@"), email.contains("."), !email.hasSuffix("."), !email.hasPrefix("@") else {
+            var ephemeral = ephemeral
+            ephemeral.signIn.error = "Enter a valid email address."
+            return StateChange(ephemeral: ephemeral)
+        }
+        var ephemeral = ephemeral
+        ephemeral.signIn = EphemeralState.SignInState(
+            phase: .requestingCode(email: email), error: nil
+        )
+        return StateChange(ephemeral: ephemeral, activities: [Activity.RequestAccessCode(email: email)])
+    }
+}
+
+extension Intent.AccessCodeRequested: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        // Only the newest request counts — a late reply from a superseded
+        // email must not flip the phase back.
+        guard case .requestingCode(email: let pending) = ephemeral.signIn.phase, pending == email else {
+            return .noChange
+        }
+        ephemeral.signIn.phase = .awaitingCode(email: email)
+        return StateChange(ephemeral: ephemeral)
+    }
+}
+
+extension Intent.AccessCodeRequestFailed: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        guard case .requestingCode = ephemeral.signIn.phase else { return .noChange }
+        ephemeral.signIn.phase = .idle
+        ephemeral.signIn.error = message
+        return StateChange(ephemeral: ephemeral)
+    }
+}
+
+extension Intent.SubmitAccessCode: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        let code = code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard case .awaitingCode(email: let email) = ephemeral.signIn.phase, !code.isEmpty else {
+            return .noChange
+        }
+        var ephemeral = ephemeral
+        ephemeral.signIn.phase = .authenticating(email: email, code: code)
+        ephemeral.signIn.error = nil
+        return StateChange(ephemeral: ephemeral, activities: [Activity.Authenticate(email: email, code: code)])
+    }
+}
+
+extension Intent.BitCraftAuthenticated: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var persistent = persistent
+        var ephemeral = ephemeral
+        guard case .authenticating = ephemeral.signIn.phase else { return .noChange }
+        persistent.bitCraftAccount = account
+        ephemeral.signIn = EphemeralState.SignInState()
+        ephemeral.signInVisible = false
+        return StateChange(persistent: persistent, ephemeral: ephemeral)
+    }
+}
+
+extension Intent.BitCraftAuthenticationFailed: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        guard case .authenticating(email: let pending, code: _) = ephemeral.signIn.phase, pending == email else {
+            return .noChange
+        }
+        // Back to code entry — the user can retry the same email (codes are
+        // short-lived; a stale one fails again with the server's message).
+        ephemeral.signIn.phase = .awaitingCode(email: email)
+        ephemeral.signIn.error = message
+        return StateChange(ephemeral: ephemeral)
+    }
+}
+
+extension Intent.EditSignInEmail: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        guard case .awaitingCode = ephemeral.signIn.phase else { return .noChange }
+        ephemeral.signIn.phase = .idle
+        ephemeral.signIn.error = nil
+        return StateChange(ephemeral: ephemeral)
+    }
+}
+
+extension Intent.ForgetBitCraftAccount: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var persistent = persistent
+        guard persistent.bitCraftAccount != nil else { return .noChange }
+        persistent.bitCraftAccount = nil
+        return StateChange(persistent: persistent)
     }
 }

@@ -40,6 +40,8 @@ struct RootView: View {
         switch viewRep {
         case .onboarding(let onboarding):
             OnboardingView(onboarding: onboarding, ingest: ingest)
+        case .bitCraftSignIn(let signIn):
+            SignInView(signIn: signIn, ingest: ingest)
         case .session(let session):
             ActivityScreen(
                 session: session,

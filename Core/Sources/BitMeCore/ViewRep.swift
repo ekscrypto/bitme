@@ -5,6 +5,7 @@ import Foundation
 /// milliseconds so renderers interpolate countdowns locally.
 public enum ViewRep: Equatable, Sendable, Codable {
     case onboarding(Onboarding)
+    case bitCraftSignIn(BitCraftSignIn)
     case session(Session)
 
     public struct Onboarding: Equatable, Sendable, Codable {
@@ -13,6 +14,26 @@ public enum ViewRep: Equatable, Sendable, Codable {
         public var error: String?
         /// The name resolved but the character is offline — usable hint.
         public var resolvedOfflineHint: Bool
+        /// Email of the signed-in BitCraft account, when there is one.
+        public var bitCraftAccountEmail: String?
+    }
+
+    /// The BitCraft account sign-in screen: emailed access code login
+    /// (email → code → SpacetimeDB token).
+    public struct BitCraftSignIn: Equatable, Sendable, Codable {
+        public enum Phase: Equatable, Sendable, Codable {
+            /// Email entry.
+            case idle
+            /// The code request is in flight.
+            case requestingCode
+            /// The code was emailed to `email`; the user is typing it.
+            case awaitingCode(email: String)
+            /// The code was submitted; authentication is in flight.
+            case authenticating(email: String)
+        }
+
+        public var phase: Phase
+        public var error: String?
     }
 
     public struct Session: Equatable, Sendable, Codable {
@@ -139,6 +160,9 @@ public enum ViewRep: Equatable, Sendable, Codable {
         public var username: String?
         public var entityID: String?
         public var region: Int?
+        /// Email of the signed-in BitCraft account, when there is one —
+        /// drives the session header's account entry.
+        public var bitCraftAccountEmail: String?
         public var signedIn: Bool?
         public var connection: Connection
         public var claimName: String?
@@ -153,6 +177,18 @@ public enum ViewRep: Equatable, Sendable, Codable {
     }
 
     static func from(persistent: PersistentState, ephemeral: EphemeralState) -> ViewRep {
+        if ephemeral.signInVisible {
+            let phase: BitCraftSignIn.Phase
+            switch ephemeral.signIn.phase {
+            case .idle: phase = .idle
+            case .requestingCode: phase = .requestingCode
+            case .awaitingCode(let email): phase = .awaitingCode(email: email)
+            case .authenticating(let email, _): phase = .authenticating(email: email)
+            }
+            return .bitCraftSignIn(BitCraftSignIn(
+                phase: phase, error: ephemeral.signIn.error
+            ))
+        }
         guard persistent.identity != nil else {
             let resolving: String? = {
                 if case .resolving(let name) = ephemeral.onboarding { return name }
@@ -162,7 +198,8 @@ public enum ViewRep: Equatable, Sendable, Codable {
                 isResolving: resolving != nil,
                 lookingUpName: resolving,
                 error: ephemeral.resolveError,
-                resolvedOfflineHint: ephemeral.resolvedOfflineHint
+                resolvedOfflineHint: ephemeral.resolvedOfflineHint,
+                bitCraftAccountEmail: persistent.bitCraftAccount?.email
             ))
         }
 
@@ -297,6 +334,7 @@ public enum ViewRep: Equatable, Sendable, Codable {
             username: persistent.identity?.username,
             entityID: persistent.identity?.entityID,
             region: ephemeral.session?.snapshot?.region ?? persistent.identity?.regionID,
+            bitCraftAccountEmail: persistent.bitCraftAccount?.email,
             signedIn: ephemeral.session?.snapshot?.signedIn,
             connection: (ephemeral.session?.connection).map { rep in
                 switch rep {

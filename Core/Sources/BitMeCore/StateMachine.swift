@@ -49,6 +49,7 @@ public final actor StateMachine: IntentIngestor {
         if let persistent = change.persistentState {
             persistentState = persistent
             await adapters.persistIdentity(persistent.identity)
+            await adapters.persistBitCraftAccount(persistent.bitCraftAccount)
         }
         if let ephemeral = change.ephemeralState {
             ephemeralState = ephemeral

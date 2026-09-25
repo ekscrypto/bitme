@@ -19,6 +19,10 @@ public struct StoredIdentity: Codable, Equatable, Sendable {
 /// every persistent mutation via `Adapters.persistIdentity`.
 struct PersistentState: Codable, Sendable {
     var identity: StoredIdentity?
+    /// The signed-in BitCraft account. The token itself round-trips through
+    /// `Adapters.persistBitCraftAccount` (Keychain) — it also sits in this
+    /// struct because the machine is the single source of truth.
+    var bitCraftAccount: BitCraftAccount?
 }
 
 /// Lives for the process lifetime: onboarding progress, gamedata, and the
@@ -35,6 +39,26 @@ struct EphemeralState: Sendable {
     var resolvedOfflineHint = false
     var gamedata: FoodBuffGamedata?
     var session: Session?
+
+    /// BitCraft account sign-in (emailed access code). The flow:
+    /// email → `requestingCode` → `awaitingCode` → `authenticating` →
+    /// account lands in `PersistentState.bitCraftAccount`.
+    var signIn = SignInState()
+    /// Whether the sign-in screen is shown (entered from onboarding; left
+    /// via back, cancel, or a successful authentication).
+    var signInVisible = false
+
+    struct SignInState: Equatable, Sendable {
+        enum Phase: Equatable, Sendable {
+            case idle
+            case requestingCode(email: String)
+            case awaitingCode(email: String)
+            case authenticating(email: String, code: String)
+        }
+
+        var phase: Phase = .idle
+        var error: String?
+    }
 
     struct Session: Sendable {
         let entityID: String

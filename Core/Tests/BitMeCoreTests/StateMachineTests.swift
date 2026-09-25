@@ -167,6 +167,7 @@ struct StateMachineTests {
             foodBuffIDs: [42], fetchedAt: .now
         ),
         restoreIdentity: (@Sendable () async -> StoredIdentity?)? = nil,
+        bitCraftAccount: BitCraftAccount? = nil,
         sleep: (@Sendable (Double) async throws -> Void)? = nil
     ) -> StateMachine {
         StateMachine(adapters: Adapters(
@@ -201,9 +202,15 @@ struct StateMachineTests {
                     relay.stream?.next() ?? AsyncStream { _ in } // parked
                 }
             ),
+            bitCraft: Adapters.BitCraft(
+                requestAccessCode: { _ in },
+                authenticate: { _, _ in "test-token" }
+            ),
             loadFoodBuffGamedata: { gamedata },
             restoreIdentity: restoreIdentity ?? { identity },
             persistIdentity: { _ in },
+            restoreBitCraftAccount: { bitCraftAccount },
+            persistBitCraftAccount: { _ in },
             sleep: sleep ?? { _ in } // instant — flows run at task speed
         ))
     }
@@ -889,7 +896,9 @@ struct StateMachineTests {
         }, until: { rep in
             guard let session = sessionRep(rep) else { return false }
             return session.entityID == "3000" && !session.resourceMap.nearby.isEmpty
-        })
+        }, timeout: 15) // full-suite parallelism can starve this chain
+                         // (poll → window fetch → dictionary) past the 5 s
+                         // default; solo it finishes in milliseconds.
         guard case .session(let session)? = second.last(where: {
             sessionRep($0)?.entityID == "3000"
         }) else {

@@ -37,6 +37,24 @@ public struct Adapters: Sendable {
     }
 
     public let relay: Relay
+
+    /// BitCraft account API (api.bitcraftonline.com): the emailed-code login.
+    public struct BitCraft: Sendable {
+        /// Emails an access code. Empty 200 on success.
+        public let requestAccessCode: @Sendable (_ email: String) async throws -> Void
+        /// Exchanges the code for the account's SpacetimeDB token.
+        public let authenticate: @Sendable (_ email: String, _ code: String) async throws -> String
+
+        public init(
+            requestAccessCode: @escaping @Sendable (String) async throws -> Void,
+            authenticate: @escaping @Sendable (String, String) async throws -> String
+        ) {
+            self.requestAccessCode = requestAccessCode
+            self.authenticate = authenticate
+        }
+    }
+
+    public let bitCraft: BitCraft
     /// Food-buff gamedata over the mirror WebSocket, 48 h cached. Failing
     /// adapters return the stale cache (or nil) instead of throwing.
     public let loadFoodBuffGamedata: @Sendable () async -> FoodBuffGamedata?
@@ -44,27 +62,37 @@ public struct Adapters: Sendable {
     /// every persistent mutation.
     public let restoreIdentity: @Sendable () async -> StoredIdentity?
     public let persistIdentity: @Sendable (StoredIdentity?) async -> Void
+    /// BitCraft account persistence (nil deletes) — Keychain in production.
+    public let restoreBitCraftAccount: @Sendable () async -> BitCraftAccount?
+    public let persistBitCraftAccount: @Sendable (BitCraftAccount?) async -> Void
     /// The session loop's inter-poll wait. Production sleeps; tests pass an
     /// instant no-op so flows run deterministically.
     public let sleep: @Sendable (_ seconds: Double) async throws -> Void
 
     public init(
         relay: Relay,
+        bitCraft: BitCraft,
         loadFoodBuffGamedata: @escaping @Sendable () async -> FoodBuffGamedata?,
         restoreIdentity: @escaping @Sendable () async -> StoredIdentity?,
         persistIdentity: @escaping @Sendable (StoredIdentity?) async -> Void,
+        restoreBitCraftAccount: @escaping @Sendable () async -> BitCraftAccount?,
+        persistBitCraftAccount: @escaping @Sendable (BitCraftAccount?) async -> Void,
         sleep: @escaping @Sendable (Double) async throws -> Void
     ) {
         self.relay = relay
+        self.bitCraft = bitCraft
         self.loadFoodBuffGamedata = loadFoodBuffGamedata
         self.restoreIdentity = restoreIdentity
         self.persistIdentity = persistIdentity
+        self.restoreBitCraftAccount = restoreBitCraftAccount
+        self.persistBitCraftAccount = persistBitCraftAccount
         self.sleep = sleep
     }
 
     /// Real relay + on-disk persistence + real waiting.
     public static func production() -> Adapters {
         let relay = RelayClient.production
+        let auth = BitCraftAuthClient.production
         return Adapters(
             relay: Relay(
                 resolve: { name in try await relay.resolve(name: name) },
@@ -78,9 +106,30 @@ public struct Adapters: Sendable {
                     ResourceStreamClient.production.events(entityID: entityID)
                 }
             ),
+            bitCraft: BitCraft(
+                requestAccessCode: { email in try await auth.requestAccessCode(email: email) },
+                authenticate: { email, code in try await auth.authenticate(email: email, code: code) }
+            ),
             loadFoodBuffGamedata: { await GamedataService.loadFoodBuffGamedata() },
             restoreIdentity: { Self.restoreIdentity() },
             persistIdentity: { Self.persistIdentity($0) },
+            restoreBitCraftAccount: {
+                if let account = BitCraftTokenStore.load() {
+                    authLog.info("restored BitCraft account \(account.email, privacy: .private) from Keychain")
+                    return account
+                }
+                authLog.info("no stored BitCraft account")
+                return nil
+            },
+            persistBitCraftAccount: { account in
+                if let account {
+                    BitCraftTokenStore.save(account)
+                    authLog.info("stored BitCraft account \(account.email, privacy: .private) in Keychain")
+                } else {
+                    BitCraftTokenStore.delete()
+                    authLog.info("removed BitCraft account from Keychain")
+                }
+            },
             sleep: { seconds in try await Task.sleep(for: .seconds(seconds)) }
         )
     }

@@ -71,6 +71,24 @@ struct OnboardingView: View {
             .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || onboarding.isResolving)
             .padding(.horizontal, 32)
 
+            if let accountEmail = onboarding.bitCraftAccountEmail {
+                Button {
+                    Task { await ingest(Intent.ShowBitCraftSignIn()) }
+                } label: {
+                    Label("Signed in to BitCraft as \(accountEmail)",
+                          systemImage: "checkmark.seal.fill")
+                        .font(.footnote)
+                        .foregroundStyle(.green)
+                }
+                .padding(.top, 4)
+            } else {
+                Button("Sign in with BitCraft") {
+                    Task { await ingest(Intent.ShowBitCraftSignIn()) }
+                }
+                .font(.footnote.weight(.medium))
+                .padding(.top, 4)
+            }
+
             Spacer()
             Spacer()
         }
