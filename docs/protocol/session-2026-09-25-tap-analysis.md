@@ -44,6 +44,25 @@ World selection data (subscribed on the global DB):
 - `user_region_state WHERE identity = 0x<your hex identity>` — the player's region
 - `region_connection_info` — rows `{ uri: "https://bitcraft-early-access.spacetimedb.com", name: "bitcraft-live-1" … "bitcraft-live-14"+ }`
 
+### 2.1 Identity → player over the JSON protocol (verified live, 2026-09-25)
+
+The game host accepts `v1.json.spacetimedb` (not just the v2.bsatn the
+client uses) with the account JWT as `Authorization: Bearer` — same
+`/v1/database/<db>/subscribe` URL the relay mirror serves anonymously. That
+gives an account-driven client (BitMe Pocket Crafter) everything it needs
+to go from a login token to the player, with no character-name entry:
+
+| Query (on `bitcraft-live-global`) | Row |
+| --- | --- |
+| `user_state WHERE identity = 0x<hex>` | `{"identity":{"__identity__":"0x…"},"entity_id":<u64>,"can_sign_in":<bool>}` |
+| `user_region_state WHERE identity = 0x<hex>` | `{"identity":{…},"region_id":<int>}` |
+| `player_username_state WHERE entity_id = <u64>` | `{"entity_id":<u64>,"username":"Maplesugar"}` |
+
+`entity_id` here is the same decimal-string key the relay's
+`/bitme/session/:entity_id` takes. Core implementation:
+`GlobalPlayerResolver` + a Bearer-capable `SpacetimeSubscribeClient`.
+An account with no row in `user_state` has no character yet.
+
 ## 3. Wire protocol (v2.bsatn.spacetimedb)
 
 - WS URL: `wss://<host>/v1/database/<db>/subscribe?connection_id=<32-hex>&compression=Brotli&confirmed=false`
@@ -58,12 +77,52 @@ World selection data (subscribed on the global DB):
 - Server pushes `InitialConnection { identity, connection_id, token }` first
   (token refresh mechanism — the frame carries a fresh JWT).
 
+### 3.1 Client transport requirements (verified live, 2026-09-26)
+
+The websocket edge (nginx 1.18 in front of SpacetimeDB) is picky in ways
+that break both Apple platform websocket APIs:
+
+- **`Upgrade: websocket` is matched case-sensitively.** `Upgrade: WebSocket`
+  (which `NWProtocolWebSocket` always sends) gets HTTP 426. The exact
+  lowercase token is required.
+- **h2 breaks the upgrade.** `URLSessionWebSocketTask` negotiates ALPN and,
+  when the server selects h2, attempts RFC 8441 extended CONNECT (no public
+  opt-out); this nginx does not advertise `SETTINGS_ENABLE_CONNECT_PROTOCOL`
+  and the task dies with POSIX 57 "Socket is not connected".
+- **Anonymous or invalid-token connections to the global DB are closed
+  ~100 ms after the 101.** A valid account token gets `InitialConnection`
+  immediately; anything less gets silence then a reset.
+- The edge **pings and expects pongs within ~30 s** (see the mirror's
+  `MULTI-MIRROR-UPSTREAM-RESETS.md`); clients ping at ~10 s cadence.
+
+The working shape (what tokio-tungstenite sends, and what
+`spacetimedb-swift-sdk`'s `NWWebSocketConnection` now sends): plain TLS
+**without ALPN** over `NWConnection`, a hand-built HTTP/1.1 upgrade with
+the exact lowercase header values, and in-package RFC 6455 framing (masked
+client frames, auto-pong). Verified end-to-end against the live host:
+101 → `InitialConnection` → authenticated `OneOffQuery` rows → `CallReducer`
+result.
+
 ## 4. Global-DB session sequence (conn-03, 1,783 frames, 0 decode errors)
 
 1. `InitialConnection`
 2. `Subscribe` qsid=1: `user_region_state WHERE identity = 0x…` + `region_connection_info`
 3. 33 more `Subscribe` sets (full SQL in decoded.jsonl; catalog below)
-4. `CallReducer sign_in` (8-byte args: u64 `0x0007e0ca` = 516298 — meaning TBD, possibly client/protocol version)
+4. `CallReducer sign_in` — args decode to `{ owner_entity_id: u64 }` where the
+   id is the account's user entity (`user_state.entity_id`, the same id
+   §2.1's identity→player lookup returns). Captured bytes
+   `CA E0 07 01 00 00 00 12` = 1297036692699996362, the id the client also
+   keys its self-subscriptions by (`player_username_state WHERE entity_id = …`,
+   `friends_state WHERE owner_entity_id = …`, …). Signature confirmed via the
+   module's public schema: `GET /v1/database/<db>/schema?version=9|10`
+   (unauthenticated, ~600 KB JSON; reducers carry full param types).
+   This is the session-takeover wire action — the game allows one live
+   session per account, and a fresh `sign_in` is what takes (and thereby
+   kicks) it. BitMe Pocket Crafter performs it over the JSON protocol
+   (`v1.json.spacetimedb`, Bearer token) with
+   `"args":"[{\"owner_entity_id\":<id>]"`, `flags: 0` (FullUpdate) so a
+   subscriptionless caller still receives its own `TransactionUpdate`
+   (core: `GlobalSessionClient` + `Activity.GameSessionLoop`).
 5. During play: ~830 `OneOffQuery`/result pairs (polling-style queries), 40
    `TransactionUpdate`s (live row changes), chat via `chat_post_targeted_message`
 
@@ -71,7 +130,7 @@ Reducer calls observed, in order:
 
 | time | reducer | args |
 | --- | --- | --- |
-| 20:49:37 | `sign_in` | u64 516298 |
+| 20:49:37 | `sign_in` | `{ owner_entity_id: 1297036692699996362 }` (see §4) |
 | 20:50:50 | `chat_post_targeted_message` | channel id + UTF-8 text ("o/…") |
 | 20:51:16 | `chat_post_targeted_message` | "all good for clay?" |
 | 20:55:44 | `chat_post_targeted_message` | "perfect" |

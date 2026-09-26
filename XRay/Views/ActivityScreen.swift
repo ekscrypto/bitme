@@ -29,7 +29,7 @@ struct ActivityScreen: View {
                 switch viewRep {
                 case .session(let next):
                     session = next
-                case .onboarding, .bitCraftSignIn:
+                case .onboarding, .bitCraftSignIn, .gameSessionPrompt:
                     // e.g. "Switch character" dispatched below — hand the
                     // screen back to the root (onboarding) immediately.
                     session = nil

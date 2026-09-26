@@ -79,7 +79,7 @@ struct MapScreen: View {
                 switch viewRep {
                 case .session(let session): self.session = session
                 case .onboarding: self.session = nil
-                case .bitCraftSignIn: break // no session while signing in
+                case .bitCraftSignIn, .gameSessionPrompt: break // no session while signing in
                 }
             }
         }
@@ -530,10 +530,17 @@ struct MapScreen: View {
         let entry = word.flatMap { TileWord.dictIndex($0) != 0 ? rep.entries[TileWord.dictIndex($0)] : nil }
         let superOffset = SuperHexMath.tileToSuperOffset(x: tile.x, z: tile.z)
         let terrain = rep.terrain?.cell(atTileX: tile.x, z: tile.z)
+        // Wire format: dictionary index 0 — word 0 or water-only — means
+        // nothing occupies the tile; a nonzero index whose entry is missing
+        // means the dictionary is still loading. A nil word is a tap outside
+        // the loaded window.
+        let fallbackTitle = word == nil
+            ? "Outside map window"
+            : TileWord.dictIndex(word!) == 0 ? "Empty tile" : "Unknown resource"
 
         return VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(entry?.name ?? (word == nil || word == 0 ? "uncharted" : "unknown resource"))
+                Text(entry?.name ?? fallbackTitle)
                     .font(.subheadline.bold())
                 Spacer()
                 Text("N \(superOffset.z) · E \(superOffset.x)")

@@ -44,13 +44,27 @@ public struct Adapters: Sendable {
         public let requestAccessCode: @Sendable (_ email: String) async throws -> Void
         /// Exchanges the code for the account's SpacetimeDB token.
         public let authenticate: @Sendable (_ email: String, _ code: String) async throws -> String
+        /// Resolves a signed-in account (token + identity) to its player over
+        /// the game's global database.
+        public let resolveAccountPlayer: @Sendable (_ token: String, _ identityHex: String) async throws -> AccountPlayer
+        /// One game-session connection set: signs the account in
+        /// (`CallReducer sign_in`) on the global database and the account's
+        /// region shard, and holds both sockets open — the wire action that
+        /// owns the game's one-live-session slot. The returned stream ends
+        /// when any leg ends; reconnection is the caller's policy
+        /// (`Activity.GameSessionLoop`).
+        public let openGlobalSession: @Sendable (_ token: String, _ entityID: String, _ regionID: Int?) -> AsyncStream<GlobalSessionEvent>
 
         public init(
             requestAccessCode: @escaping @Sendable (String) async throws -> Void,
-            authenticate: @escaping @Sendable (String, String) async throws -> String
+            authenticate: @escaping @Sendable (String, String) async throws -> String,
+            resolveAccountPlayer: @escaping @Sendable (String, String) async throws -> AccountPlayer,
+            openGlobalSession: @escaping @Sendable (String, String, Int?) -> AsyncStream<GlobalSessionEvent>
         ) {
             self.requestAccessCode = requestAccessCode
             self.authenticate = authenticate
+            self.resolveAccountPlayer = resolveAccountPlayer
+            self.openGlobalSession = openGlobalSession
         }
     }
 
@@ -108,7 +122,17 @@ public struct Adapters: Sendable {
             ),
             bitCraft: BitCraft(
                 requestAccessCode: { email in try await auth.requestAccessCode(email: email) },
-                authenticate: { email, code in try await auth.authenticate(email: email, code: code) }
+                authenticate: { email, code in try await auth.authenticate(email: email, code: code) },
+                resolveAccountPlayer: { token, identityHex in
+                    try await GlobalPlayerResolver.resolve(token: token, identityHex: identityHex)
+                },
+                openGlobalSession: { token, entityID, regionID in
+                    guard let entity = UInt64(entityID) else {
+                        coreLog.error("game session: malformed entity id \(entityID, privacy: .public)")
+                        return AsyncStream { $0.finish() }
+                    }
+                    return GlobalSessionClient.events(token: token, entityID: entity, regionID: regionID)
+                }
             ),
             loadFoodBuffGamedata: { await GamedataService.loadFoodBuffGamedata() },
             restoreIdentity: { Self.restoreIdentity() },

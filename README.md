@@ -7,10 +7,11 @@ Two mobile companion apps for BitCraft, one shared core:
   on the hex resource map, with the glanceable activity dashboard (bush
   countdown, citric, stamina, food, nearby resources) a cover away.
 - **BitMe Pocket Crafter** (bundle `life.encoded.bitme.crafter`) — the
-  claim's workstations and craft tasks on the go. Currently a stub: real
-  claim header + running-craft card + BitCraft sign-in; the workstation /
-  public + personal task list is waiting on its data source. The map stack
-  is disabled at construction (see `StateMachine.Configuration`).
+  claim's workstations and craft tasks on the go. Signs in with the BitCraft
+  account (email → emailed access code) and tracks the account's own player,
+  located over the game's global database — no character-name entry. The
+  workstation / public + personal task list is waiting on its data source.
+  The map stack is disabled at construction (see `StateMachine.Configuration`).
 
 Both are thin clients over the `relay.bitcraftsync.app` **Bit-Me API**
 (JSON HTTPS endpoints + binary resource-map endpoints, ~1 Hz polling). All
@@ -94,8 +95,19 @@ open BitMe.xcodeproj       # pick the BitMeXRay or BitMeCrafter scheme, Cmd+R
   and mirrors the published `ViewRep`; `MapScreen` is the root screen and
   presents `ActivityScreen` (the dashboard) as a full-screen cover.
 - **BitMe Pocket Crafter** — bundle ID `life.encoded.bitme.crafter`
-  (display name "BitMe Pocket Crafter"). `Crafter/` renders onboarding
-  (with BitCraft sign-in), `SignInView`, and the `CrafterHomeView` stub.
+  (display name "BitMe Pocket Crafter"). `Crafter/` renders the emailed-code
+  `SignInView` (the app's root — account-driven sign-in), then the
+  pre-sign-in gate (`GameSessionPromptView`: character name, in-game N/E
+  coordinates, current claim, and the relay's live answer to whether the
+  account is signed in elsewhere), then the `CrafterHomeView` stub. The
+  gate's action performs the game's `sign_in` (`CallReducer` on the global
+  database, held open by `Activity.GameSessionLoop`) — "Take over session"
+  when another device holds it, "Sign in" when not — which is what kicks
+  the desktop client (and vice versa). A kicked or dropped session returns
+  to the gate and is never re-taken automatically. All game-database
+  traffic rides our [spacetimedb-swift-sdk](../spacetimedb-swift-sdk)
+  (v2.bsatn; its transport speaks the byte-exact HTTP/1.1 websocket this
+  server requires — see docs/protocol §3.1).
 - `Shared/` — presentation code compiled into both targets
   (`OnboardingView`, `Format`).
 - Each app has its own sandbox: identity persists at

@@ -66,17 +66,20 @@ public enum FoodBuffClassification {
     }
 }
 
-/// Minimal one-shot client for the relay mirror's SpacetimeDB JSON
-/// subscription endpoint (`v1.json.spacetimedb`): connect → `SubscribeSingle`
-/// per table → collect each `SubscribeApplied` snapshot → close. No
-/// reconnects, no deltas, no reducers — Bit-Me polls HTTP for live data;
-/// this exists only for small static tables (`buff_desc`, `buff_type_desc`).
+/// Minimal one-shot client for a SpacetimeDB JSON subscription endpoint
+/// (`v1.json.spacetimedb`): connect → `SubscribeSingle` per query → collect
+/// each `SubscribeApplied` snapshot → close. No reconnects, no deltas, no
+/// reducers — Bit-Me polls HTTP for live data; this exists for small lookups
+/// (the relay mirror's `buff_desc`/`buff_type_desc`, the game global DB's
+/// identity → player rows).
 ///
-/// Wire facts (relay-verified): the first message is an anonymous
+/// Wire facts (relay- and game-verified): the first message is an
 /// `IdentityToken`; `query_id` must be an object `{"id": n}` (a bare number
 /// hard-closes the socket); literals are inlined in the SQL; u64 ids arrive
 /// as raw JSON numbers (fine for Swift Int64); rows arrive as JSON *strings*
 /// inside `SubscribeApplied.rows.table_rows.updates[].Uncompressed.inserts`.
+/// With a Bearer token the game host accepts the same protocol and answers
+/// authenticated per-identity queries (verified live, 2026-09-25).
 public struct SpacetimeSubscribeClient: Sendable {
     enum ClientError: Error, Equatable, Sendable {
         case timeout(String)
@@ -86,21 +89,38 @@ public struct SpacetimeSubscribeClient: Sendable {
 
     let hostPort: String
     let database: String
+    /// Bearer credential for authenticated databases (the game global DB);
+    /// nil for the anonymous relay mirror.
+    let bearerToken: String?
     /// Overall budget for the whole fetch (handshake + all snapshots).
     let timeout: TimeInterval
 
-    init(hostPort: String, database: String, timeout: TimeInterval = 30) {
+    init(hostPort: String, database: String, bearerToken: String? = nil, timeout: TimeInterval = 30) {
         self.hostPort = hostPort
         self.database = database
+        self.bearerToken = bearerToken
         self.timeout = timeout
     }
 
     /// Fetch the full snapshot of each table. Row order is not defined.
     func fetchRows(tables: [String]) async throws -> [String: [Data]] {
+        var byTable: [String: [Data]] = [:]
+        for (rows, table) in try zip(await fetchRows(queries: tables.map { "SELECT * FROM \($0);" }), tables) {
+            byTable[table] = rows
+        }
+        return byTable
+    }
+
+    /// Fetch one snapshot per SQL query, in query order. Each query gets its
+    /// own query id; a query that returns zero rows contributes `[]`.
+    func fetchRows(queries: [String]) async throws -> [[Data]] {
         var request = URLRequest(
             url: URL(string: "wss://\(hostPort)/v1/database/\(database)/subscribe")!
         )
         request.setValue("v1.json.spacetimedb", forHTTPHeaderField: "Sec-WebSocket-Protocol")
+        if let bearerToken {
+            request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
+        }
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = timeout
         let task = URLSession(configuration: config).webSocketTask(with: request)
@@ -118,11 +138,11 @@ public struct SpacetimeSubscribeClient: Sendable {
             throw ClientError.protocolError("first message was not IdentityToken")
         }
 
-        // 2. Subscribe to every table (distinct query ids; inline literals).
-        for (index, table) in tables.enumerated() {
+        // 2. Subscribe with every query (distinct query ids; inline literals).
+        for (index, query) in queries.enumerated() {
             let payload: [String: Any] = [
                 "SubscribeSingle": [
-                    "query": "SELECT * FROM \(table);",
+                    "query": query,
                     "request_id": index + 1,
                     "query_id": ["id": index + 1],
                 ]
@@ -131,11 +151,12 @@ public struct SpacetimeSubscribeClient: Sendable {
             try await send(task, .string(String(data: data, encoding: .utf8)!))
         }
 
-        // 3. Collect one SubscribeApplied per table.
-        var result: [String: [Data]] = [:]
-        while result.count < tables.count {
+        // 3. Collect one SubscribeApplied per query, keyed by query id.
+        var result = [[Data]](repeating: [], count: queries.count)
+        var appliedCount = 0
+        while appliedCount < queries.count {
             if Date() > deadline {
-                throw ClientError.timeout("waiting for \(tables.count - result.count) snapshot(s)")
+                throw ClientError.timeout("waiting for \(queries.count - appliedCount) snapshot(s)")
             }
             guard let text = try await receiveString(task) else {
                 throw ClientError.connectionClosed
@@ -153,8 +174,8 @@ public struct SpacetimeSubscribeClient: Sendable {
                 continue
             }
             let queryID = (applied["query_id"] as? [String: Any])?["id"] as? Int ?? 0
-            let table = tables.indices.contains(queryID - 1) ? tables[queryID - 1] : "unknown-\(queryID)"
-            var inserted: [Data] = result[table, default: []]
+            guard queries.indices.contains(queryID - 1) else { continue }
+            var inserted: [Data] = []
             for update in updates {
                 let uncompressed = (update["Uncompressed"] as? [String: Any]) ?? update
                 for insert in uncompressed["inserts"] as? [Any] ?? [] {
@@ -165,7 +186,10 @@ public struct SpacetimeSubscribeClient: Sendable {
                     }
                 }
             }
-            result[table] = inserted
+            if result[queryID - 1].isEmpty {
+                appliedCount += 1
+            }
+            result[queryID - 1] = inserted
         }
         return result
     }

@@ -94,7 +94,9 @@ struct SignInFlowTests {
             ),
             bitCraft: Adapters.BitCraft(
                 requestAccessCode: { email in try await auth.requestAccessCode(email) },
-                authenticate: { email, code in try await auth.authenticate(email: email, code: code) }
+                authenticate: { email, code in try await auth.authenticate(email: email, code: code) },
+                resolveAccountPlayer: { _, _ in throw URLError(.badServerResponse) }, // unused: standard config
+                openGlobalSession: { _, _, _ in AsyncStream { _ in } } // parked
             ),
             loadFoodBuffGamedata: { nil },
             restoreIdentity: { nil },

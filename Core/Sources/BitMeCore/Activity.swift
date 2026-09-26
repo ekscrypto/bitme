@@ -93,6 +93,52 @@ extension Activity.Authenticate: AsyncActivity {
     }
 }
 
+extension Activity {
+    /// Locates the signed-in account's player over the game's global
+    /// database (identity → entity/username/region — the same rows the real
+    /// client subscribes after login; see GlobalPlayerResolver).
+    struct LinkAccountPlayer: Sendable {
+        let account: BitCraftAccount
+    }
+}
+
+extension Activity.LinkAccountPlayer: AsyncActivity {
+    func start(ingestor: IntentIngestor, adapters: Adapters) async {
+        guard let identityHex = account.identityHex else {
+            authLog.error("token carried no hex_identity — cannot locate the player")
+            await ingestor.ingest(Intent.AccountPlayerLinkFailed(
+                accountEmail: account.email,
+                message: "The sign-in token did not identify a player — sign in again."
+            ))
+            return
+        }
+        authLog.info("locating the player for BitCraft account \(account.email, privacy: .private)")
+        do {
+            let player = try await adapters.bitCraft.resolveAccountPlayer(account.token, identityHex)
+            authLog.info("BitCraft account \(account.email, privacy: .private) → player \(player.username ?? player.entityID, privacy: .public) (entity \(player.entityID, privacy: .public), region \(player.regionID.map(String.init) ?? "?", privacy: .public))")
+            await ingestor.ingest(Intent.AccountPlayerLinked(accountEmail: account.email, player: player))
+        } catch is CancellationError {
+            // Shutdown — no feedback intent.
+        } catch GlobalPlayerResolver.Error.noPlayer {
+            await ingestor.ingest(Intent.AccountPlayerLinkFailed(
+                accountEmail: account.email,
+                message: "This BitCraft account has no character yet — create one in game, then sign in again."
+            ))
+        } catch GlobalPlayerResolver.Error.badIdentity {
+            await ingestor.ingest(Intent.AccountPlayerLinkFailed(
+                accountEmail: account.email,
+                message: "The sign-in token did not identify a player — sign in again."
+            ))
+        } catch {
+            authLog.error("account player lookup failed: \(String(describing: error), privacy: .public)")
+            await ingestor.ingest(Intent.AccountPlayerLinkFailed(
+                accountEmail: account.email,
+                message: "BitCraft unreachable — check your connection and try again."
+            ))
+        }
+    }
+}
+
 // MARK: - Gamedata
 
 extension Activity {
@@ -331,5 +377,52 @@ extension Activity.ResourceStreamLoop: AsyncActivity, StampableActivity {
                 return // cancelled
             }
         }
+    }
+}
+
+// MARK: - Game session
+
+extension Activity {
+    /// The account's game session on the game's databases: holds the
+    /// `sign_in`s that own the game's one-live-session-per-account slot
+    /// (`GlobalSessionClient` — the global DB plus the region shard, the
+    /// two legs the desktop client holds). One connection set per user
+    /// action (`Intent.SignInGameSession`). There is deliberately no
+    /// reconnect — when a leg is kicked (the desktop client signing in),
+    /// dropped, or refused, the machine returns to the pre-sign-in gate
+    /// and only the user takes the session back.
+    struct GameSessionLoop: Sendable {
+        let token: String
+        let entityID: String
+        /// The account's region — selects the shard leg.
+        let regionID: Int?
+        /// Machine-stamped with the spawned task; stored in session state by
+        /// the starting intent so `Intent.SignOut` can cancel it.
+        let cancellable: CancellableTask
+    }
+}
+
+extension Activity.GameSessionLoop: AsyncActivity, StampableActivity {
+    var stampTarget: CancellableTask { cancellable }
+
+    func start(ingestor: IntentIngestor, adapters: Adapters) async {
+        coreLog.info("game session connecting for \(self.entityID, privacy: .public)")
+        await ingestor.ingest(Intent.GameSessionStatusChanged(status: .connecting, message: nil))
+        for await event in adapters.bitCraft.openGlobalSession(token, entityID, regionID) {
+                if Task.isCancelled { return }
+                switch event {
+                case .established:
+                    coreLog.info("game session holding for \(self.entityID, privacy: .public)")
+                    await ingestor.ingest(Intent.GameSessionStatusChanged(status: .live, message: nil))
+                case .rejected(let message):
+                    coreLog.error("game session sign_in rejected: \(message, privacy: .public)")
+                    await ingestor.ingest(Intent.GameSessionStatusChanged(status: .rejected, message: message))
+                }
+            }
+        guard !Task.isCancelled else { return }
+        // The connection that held the session ended. No automatic retake,
+        // by design — report it and stop; the gate decides what happens
+        // next.
+        await ingestor.ingest(Intent.GameSessionEnded())
     }
 }

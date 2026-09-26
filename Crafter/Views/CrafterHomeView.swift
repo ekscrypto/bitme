@@ -60,34 +60,32 @@ struct CrafterHomeView: View {
             }
             Spacer()
             accountMenu
+            if let game = session.gameSession {
+                GameSessionPill(status: game.status)
+            }
             ConnectionPill(connection: session.connection)
         }
     }
 
-    /// Account + character controls. The BitCraft entry opens the emailed-
-    /// code sign-in screen (signed in or not — a second sign-in switches
-    /// accounts); "Switch character" forgets the resolved character and
-    /// stops the session.
+    /// Account controls. "Switch BitCraft account" reopens the emailed-code
+    /// screen over the session (cancel returns here); "Sign out" forgets the
+    /// account and its player — the app returns to email entry.
     private var accountMenu: some View {
         Menu {
-            if let email = session.bitCraftAccountEmail {
-                Button {
-                    Task { await ingest(Intent.ShowBitCraftSignIn()) }
-                } label: {
-                    Label("BitCraft account: \(email)", systemImage: "person.crop.circle")
-                }
-            } else {
-                Button {
-                    Task { await ingest(Intent.ShowBitCraftSignIn()) }
-                } label: {
-                    Label("Sign in with BitCraft", systemImage: "person.crop.circle")
-                }
+            Button {
+                Task { await ingest(Intent.ShowBitCraftSignIn()) }
+            } label: {
+                Label(
+                    session.bitCraftAccountEmail.map { "Switch BitCraft account (\($0))" }
+                        ?? "Sign in with BitCraft",
+                    systemImage: "person.crop.circle"
+                )
             }
             Divider()
             Button(role: .destructive) {
                 Task { await ingest(Intent.SignOut()) }
             } label: {
-                Label("Switch character", systemImage: "arrow.uturn.backward")
+                Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right")
             }
         } label: {
             Image(systemName: "ellipsis")
@@ -176,6 +174,39 @@ private struct ConnectionPill: View {
         case .ok: .green
         case .degraded: .orange
         case .down: .red
+        }
+    }
+}
+
+/// The account's game session — the `sign_in` this app holds on the game's
+/// global database. The game allows one live session per account: while
+/// this reads "held", the desktop client has been kicked (and vice versa).
+private struct GameSessionPill: View {
+    let status: ViewRep.Session.GameSession.Status
+
+    var body: some View {
+        Text(label)
+            .font(.caption2).bold()
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(color.opacity(0.25), in: Capsule())
+            .foregroundStyle(color)
+    }
+
+    private var label: String {
+        switch status {
+        case .connecting: "SIGNING IN"
+        case .live: "GAME SESSION"
+        case .reconnecting: "RETAKING"
+        case .rejected: "REFUSED"
+        }
+    }
+
+    private var color: Color {
+        switch status {
+        case .connecting: .secondary
+        case .live: .indigo
+        case .reconnecting: .orange
+        case .rejected: .red
         }
     }
 }

@@ -43,14 +43,32 @@ struct EphemeralState: Sendable {
     /// resource-map activities on it. Apps share one value for their whole
     /// process lifetime.
     var resourceMapEnabled = true
+    /// Seeded once from `StateMachine.Configuration`: true for account-driven
+    /// apps (Pocket Crafter), where the BitCraft sign-in screen is the root
+    /// and a resolved character is always the account's own player — never a
+    /// name typed on the onboarding screen.
+    var accountDrivenSignIn = false
 
     /// BitCraft account sign-in (emailed access code). The flow:
     /// email → `requestingCode` → `awaitingCode` → `authenticating` →
-    /// account lands in `PersistentState.bitCraftAccount`.
+    /// (`linking`, account-driven apps) → account lands in
+    /// `PersistentState.bitCraftAccount`.
     var signIn = SignInState()
-    /// Whether the sign-in screen is shown (entered from onboarding; left
-    /// via back, cancel, or a successful authentication).
+    /// Whether the sign-in screen is shown over whatever is behind it
+    /// (onboarding or a live session); left via cancel or a successful
+    /// authentication. In account-driven apps the screen is also the root
+    /// whenever no character is linked — that projection needs no flag.
     var signInVisible = false
+    /// Account-driven apps: the post-authentication, pre-sign-in gate is
+    /// showing (the character card with its Sign in / Take over session
+    /// action). True from a completed link (or a restored launch) until
+    /// the user signs the game session in — and again whenever a held
+    /// session ends. The game session is never re-taken automatically:
+    /// only the button takes it back.
+    var preSignInVisible = false
+    /// Why the previous game session ended (refused, kicked, lost) — shown
+    /// on the pre-sign-in gate; cleared by the next sign-in attempt.
+    var gameSessionNotice: String?
 
     struct SignInState: Equatable, Sendable {
         enum Phase: Equatable, Sendable {
@@ -58,6 +76,9 @@ struct EphemeralState: Sendable {
             case requestingCode(email: String)
             case awaitingCode(email: String)
             case authenticating(email: String, code: String)
+            /// The account is verified; its player is being located over the
+            /// game's global database (account-driven apps only).
+            case linking(email: String)
         }
 
         var phase: Phase = .idle
@@ -81,6 +102,24 @@ struct EphemeralState: Sendable {
         /// streaming is wanted (live + overworld) here.
         let streamCarrier = ResourceStreamCarrier()
         var streamLoop: CancellableTask?
+        /// The account's game session on the game's global database: the
+        /// `sign_in` the game-session loop holds, which owns the game's
+        /// one-live-session slot (account-driven apps only).
+        var gameSessionLoop: CancellableTask?
+        var gameSession = GameSessionState()
+
+        /// Projection-facing state of the game-session loop.
+        struct GameSessionState: Sendable {
+            enum Status: Equatable, Sendable {
+                case connecting
+                case live
+                case reconnecting
+                case rejected
+            }
+
+            var status: Status = .connecting
+            var lastError: String?
+        }
         /// Live resource map (window + dictionary + change feed).
         var resourceMap = ResourceMapState()
         /// Local-clock ms of the last poll — anchors the local→relay clock

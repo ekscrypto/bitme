@@ -53,6 +53,23 @@ public enum Intent {
         public init() {}
     }
 
+    /// User asked to retry locating the signed-in account's player (the
+    /// previous attempt failed — the account is verified, no new code
+    /// needed). Account-driven apps only.
+    public struct RetryAccountLink: Sendable {
+        public init() {}
+    }
+
+    /// User tapped the pre-sign-in gate's action — sign the game session
+    /// in (`CallReducer sign_in` on the game's global database, taking the
+    /// account's one live session from whoever holds it). Only taken while
+    /// the latest snapshot places the character inside a claim — without
+    /// one (or without a snapshot at all) the machine refuses the action,
+    /// mirroring the gate's disabled button. Account-driven apps only.
+    public struct SignInGameSession: Sendable {
+        public init() {}
+    }
+
     /// User asked to forget the signed-in BitCraft account (deletes token).
     public struct ForgetBitCraftAccount: Sendable {
         public init() {}
@@ -84,6 +101,19 @@ extension Intent {
 
     struct BitCraftAuthenticationFailed: Sendable {
         let email: String
+        let message: String
+    }
+
+    // Account link feedback (activity → machine) — the account's player was
+    // located (or not) over the game's global database.
+
+    struct AccountPlayerLinked: Sendable {
+        let accountEmail: String
+        let player: AccountPlayer
+    }
+
+    struct AccountPlayerLinkFailed: Sendable {
+        let accountEmail: String
         let message: String
     }
 
@@ -157,6 +187,21 @@ extension Intent {
     struct ResourceStreamStatusChanged: Sendable {
         let status: EphemeralState.Session.ResourceMapState.StreamStatus
     }
+
+    // Game session (account-driven apps) — feedback from the game-session
+    // loop: the account's `sign_in` on the game's global database.
+
+    struct GameSessionStatusChanged: Sendable {
+        let status: EphemeralState.Session.GameSessionState.Status
+        /// Set on `.rejected`; nil otherwise.
+        let message: String?
+    }
+
+    /// The connection holding the game session ended — kicked by another
+    /// sign-in (the desktop client), dropped, or refused. The machine
+    /// returns to the pre-sign-in gate; the session is never re-taken
+    /// automatically.
+    struct GameSessionEnded: Sendable {}
 }
 
 /// Reference carrier the session loop and the intents share (ADR-014: the
@@ -173,6 +218,38 @@ final class SessionLoopCarrier: @unchecked Sendable {
 }
 
 // MARK: - Mutations
+
+/// Starts (or replaces) the session loops for a freshly linked character.
+/// A stale session for a *different* entity can be running when a late
+/// bootstrap raced the resolve (the CLI's start → SignOut → resolve
+/// sequence) — its loops are retired before fresh ones spawn. Returns the
+/// session to store plus the loop activities to run. The game-session
+/// loop is deliberately not among them: signing the game session in is a
+/// user action (`Intent.SignInGameSession`), never a side effect of
+/// linking.
+private func startSession(
+    entityID: String,
+    in ephemeral: EphemeralState
+) -> (session: EphemeralState.Session, activities: [any AsyncActivity]) {
+    if let existing = ephemeral.session, existing.entityID == entityID {
+        return (existing, [])
+    }
+    ephemeral.session?.loop.cancel()
+    ephemeral.session?.streamLoop?.cancel()
+    ephemeral.session?.gameSessionLoop?.cancel()
+    let loop = CancellableTask()
+    let streamLoop = CancellableTask()
+    let session = EphemeralState.Session(entityID: entityID, loop: loop, streamLoop: streamLoop)
+    var activities: [any AsyncActivity] = [Activity.SessionLoop(
+        entityID: entityID, carrier: session.carrier, cancellable: loop
+    )]
+    if ephemeral.resourceMapEnabled {
+        activities.append(Activity.ResourceStreamLoop(
+            entityID: entityID, carrier: session.streamCarrier, cancellable: streamLoop
+        ))
+    }
+    return (session, activities)
+}
 
 extension Intent.ResolvePlayer: StateMutator {
     func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
@@ -199,32 +276,14 @@ extension Intent.ResolveSucceeded: StateMutator {
         ephemeral.onboarding = .idle
         ephemeral.resolvedOfflineHint = response.signedIn == false
 
-        var activities: [any AsyncActivity] = [Activity.LoadGamedata()]
-        if ephemeral.session?.entityID != response.entityID {
-            // A stale session for a *different* character can be running when
-            // a late bootstrap raced this resolve (the CLI's start → SignOut
-            // → resolve sequence) — retire its loops before starting fresh.
-            ephemeral.session?.loop.cancel()
-            ephemeral.session?.streamLoop?.cancel()
-            let loop = CancellableTask()
-            let streamLoop = CancellableTask()
-            ephemeral.session = EphemeralState.Session(
-                entityID: response.entityID, loop: loop, streamLoop: streamLoop
-            )
-            activities.append(Activity.SessionLoop(
-                entityID: response.entityID,
-                carrier: ephemeral.session!.carrier,
-                cancellable: loop
-            ))
-            if ephemeral.resourceMapEnabled {
-                activities.append(Activity.ResourceStreamLoop(
-                    entityID: response.entityID,
-                    carrier: ephemeral.session!.streamCarrier,
-                    cancellable: streamLoop
-                ))
-            }
-        }
-        return StateChange(persistent: persistent, ephemeral: ephemeral, activities: activities)
+        let started = startSession(
+            entityID: response.entityID, in: ephemeral
+        )
+        ephemeral.session = started.session
+        return StateChange(
+            persistent: persistent, ephemeral: ephemeral,
+            activities: [Activity.LoadGamedata()] + started.activities
+        )
     }
 }
 
@@ -248,28 +307,34 @@ extension Intent.BootstrapCompleted: StateMutator {
         if let identity, ephemeral.session == nil,
            case .idle = ephemeral.onboarding {
             persistent.identity = identity
-            let loop = CancellableTask()
-            let streamLoop = CancellableTask()
-            ephemeral.session = EphemeralState.Session(
-                entityID: identity.entityID, loop: loop, streamLoop: streamLoop
-            )
-            activities.append(Activity.SessionLoop(
+            let started = startSession(
                 entityID: identity.entityID,
-                carrier: ephemeral.session!.carrier,
-                cancellable: loop
-            ))
-            if ephemeral.resourceMapEnabled {
-                activities.append(Activity.ResourceStreamLoop(
-                    entityID: identity.entityID,
-                    carrier: ephemeral.session!.streamCarrier,
-                    cancellable: streamLoop
-                ))
-            }
+                in: ephemeral
+            )
+            ephemeral.session = started.session
+            activities += started.activities
         }
         // The account restore has no races to guard: sign-in never runs
         // before bootstrap finishes (the machine processes intents serially,
         // and the screen is reachable only after the first rep).
         persistent.bitCraftAccount = bitCraftAccount
+        // Account-driven apps: an account with no linked character resumes
+        // the link (a previous link failed, or the identity file is gone).
+        // With a character, the restore above already started the session.
+        if ephemeral.accountDrivenSignIn, let bitCraftAccount,
+           persistent.identity == nil, ephemeral.session == nil {
+            // The sign-in screen is showing this link (it is the root while
+            // no character is linked) — flag it so the link's result counts.
+            ephemeral.signIn = EphemeralState.SignInState(
+                phase: .linking(email: bitCraftAccount.email)
+            )
+            ephemeral.signInVisible = true
+            activities.append(Activity.LinkAccountPlayer(account: bitCraftAccount))
+        } else if ephemeral.accountDrivenSignIn, persistent.identity != nil {
+            // A restored launch lands on the pre-sign-in gate, not in a
+            // held session — the game session is only ever user-taken.
+            ephemeral.preSignInVisible = true
+        }
         return StateChange(persistent: persistent, ephemeral: ephemeral, activities: activities)
     }
 }
@@ -531,14 +596,95 @@ extension Intent.ResourceStreamStatusChanged: StateMutator {
     }
 }
 
+// MARK: - Game session mutations (account-driven apps)
+
+extension Intent.GameSessionStatusChanged: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        guard var session = ephemeral.session else { return .noChange }
+        guard session.gameSession.status != status
+            || session.gameSession.lastError != message else {
+            return .noChange
+        }
+        session.gameSession.status = status
+        session.gameSession.lastError = message
+        ephemeral.session = session
+        return StateChange(ephemeral: ephemeral)
+    }
+}
+
+extension Intent.SignInGameSession: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        guard ephemeral.accountDrivenSignIn,
+              let account = persistent.bitCraftAccount,
+              let identity = persistent.identity,
+              var session = ephemeral.session,
+              session.gameSessionLoop == nil,
+              // The character must stand in a claim — and a snapshot must
+              // say so; without one the state is unknown, which refuses.
+              session.snapshot?.claim != nil else {
+            return .noChange
+        }
+        let gameSessionLoop = CancellableTask()
+        session.gameSessionLoop = gameSessionLoop
+        session.gameSession = EphemeralState.Session.GameSessionState()
+        ephemeral.session = session
+        ephemeral.preSignInVisible = false
+        ephemeral.gameSessionNotice = nil
+        return StateChange(ephemeral: ephemeral, activities: [
+            Activity.GameSessionLoop(
+                token: account.token,
+                entityID: identity.entityID,
+                regionID: identity.regionID,
+                cancellable: gameSessionLoop
+            )
+        ])
+    }
+}
+
+extension Intent.GameSessionEnded: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        guard var session = ephemeral.session else { return .noChange }
+        // What the machine knows decides the gate's notice: a refused
+        // sign-in carries the server's message; anything else is simply a
+        // session that ended (the gate's live presence line tells the user
+        // whether another device now holds it).
+        let notice: String
+        if session.gameSession.status == .rejected, let error = session.gameSession.lastError {
+            notice = "The game refused the sign-in: \(error)"
+        } else {
+            notice = "The game session ended."
+        }
+        session.gameSessionLoop?.cancel()
+        session.gameSessionLoop = nil
+        session.gameSession = EphemeralState.Session.GameSessionState()
+        ephemeral.session = session
+        ephemeral.preSignInVisible = true
+        ephemeral.gameSessionNotice = notice
+        return StateChange(ephemeral: ephemeral)
+    }
+}
+
 extension Intent.SignOut: StateMutator {
     func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
         var persistent = persistent
         var ephemeral = ephemeral
         ephemeral.session?.loop.cancel()
         ephemeral.session?.streamLoop?.cancel()
+        ephemeral.session?.gameSessionLoop?.cancel()
         ephemeral.session = nil
         persistent.identity = nil
+        if ephemeral.accountDrivenSignIn {
+            // Signing out means the account too: its token leaves the
+            // Keychain and the app returns to fresh email entry.
+            persistent.bitCraftAccount = nil
+            ephemeral.signIn = EphemeralState.SignInState()
+            ephemeral.signInVisible = false
+            ephemeral.preSignInVisible = false
+            ephemeral.gameSessionNotice = nil
+        }
         return StateChange(persistent: persistent, ephemeral: ephemeral)
     }
 }
@@ -624,6 +770,16 @@ extension Intent.BitCraftAuthenticated: StateMutator {
         var ephemeral = ephemeral
         guard case .authenticating = ephemeral.signIn.phase else { return .noChange }
         persistent.bitCraftAccount = account
+        if ephemeral.accountDrivenSignIn {
+            // The account is verified; locate its player before any session.
+            // The screen stays up through the link (`linking` phase).
+            ephemeral.signIn = EphemeralState.SignInState(phase: .linking(email: account.email))
+            ephemeral.signInVisible = true
+            return StateChange(
+                persistent: persistent, ephemeral: ephemeral,
+                activities: [Activity.LinkAccountPlayer(account: account)]
+            )
+        }
         ephemeral.signIn = EphemeralState.SignInState()
         ephemeral.signInVisible = false
         return StateChange(persistent: persistent, ephemeral: ephemeral)
@@ -647,10 +803,89 @@ extension Intent.BitCraftAuthenticationFailed: StateMutator {
 extension Intent.EditSignInEmail: StateMutator {
     func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
         var ephemeral = ephemeral
-        guard case .awaitingCode = ephemeral.signIn.phase else { return .noChange }
+        switch ephemeral.signIn.phase {
+        case .awaitingCode, .linking:
+            break
+        default:
+            return .noChange
+        }
+        var persistent = persistent
+        if case .linking = ephemeral.signIn.phase, ephemeral.accountDrivenSignIn {
+            // Abandoning a verified account mid-link — forget it, so a
+            // relaunch doesn't auto-resume a link the user rejected.
+            persistent.bitCraftAccount = nil
+        }
         ephemeral.signIn.phase = .idle
         ephemeral.signIn.error = nil
+        return StateChange(persistent: persistent, ephemeral: ephemeral)
+    }
+}
+
+// MARK: - Account link mutations (account-driven apps)
+
+extension Intent.AccountPlayerLinked: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var persistent = persistent
+        var ephemeral = ephemeral
+        // Only the live link counts: the newest account wins, and a link the
+        // user walked away from (screen closed, phase moved on) drops.
+        guard ephemeral.accountDrivenSignIn,
+              persistent.bitCraftAccount?.email == accountEmail,
+              ephemeral.signInVisible,
+              case .linking(let pending) = ephemeral.signIn.phase, pending == accountEmail else {
+            return .noChange
+        }
+        persistent.identity = StoredIdentity(
+            entityID: player.entityID,
+            username: player.username ?? player.entityID,
+            regionID: player.regionID,
+            resolvedAt: .now
+        )
+        ephemeral.signIn = EphemeralState.SignInState()
+        ephemeral.signInVisible = false
+        let started = startSession(
+            entityID: player.entityID,
+            in: ephemeral
+        )
+        ephemeral.session = started.session
+        // The link answers "who is this account" — the game session is a
+        // separate, explicit step. Land on the pre-sign-in gate (character
+        // card + presence), where Sign in / Take over session lives.
+        ephemeral.preSignInVisible = true
+        ephemeral.gameSessionNotice = nil
+        return StateChange(
+            persistent: persistent, ephemeral: ephemeral,
+            activities: [Activity.LoadGamedata()] + started.activities
+        )
+    }
+}
+
+extension Intent.AccountPlayerLinkFailed: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        guard ephemeral.accountDrivenSignIn,
+              persistent.bitCraftAccount?.email == accountEmail,
+              case .linking(let pending) = ephemeral.signIn.phase, pending == accountEmail else {
+            return .noChange
+        }
+        // Stay on the linking step with the error — the account is already
+        // verified, so retrying needs no new code.
+        ephemeral.signIn.error = message
         return StateChange(ephemeral: ephemeral)
+    }
+}
+
+extension Intent.RetryAccountLink: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        guard ephemeral.accountDrivenSignIn,
+              let account = persistent.bitCraftAccount,
+              persistent.identity == nil,
+              case .linking(let pending) = ephemeral.signIn.phase, pending == account.email else {
+            return .noChange
+        }
+        ephemeral.signIn.error = nil
+        return StateChange(ephemeral: ephemeral, activities: [Activity.LinkAccountPlayer(account: account)])
     }
 }
 

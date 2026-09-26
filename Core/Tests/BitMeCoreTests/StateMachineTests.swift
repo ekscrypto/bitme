@@ -205,7 +205,9 @@ struct StateMachineTests {
             ),
             bitCraft: Adapters.BitCraft(
                 requestAccessCode: { _ in },
-                authenticate: { _, _ in "test-token" }
+                authenticate: { _, _ in "test-token" },
+                resolveAccountPlayer: { _, _ in throw URLError(.badServerResponse) }, // unused: standard config
+                openGlobalSession: { _, _, _ in AsyncStream { _ in } } // parked
             ),
             loadFoodBuffGamedata: { gamedata },
             restoreIdentity: restoreIdentity ?? { identity },

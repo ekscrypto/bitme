@@ -3,15 +3,13 @@ import BitMeCore
 
 /// Onboarding: renders `ViewRep.Onboarding` and dispatches
 /// `Intent.ResolvePlayer`. All behavior lives in the core machine.
-/// Shared by both apps — the host passes its title, tagline, and whether
-/// the BitCraft account entry point is offered at all (X-Ray resolves by
-/// character name only; Pocket Crafter needs the account).
+/// X-Ray's name-only entry screen (Pocket Crafter signs in with its BitCraft
+/// account instead and never shows this view).
 struct OnboardingView: View {
     let onboarding: ViewRep.Onboarding
     let ingest: @Sendable (Sendable) async -> Void
     let appTitle: String
     let tagline: String
-    var showsBitCraftSignIn = false
 
     @State private var name = ""
     @FocusState private var nameFocused: Bool
@@ -78,26 +76,6 @@ struct OnboardingView: View {
             .buttonStyle(.borderedProminent)
             .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || onboarding.isResolving)
             .padding(.horizontal, 32)
-
-            if showsBitCraftSignIn {
-                if let accountEmail = onboarding.bitCraftAccountEmail {
-                    Button {
-                        Task { await ingest(Intent.ShowBitCraftSignIn()) }
-                    } label: {
-                        Label("Signed in to BitCraft as \(accountEmail)",
-                              systemImage: "checkmark.seal.fill")
-                            .font(.footnote)
-                            .foregroundStyle(.green)
-                    }
-                    .padding(.top, 4)
-                } else {
-                    Button("Sign in with BitCraft") {
-                        Task { await ingest(Intent.ShowBitCraftSignIn()) }
-                    }
-                    .font(.footnote.weight(.medium))
-                    .padding(.top, 4)
-                }
-            }
 
             Spacer()
             Spacer()

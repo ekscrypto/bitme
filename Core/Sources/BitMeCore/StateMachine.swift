@@ -17,11 +17,17 @@ public final actor StateMachine: IntentIngestor {
         /// and the change-stream websocket. Apps that never render the hex
         /// map (Pocket Crafter) disable it to skip the traffic entirely.
         public var resourceMapEnabled: Bool
+        /// The account-driven sign-in model: the emailed-code screen is the
+        /// app's root, and every resolved character comes from the signed-in
+        /// account's own identity (never a typed name). Pocket Crafter uses
+        /// it; X-Ray and the CLI resolve by character name instead.
+        public var accountDrivenSignIn: Bool
 
         public static let standard = Configuration(resourceMapEnabled: true)
 
-        public init(resourceMapEnabled: Bool) {
+        public init(resourceMapEnabled: Bool, accountDrivenSignIn: Bool = false) {
             self.resourceMapEnabled = resourceMapEnabled
+            self.accountDrivenSignIn = accountDrivenSignIn
         }
     }
 
@@ -42,9 +48,15 @@ public final actor StateMachine: IntentIngestor {
     public init(adapters: Adapters, configuration: Configuration = .standard) {
         self.adapters = adapters
         self.ephemeralState.resourceMapEnabled = configuration.resourceMapEnabled
-        self.viewRep = ViewRepBroadcaster(initial: .onboarding(ViewRep.Onboarding(
-            isResolving: false, lookingUpName: nil, error: nil, resolvedOfflineHint: false
-        )))
+        self.ephemeralState.accountDrivenSignIn = configuration.accountDrivenSignIn
+        // Bootstrap rep: the first frame an app renders. Account-driven apps
+        // open on email entry; a restored account/character takes over on
+        // bootstrap (or the link resumes) within a frame or two.
+        self.viewRep = ViewRepBroadcaster(initial: configuration.accountDrivenSignIn
+            ? .bitCraftSignIn(ViewRep.BitCraftSignIn(phase: .idle, error: nil, canDismiss: false))
+            : .onboarding(ViewRep.Onboarding(
+                isResolving: false, lookingUpName: nil, error: nil, resolvedOfflineHint: false
+              )))
         self.mapRep = RepBroadcaster<MapRep>(initial: .empty)
     }
 
@@ -63,15 +75,22 @@ public final actor StateMachine: IntentIngestor {
             return
         }
         let change = mutator.mutate(persistent: persistentState, ephemeral: ephemeralState)
+        // Apply before the first await: the actor is reentrant across await
+        // points, and a change held across the persistence adapters would be
+        // a stale snapshot that clobbers whatever an interleaved ingest
+        // applied in the meantime (bootstrap racing a sign-in submission).
+        let mutatesPersistentState = change.persistentState != nil
         if let persistent = change.persistentState {
             persistentState = persistent
-            await adapters.persistIdentity(persistent.identity)
-            await adapters.persistBitCraftAccount(persistent.bitCraftAccount)
         }
         if let ephemeral = change.ephemeralState {
             ephemeralState = ephemeral
         }
         await viewRep.send(ViewRep.from(persistent: persistentState, ephemeral: ephemeralState))
+        if mutatesPersistentState {
+            await adapters.persistIdentity(persistentState.identity)
+            await adapters.persistBitCraftAccount(persistentState.bitCraftAccount)
+        }
         let map = MapRep.from(ephemeral: ephemeralState)
         if map != lastMapRep {
             // Equality on 160k words is a memcmp — cheap next to a poll.
