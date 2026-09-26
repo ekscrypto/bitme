@@ -168,7 +168,8 @@ struct StateMachineTests {
         ),
         restoreIdentity: (@Sendable () async -> StoredIdentity?)? = nil,
         bitCraftAccount: BitCraftAccount? = nil,
-        sleep: (@Sendable (Double) async throws -> Void)? = nil
+        sleep: (@Sendable (Double) async throws -> Void)? = nil,
+        configuration: StateMachine.Configuration = .standard
     ) -> StateMachine {
         StateMachine(adapters: Adapters(
             relay: Adapters.Relay(
@@ -212,7 +213,7 @@ struct StateMachineTests {
             restoreBitCraftAccount: { bitCraftAccount },
             persistBitCraftAccount: { _ in },
             sleep: sleep ?? { _ in } // instant — flows run at task speed
-        ))
+        ), configuration: configuration)
     }
 
     /// Lock-protected ViewRep collector — sink callbacks arrive off-main.
@@ -675,6 +676,43 @@ struct StateMachineTests {
         }
         #expect(relay.stream?.connectCount == 0)
         #expect(session.resourceMap.stream == .off)
+    }
+
+    /// Pocket-Crafter configuration: a live overworld player, but the map
+    /// stack stays off — no window/terrain fetches, no stream connections.
+    @Test func resourceMapDisabledSkipsWindowFetchAndStream() async {
+        let relay = SimulatedRelay(
+            resolveResults: [.found(Self.resolved)],
+            snapshots: [Self.snapshot(position: 1)]
+        )
+        // Everything is scripted — any fetch or connection is a failure.
+        relay.window = Self.mapWindow
+        relay.dictionary = Self.mapDictionary
+        relay.terrain = Self.mapTerrain
+        relay.stream = StreamScript([[
+            .subscribed(anchorX: 100, anchorZ: 100, width: 4, region: 7, dictVersion: 5),
+        ]])
+        // Real (small) sleeps keep a misbehaving pause-wait loop off a hot spin.
+        let machine = makeMachine(relay: relay, sleep: { _ in
+            try await Task.sleep(for: .milliseconds(2))
+        }, configuration: StateMachine.Configuration(resourceMapEnabled: false))
+        await machine.start()
+        let reps = await collect(machine, dispatch: {
+            await machine.ingest(Intent.ResolvePlayer(name: "whisper"))
+        }, until: { rep in
+            sessionRep(rep)?.nowMs != nil
+        })
+        // Give the (never-spawned) map activities time to misbehave.
+        try? await Task.sleep(for: .milliseconds(200))
+        guard case .session(let session)? = reps.last(where: { sessionRep($0) != nil }) else {
+            Issue.record("expected a session rep")
+            return
+        }
+        #expect(relay.totalWindowFetches == 0)
+        #expect(relay.totalTerrainFetches == 0)
+        #expect(relay.stream?.connectCount == 0)
+        #expect(session.resourceMap.stream == .off)
+        #expect(session.resourceMap.nearby.isEmpty)
     }
 
     /// Terrain plane whose super grid covers the fixture window's center

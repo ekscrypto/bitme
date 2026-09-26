@@ -1,29 +1,52 @@
 import SwiftUI
 import BitMeCore
 
-/// The glanceable activity screen: renders `ViewRep.Session` and interpolates
-/// countdowns locally between machine publications (4 Hz ticks, 1 Hz polls).
+/// The glanceable activity dashboard, presented over the map from
+/// `MapScreen`: renders `ViewRep.Session` and interpolates countdowns
+/// locally between machine publications (4 Hz ticks, 1 Hz polls). X-Ray
+/// resolves characters by name only — there is no BitCraft account entry
+/// here ("Switch character" is the way back to onboarding).
 struct ActivityScreen: View {
-    let session: ViewRep.Session
     let machine: StateMachine
     let ingest: @Sendable (Sendable) async -> Void
 
-    /// UI-testing hook: present the map immediately on launch.
-    @State private var showMap = ProcessInfo.processInfo.arguments.contains("-uitest-map")
-
-    /// Converts device time to relay-clock ms (snapshot anchors are relay ms).
-    private var relayOffsetMs: Double {
-        session.nowMs.map { now in now - Date().timeIntervalSince1970 * 1_000 } ?? 0
-    }
+    /// The latest session rep, subscribed from the machine so the dashboard
+    /// stays anchored to fresh polls while the cover is up.
+    @State private var session: ViewRep.Session?
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
+        Group {
+            if let session {
+                dashboard(session)
+            } else {
+                Color(white: 0.05).ignoresSafeArea()
+            }
+        }
+        .preferredColorScheme(.dark)
+        .task {
+            for await viewRep in machine.viewRep.values {
+                switch viewRep {
+                case .session(let next):
+                    session = next
+                case .onboarding, .bitCraftSignIn:
+                    // e.g. "Switch character" dispatched below — hand the
+                    // screen back to the root (onboarding) immediately.
+                    session = nil
+                    dismiss()
+                }
+            }
+        }
+    }
+
+    private func dashboard(_ session: ViewRep.Session) -> some View {
         TimelineView(.periodic(from: .now, by: 0.25)) { _ in
             let now = Date().timeIntervalSince1970 * 1_000 + relayOffsetMs
             ZStack {
                 Color(white: 0.05).ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 14) {
-                        header
+                        header(session)
                         switch session.connection {
                         case .down: ReconnectingBanner()
                         case .degraded: DegradedBanner()
@@ -41,17 +64,26 @@ struct ActivityScreen: View {
                     .padding()
                 }
             }
-            .preferredColorScheme(.dark)
         }
-        .fullScreenCover(isPresented: $showMap) {
-            MapScreen(machine: machine)
-        }
+    }
+
+    /// Converts device time to relay-clock ms (snapshot anchors are relay ms).
+    private var relayOffsetMs: Double {
+        session?.nowMs.map { now in now - Date().timeIntervalSince1970 * 1_000 } ?? 0
     }
 
     // MARK: - Header
 
-    private var header: some View {
+    private func header(_ session: ViewRep.Session) -> some View {
         HStack {
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.white.opacity(0.85))
+            }
+            .accessibilityLabel("Close dashboard")
             VStack(alignment: .leading, spacing: 2) {
                 Text(session.username ?? "—")
                     .font(.headline)
@@ -68,39 +100,15 @@ struct ActivityScreen: View {
                 .foregroundStyle(.secondary)
             }
             Spacer()
-            accountMenu
-            Button {
-                showMap = true
-            } label: {
-                Image(systemName: "map.fill")
-                    .font(.subheadline.bold())
-                    .padding(8)
-                    .background(Color(white: 0.18), in: Circle())
-            }
-            .accessibilityLabel("Resource map")
+            characterMenu
             ConnectionPill(connection: session.connection)
         }
     }
 
-    /// Account + character controls. The BitCraft entry opens the emailed-code
-    /// sign-in screen (signed in or not — a second sign-in switches accounts);
-    /// "Switch character" forgets the resolved character and stops the session.
-    private var accountMenu: some View {
+    /// Character control. "Switch character" forgets the resolved character
+    /// and stops the session — the only account surface X-Ray has.
+    private var characterMenu: some View {
         Menu {
-            if let email = session.bitCraftAccountEmail {
-                Button {
-                    Task { await ingest(Intent.ShowBitCraftSignIn()) }
-                } label: {
-                    Label("BitCraft account: \(email)", systemImage: "person.crop.circle")
-                }
-            } else {
-                Button {
-                    Task { await ingest(Intent.ShowBitCraftSignIn()) }
-                } label: {
-                    Label("Sign in with BitCraft", systemImage: "person.crop.circle")
-                }
-            }
-            Divider()
             Button(role: .destructive) {
                 Task { await ingest(Intent.SignOut()) }
             } label: {
@@ -119,7 +127,7 @@ struct ActivityScreen: View {
 
     private func bushCard(nowMs: Double) -> some View {
         VStack(spacing: 8) {
-            if let bush = session.bush {
+            if let bush = session?.bush {
                 Text(bush.name)
                     .font(.title3)
                     .lineLimit(1)
@@ -172,13 +180,13 @@ struct ActivityScreen: View {
                 Label("Stamina", systemImage: "bolt")
                     .font(.subheadline.bold())
                 Spacer()
-                if let stamina = session.stamina {
+                if let stamina = session?.stamina {
                     Text("\(Int(stamina.projected.rounded())) / \(Int(stamina.max.rounded()))")
                         .font(.subheadline.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
             }
-            if let stamina = session.stamina {
+            if let stamina = session?.stamina {
                 ProgressView(value: stamina.pct)
                     .tint(stamina.pct < 0.15 ? .red : .yellow)
                 HStack {
@@ -212,31 +220,29 @@ struct ActivityScreen: View {
 
             let relayNowSec = Int64((Date().timeIntervalSince1970 * 1_000 + relayOffsetMs) / 1_000)
 
-            if !session.food.configured {
+            if let food = session?.food, food.configured {
+                if food.active, let expiresAtSec = food.expiresAtSec {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                        Text("Active — \(Format.mmss(Double(expiresAtSec - relayNowSec) * 1_000)) left")
+                            .font(.title3.monospacedDigit())
+                    }
+                } else {
+                    HStack {
+                        Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.red)
+                        Text("No food buff — eat before the citric phase")
+                            .font(.subheadline)
+                    }
+                }
+            } else {
                 Label("Food tracking pending gamedata — live buffs below",
                       systemImage: "clock.badge.questionmark")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-            } else if session.food.active, let expiresAtSec = session.food.expiresAtSec {
-                HStack {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                    Text("Active — \(Format.mmss(Double(expiresAtSec - relayNowSec) * 1_000)) left")
-                        .font(.title3.monospacedDigit())
-                }
-            } else {
-                HStack {
-                    Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.red)
-                    Text("No food buff — eat before the citric phase")
-                        .font(.subheadline)
-                }
             }
 
-            if session.food.liveBuffs.isEmpty {
-                Text("No live buffs")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(session.food.liveBuffs, id: \.id) { buff in
+            if let buffs = session?.food.liveBuffs, !buffs.isEmpty {
+                ForEach(buffs, id: \.id) { buff in
                     let remainingMs = Double(buff.expiresAtSec - relayNowSec) * 1_000
                     VStack(alignment: .leading, spacing: 2) {
                         Text("\(buff.name ?? "buff #\(buff.id)") — \(Format.mmss(max(0, remainingMs))) left")
@@ -249,6 +255,10 @@ struct ActivityScreen: View {
                         }
                     }
                 }
+            } else {
+                Text("No live buffs")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -262,8 +272,8 @@ struct ActivityScreen: View {
     /// stream (relay §6–7 endpoints, integrated in the core).
     @ViewBuilder
     private func nearbyCard(nowMs: Double) -> some View {
-        let map = session.resourceMap
-        if map.stream != .off || !map.nearby.isEmpty || !map.feed.isEmpty {
+        if let map = session?.resourceMap,
+           map.stream != .off || !map.nearby.isEmpty || !map.feed.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Label("Nearby resources", systemImage: "map")
@@ -442,30 +452,6 @@ private struct CitricBanner: View {
             .background(hot ? Color.red : Color.purple, in: RoundedRectangle(cornerRadius: 16))
             .foregroundStyle(.white)
         }
-    }
-}
-
-// MARK: - Formatting
-
-enum Format {
-    /// "2:05" for 125_000 ms; ceiling so a countdown never shows 0:00 early.
-    static func mmss(_ ms: Double) -> String {
-        let totalSeconds = max(0, Int((ms / 1_000).rounded(.up)))
-        return String(format: "%d:%02d", totalSeconds / 60, totalSeconds % 60)
-    }
-
-    /// Relay-clock ms → local-formatted wall clock ("17:32").
-    static func clockTime(_ relayMs: Double) -> String {
-        let date = Date(timeIntervalSince1970: relayMs / 1_000)
-        return date.formatted(date: .omitted, time: .shortened)
-    }
-
-    /// Elapsed ms → "now" / "45s ago" / "12m ago".
-    static func ago(_ ms: Double) -> String {
-        let seconds = max(0, Int(ms / 1_000))
-        if seconds < 5 { return "now" }
-        if seconds < 60 { return "\(seconds)s ago" }
-        return "\(seconds / 60)m ago"
     }
 }
 

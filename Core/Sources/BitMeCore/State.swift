@@ -39,6 +39,10 @@ struct EphemeralState: Sendable {
     var resolvedOfflineHint = false
     var gamedata: FoodBuffGamedata?
     var session: Session?
+    /// Seeded once from `StateMachine.Configuration`; mutators gate the
+    /// resource-map activities on it. Apps share one value for their whole
+    /// process lifetime.
+    var resourceMapEnabled = true
 
     /// BitCraft account sign-in (emailed access code). The flow:
     /// email → `requestingCode` → `awaitingCode` → `authenticating` →

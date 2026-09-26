@@ -11,35 +11,66 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     GENERATE_INFOPLIST_FILE: YES
-    MARKETING_VERSION: "0.2.0"
-    CURRENT_PROJECT_VERSION: "2"
+    MARKETING_VERSION: "0.3.0"
+    CURRENT_PROJECT_VERSION: "3"
     CODE_SIGN_STYLE: Automatic
     # XcodeGen regeneration wipes team picks made in Xcode's UI — pin the
     # team here so device builds sign without re-selecting it every launch.
     DEVELOPMENT_TEAM: WKB9M744MQ
     ENABLE_USER_SCRIPT_SANDBOXING: YES
 targets:
-  BitMe:
+  # The map-first companion. Inherits the original Bit-Me bundle id so it
+  # upgrades the installed app in place (identity + Keychain carry over).
+  BitMeXRay:
     type: application
     platform: iOS
     sources:
-      - path: BitMe
+      - path: XRay
         type: syncedFolder
+      - path: Shared
     dependencies:
       - package: BitMeCore
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: life.encoded.bitme.ios
-        INFOPLIST_KEY_CFBundleDisplayName: Bit-Me
+        INFOPLIST_KEY_CFBundleDisplayName: BitMe X-Ray
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        TARGETED_DEVICE_FAMILY: "1"
+        SUPPORTS_MACCATALYST: NO
+
+  # The crafting companion (workstations + tasks). Stub until its data
+  # source lands — sign-in and the session loop are live, the map stack is
+  # disabled at construction (see CrafterApp).
+  BitMeCrafter:
+    type: application
+    platform: iOS
+    sources:
+      - path: Crafter
+        type: syncedFolder
+      - path: Shared
+    dependencies:
+      - package: BitMeCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: life.encoded.bitme.crafter
+        INFOPLIST_KEY_CFBundleDisplayName: BitMe Pocket Crafter
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait"
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         TARGETED_DEVICE_FAMILY: "1"
         SUPPORTS_MACCATALYST: NO
 schemes:
-  BitMe:
+  BitMeXRay:
     build:
       targets:
-        BitMe: all
+        BitMeXRay: all
+    run:
+      config: Debug
+  BitMeCrafter:
+    build:
+      targets:
+        BitMeCrafter: all
     run:
       config: Debug

@@ -1,12 +1,22 @@
-# Bit-Me
+# BitMe
 
-Cross-platform mobile companion app for BitCraft: large, glanceable,
-time-critical guidance while harvesting timed world resources — the Giant
-Bountiful Strawberry Bush → Citric window being the reference scenario.
+Two mobile companion apps for BitCraft, one shared core:
 
-The app is a thin client over the `relay.bitcraftsync.app` **Bit-Me API**
-(two JSON HTTPS endpoints, ~1 Hz polling). All countdowns and alert logic
-run client-side from snapshots + bundled gamedata.
+- **BitMe X-Ray** (bundle `life.encoded.bitme.ios`, the successor of the
+  original "Bit-Me" app) — map-first: resolve a character by name and live
+  on the hex resource map, with the glanceable activity dashboard (bush
+  countdown, citric, stamina, food, nearby resources) a cover away.
+- **BitMe Pocket Crafter** (bundle `life.encoded.bitme.crafter`) — the
+  claim's workstations and craft tasks on the go. Currently a stub: real
+  claim header + running-craft card + BitCraft sign-in; the workstation /
+  public + personal task list is waiting on its data source. The map stack
+  is disabled at construction (see `StateMachine.Configuration`).
+
+Both are thin clients over the `relay.bitcraftsync.app` **Bit-Me API**
+(JSON HTTPS endpoints + binary resource-map endpoints, ~1 Hz polling). All
+countdowns and alert logic run client-side from snapshots + bundled
+gamedata — the Giant Bountiful Strawberry Bush → Citric window remains the
+reference scenario for X-Ray's dashboard.
 
 ## Documentation
 
@@ -33,7 +43,7 @@ run client-side from snapshots + bundled gamedata.
 ## Architecture
 
 All behavior lives in the **`Core/` local Swift package** (fenex-light-style
-one-way state machine), shared by the iOS app and a headless CLI:
+one-way state machine), shared by both iOS apps and a headless CLI:
 
 - `StateMachine` — `final actor`, owns `PersistentState` (resolved identity)
   and `EphemeralState`; all mutation flows through serially-processed
@@ -45,12 +55,18 @@ one-way state machine), shared by the iOS app and a headless CLI:
 - `MapRep` — the tile-data channel for the hex-grid map renderer: raw BMR1
   window words, the BME1 terrain plane, and the dictionary, published only
   when map state changes (never on every poll).
+- `StateMachine.Configuration` — optional subsystems an app host toggles at
+  construction. Pocket Crafter disables the resource-map stack (no tile
+  windows, no terrain, no change-stream websocket); X-Ray and the CLI use
+  the standard configuration.
 - `Adapters` — closure-based system boundaries (relay HTTP, resource change
   stream, mirror WebSocket gamedata, identity persistence, sleep) so tests
   substitute simulated doubles and flows run deterministically.
 - API layer (relay HTTP client incl. the BMR1/BMD1/BME1 binary codecs,
-  change-stream WebSocket client, mirror WebSocket gamedata client) and the
-  pure harvest/resource-map engines are internal to the package.
+  change-stream WebSocket client, mirror WebSocket gamedata client, and the
+  BitCraft account auth client — emailed access code → SpacetimeDB JWT,
+  Keychain-stored) and the pure harvest/resource-map engines are internal
+  to the package.
 
 ### CLI (`bitme-cli`) — headless testing surface
 
@@ -62,23 +78,30 @@ swift run bitme-cli watch maplesugar --json # one JSON ViewRep per line
 swift test                                  # core unit tests (no simulator)
 ```
 
-### iOS app
+### iOS apps
 
 SwiftUI (iOS 17+, Swift 6, zero third-party dependencies). The Xcode project
 is generated with XcodeGen:
 
 ```bash
 xcodegen generate          # creates BitMe.xcodeproj from project.yml
-open BitMe.xcodeproj       # Cmd+R in Xcode
+open BitMe.xcodeproj       # pick the BitMeXRay or BitMeCrafter scheme, Cmd+R
 ```
 
-- Bundle ID: `life.encoded.bitme.ios` (display name "Bit-Me")
-- `BitMe/` is presentation only: `BitMeApp` owns the `StateMachine` and
-  mirrors the published `ViewRep`; `OnboardingView` / `ActivityScreen` render
-  reps and dispatch intents.
-- Identity persists at `<Application Support>/BitMe/identity.json` (written
-  by the core after a successful resolve) — on relaunch the app goes
-  straight to the activity screen.
+- **BitMe X-Ray** — bundle ID `life.encoded.bitme.ios` (display name
+  "BitMe X-Ray"; inherits the original app's identity, so it upgrades in
+  place). `XRay/` is presentation only: `XRayApp` owns the `StateMachine`
+  and mirrors the published `ViewRep`; `MapScreen` is the root screen and
+  presents `ActivityScreen` (the dashboard) as a full-screen cover.
+- **BitMe Pocket Crafter** — bundle ID `life.encoded.bitme.crafter`
+  (display name "BitMe Pocket Crafter"). `Crafter/` renders onboarding
+  (with BitCraft sign-in), `SignInView`, and the `CrafterHomeView` stub.
+- `Shared/` — presentation code compiled into both targets
+  (`OnboardingView`, `Format`).
+- Each app has its own sandbox: identity persists at
+  `<Application Support>/BitMe/identity.json` per app, and the BitCraft
+  account lives in each app's own Keychain item — sign in separately in
+  each.
 
 Known gaps (tunable placeholders live in `Core/Sources/BitMeCore/GameConfig.swift`):
 stamina regen constants need gamedata + playtest confirmation.
@@ -90,19 +113,18 @@ stamina regen constants need gamedata + playtest confirmation.
   **Resource-map APIs live** (2026-09-24, first shipped on the X-Ray web
   client): BMR1 session/world windows, region dictionaries, BME1 terrain,
   and the BMD1 change-stream WebSocket.
-- Core + CLI: state machine, API, ViewRep extracted; 56 unit tests; CLI
+- Core + CLI: state machine, API, ViewRep extracted; 79 unit tests; CLI
   verified against production (resolve, live watch, live resource map —
   window + dictionary + stream). The session/map loops also survive the
   CLI's start → SignOut → resolve race (late bootstraps can no longer
   resurrect the previous character).
-- iOS app: **v0.3** — thin ViewRep renderer over the core (onboarding, big
-  countdown with learned pacing, citric banner, stamina projection,
-  food-buff classification, live nearby-resources card with the
-  spawn/despawn feed) plus the **odd-r hex-grid map**: terrain from BME1
-  planes, resources colored per id, live deltas, pan/pinch/follow,
-  tap-to-inspect tiles, and a **resource filter panel** (nearby counts,
-  search, tracked set persisted in UserDefaults, untracked resources
-  faded to 10%), plus a **gathering HUD** — a ¼-width × ⅒-height banner
-  pinned to the left edge below the half point while the character is
-  Extract-ing, showing the resource name, time until depleted, and the
-  stamina meter — verified rendered in the simulator against production.
+- iOS apps: **v0.3 — split into two apps.** **X-Ray** (map-first; same
+  bundle id as the original Bit-Me app) carries everything the combined
+  app had — the odd-r hex-grid map (terrain from BME1 planes, per-id
+  resource colors, live deltas, pan/pinch/follow, tile inspect, filter
+  panel with persisted tracked set, gathering HUD) with the activity
+  dashboard (big countdown with learned pacing, citric banner, stamina
+  projection, food-buff classification, nearby-resources feed) now a
+  cover over the map. **Pocket Crafter** is the stub described above
+  (real claim header + running-craft card + sign-in; workstation list
+  pending its data source).

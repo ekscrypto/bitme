@@ -2,7 +2,8 @@ import SwiftUI
 import BitMeCore
 import UIKit
 
-/// The odd-r hex grid map — the mobile counterpart of the X-Ray web map.
+/// The odd-r hex grid map — the mobile counterpart of the X-Ray web map,
+/// and X-Ray's root screen.
 ///
 /// Rendering follows the reference client's strategy: the BMR1 window is
 /// prerendered once into a bitmap (2 px/hex) and blitted while zoomed out;
@@ -13,6 +14,7 @@ import UIKit
 /// stream bump `MapRep.tileVersion`, which re-keys the prerender.
 struct MapScreen: View {
     let machine: StateMachine
+    let ingest: @Sendable (Sendable) async -> Void
 
     @State private var rep: MapRep = .empty
     /// The tracked character's session (stamina, bush, running actions) for
@@ -29,8 +31,9 @@ struct MapScreen: View {
     /// localStorage). Empty set = show everything.
     @AppStorage("map.trackedResourceIds") private var trackedData = Data()
     @State private var filterVisible = ProcessInfo.processInfo.arguments.contains("-uitest-map-filter")
+    /// UI-testing hook: present the dashboard cover immediately on launch.
+    @State private var showDashboard = ProcessInfo.processInfo.arguments.contains("-uitest-dashboard")
     @State private var searchText = ""
-    @Environment(\.dismiss) private var dismiss
 
     private var tracked: Set<Int> {
         get {
@@ -67,6 +70,9 @@ struct MapScreen: View {
             chrome
         }
         .preferredColorScheme(.dark)
+        .fullScreenCover(isPresented: $showDashboard) {
+            ActivityScreen(machine: machine, ingest: ingest)
+        }
         .task { await subscribe() }
         .task {
             for await viewRep in machine.viewRep.values {
@@ -361,12 +367,13 @@ struct MapScreen: View {
         VStack {
             HStack {
                 Button {
-                    dismiss()
+                    showDashboard = true
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
+                    Image(systemName: "gauge.with.needle")
                         .font(.title3)
                         .foregroundStyle(.white.opacity(0.85))
                 }
+                .accessibilityLabel("Activity dashboard")
                 statusPill
                     .frame(maxWidth: .infinity)
                 Button {

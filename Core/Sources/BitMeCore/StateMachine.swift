@@ -9,6 +9,22 @@ import os
 /// Internal state is not queryable (ADR-014): it is read only inside intent
 /// mutations and `ViewRep.from`. Observers use `viewRep.values`.
 public final actor StateMachine: IntentIngestor {
+    /// Optional subsystems an app host turns on or off at construction.
+    /// Seeded into ephemeral state once; intents gate their activity spawns
+    /// on it (the machine never re-reads the struct afterwards).
+    public struct Configuration: Sendable {
+        /// The resource-map stack: BMR1 window fetches, terrain, dictionary,
+        /// and the change-stream websocket. Apps that never render the hex
+        /// map (Pocket Crafter) disable it to skip the traffic entirely.
+        public var resourceMapEnabled: Bool
+
+        public static let standard = Configuration(resourceMapEnabled: true)
+
+        public init(resourceMapEnabled: Bool) {
+            self.resourceMapEnabled = resourceMapEnabled
+        }
+    }
+
     /// The UI subscribes here. `nonisolated` so callers can reach `.values`
     /// without an actor hop.
     public nonisolated let viewRep: ViewRepBroadcaster
@@ -23,8 +39,9 @@ public final actor StateMachine: IntentIngestor {
     private var started = false
     private var lastMapRep: MapRep = .empty
 
-    public init(adapters: Adapters) {
+    public init(adapters: Adapters, configuration: Configuration = .standard) {
         self.adapters = adapters
+        self.ephemeralState.resourceMapEnabled = configuration.resourceMapEnabled
         self.viewRep = ViewRepBroadcaster(initial: .onboarding(ViewRep.Onboarding(
             isResolving: false, lookingUpName: nil, error: nil, resolvedOfflineHint: false
         )))

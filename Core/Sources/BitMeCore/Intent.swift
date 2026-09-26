@@ -216,11 +216,13 @@ extension Intent.ResolveSucceeded: StateMutator {
                 carrier: ephemeral.session!.carrier,
                 cancellable: loop
             ))
-            activities.append(Activity.ResourceStreamLoop(
-                entityID: response.entityID,
-                carrier: ephemeral.session!.streamCarrier,
-                cancellable: streamLoop
-            ))
+            if ephemeral.resourceMapEnabled {
+                activities.append(Activity.ResourceStreamLoop(
+                    entityID: response.entityID,
+                    carrier: ephemeral.session!.streamCarrier,
+                    cancellable: streamLoop
+                ))
+            }
         }
         return StateChange(persistent: persistent, ephemeral: ephemeral, activities: activities)
     }
@@ -256,11 +258,13 @@ extension Intent.BootstrapCompleted: StateMutator {
                 carrier: ephemeral.session!.carrier,
                 cancellable: loop
             ))
-            activities.append(Activity.ResourceStreamLoop(
-                entityID: identity.entityID,
-                carrier: ephemeral.session!.streamCarrier,
-                cancellable: streamLoop
-            ))
+            if ephemeral.resourceMapEnabled {
+                activities.append(Activity.ResourceStreamLoop(
+                    entityID: identity.entityID,
+                    carrier: ephemeral.session!.streamCarrier,
+                    cancellable: streamLoop
+                ))
+            }
         }
         // The account restore has no races to guard: sign-in never runs
         // before bootstrap finishes (the machine processes intents serially,
@@ -294,12 +298,13 @@ extension Intent.SessionPolled: StateMutator {
 
         // Resource map: fetch a window while the player is live in the
         // overworld (deltas then keep it fresh; this is also the recovery
-        // move), and gate the change stream on the same liveness.
+        // move), and gate the change stream on the same liveness. The whole
+        // stack is skipped for apps that never render the map.
         let config = GameConfig.shared
         let live = snapshot.signedIn != false && (snapshot.position?.dimension ?? 1) == 1
-        session.streamCarrier.wanted = live
+        session.streamCarrier.wanted = live && ephemeral.resourceMapEnabled
         var activities: [any AsyncActivity] = []
-        if live {
+        if live, ephemeral.resourceMapEnabled {
             var need = session.resourceMap.window == nil
             if let window = session.resourceMap.window {
                 if let position = snapshot.position {
