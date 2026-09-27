@@ -13,3 +13,6 @@ build/
 # net-recon tooling
 tools/tap/node_modules/
 tools/tap/captures/
+
+# Extracted game art lives in its own private repo (github.com/ekscrypto/bitme-resources)
+bitme-resources/

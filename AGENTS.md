@@ -15,6 +15,15 @@ external queries.
 | SpacetimeDB BitCraft mirror | `../relay-bitcraftsync-app/spacetimedb-bitcraft-mirror` | Source of truth for the Bit-Me relay API and the full SpacetimeDB server/protocol source the game runs on. |
 | BitCraft Materials Coordination | `../bitcraft-mats` | The BitCraft module table schemas — the game servers' actual data model. |
 
+### `bitme-resources/` — extracted game art (nested, private)
+
+`bitme-resources/` inside this checkout is its own **private** repo
+(github.com/ekscrypto/bitme-resources; gitignored here, not a submodule)
+holding 3,310 icons/tier-rarity PNGs extracted from the BitCraft client.
+Source map, tier palette, refresh procedure:
+[docs/client-assets.md](docs/client-assets.md); tooling:
+[tools/asset-extraction](tools/asset-extraction/).
+
 ### `relay-bitcraftsync-app` — relay workspace
 
 Mirrors `/srv/relay/` on the production host; its own `AGENTS.md` documents
