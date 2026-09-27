@@ -687,7 +687,9 @@ extension Intent.GameSessionEnded: StateMutator {
         session.buildingsLoop?.cancel()
         session.buildingsLoop = nil
         session.regionLeg = nil
-        session.buildings = EphemeralState.Session.BuildingsState()
+        var cleared = EphemeralState.Session.BuildingsState()
+        cleared.version = session.buildings.version + 1 // monotonic across resets
+        session.buildings = cleared
         session.claimCarrier.claimEntityID = nil
         ephemeral.session = session
         ephemeral.preSignInVisible = true
@@ -713,6 +715,7 @@ extension Intent.GameSessionRegionLegReady: StateMutator {
         var buildings = EphemeralState.Session.BuildingsState()
         buildings.playerEntityID = playerEntityID
         buildings.status = .syncing
+        buildings.version = session.buildings.version + 1 // monotonic across resets
         session.buildings = buildings
         let buildingsLoop = CancellableTask()
         session.buildingsLoop = buildingsLoop
@@ -760,6 +763,7 @@ extension Intent.ClaimBuildingsChanged: StateMutator {
                 session.buildings.lastError = message
             }
         }
+        session.buildings.version += 1
         ephemeral.session = session
         return StateChange(ephemeral: ephemeral)
     }

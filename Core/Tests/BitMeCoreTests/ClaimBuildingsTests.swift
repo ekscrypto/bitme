@@ -387,7 +387,318 @@ struct ClaimBuildingsTests {
         await machine.ingest(Intent.SignOut()) // retire the loops
     }
 
+    /// The opt-in ingest trace (`StateMachine.setIngestTracer`): one line
+    /// per intent naming the state its mutation produced. The line is the
+    /// one-run answer to "the UI shows X but the wire said Y" — here it
+    /// must surface the sign-in phases as they happen and the raw
+    /// buildings/crafts/catalog counts (projection filtering is not its
+    /// business).
+    @Test func ingestTracerSummarizesStatePerIntent() async throws {
+        final class TraceCollector: @unchecked Sendable {
+            private let lock = NSLock()
+            private var _lines: [String] = []
+            func append(_ line: String) { lock.withLock { _lines.append(line) } }
+            var lines: [String] { lock.withLock { _lines } }
+        }
+        let traces = TraceCollector()
+        let leg = Self.makeLeg()
+        let claimBuildings = SimulatedClaimBuildings(scripts: [Self.syncScript()])
+        let globalSession = AccountDrivenSignInTests.SimulatedGlobalSession(
+            scripts: [.init(events: [.regionLeg(leg), .established], hold: true)]
+        )
+        let machine = AccountDrivenSignInTests().makeMachine(
+            link: .init(outcome: .player(AccountDrivenSignInTests.player)),
+            globalSession: globalSession,
+            claimBuildings: claimBuildings
+        )
+        await machine.setIngestTracer { traces.append($0) }
+
+        await machine.start()
+        await machine.ingest(Intent.StartBitCraftSignIn(email: "crafter@example.com"))
+        _ = await collectUntil(machine) { rep in
+            if case .bitCraftSignIn(let signIn) = rep, case .awaitingCode = signIn.phase { return true }
+            return false
+        }
+        await machine.ingest(Intent.SubmitAccessCode(code: "123456"))
+        _ = await collectUntil(machine) { rep in
+            if case .gameSessionPrompt(let prompt) = rep, prompt.claimName != nil { return true }
+            return false
+        }
+        await machine.ingest(Intent.SignInGameSession())
+        _ = await collectUntil(machine) { rep in
+            if case .session(let s) = rep, s.workstations.crafts.count == 2 { return true }
+            return false
+        }
+        await machine.ingest(Intent.SignOut()) // retire the loops
+
+        let lines = traces.lines
+        #expect(!lines.isEmpty)
+        #expect(lines.allSatisfy { $0.contains(" → screen=") })
+
+        // The sign-in flow's phases are visible as they happen.
+        #expect(lines.contains {
+            $0.hasPrefix("StartBitCraftSignIn → screen=signin phase=requestingCode acts=1")
+        })
+        #expect(lines.contains {
+            $0.hasPrefix("SubmitAccessCode → screen=signin phase=authenticating acts=1")
+        })
+
+        // The buildings summary: raw counts (the completed craft included)
+        // plus catalog coverage — descs=0 here would name the
+        // empty-workstations bug class in one glance.
+        guard let last = lines.last(where: { $0.hasPrefix("ClaimBuildingsChanged →") }) else {
+            Issue.record("expected a ClaimBuildingsChanged trace line")
+            return
+        }
+        #expect(last.contains("wks=live"))
+        #expect(last.contains("claim=\"Emberfall\""))
+        #expect(last.contains("b=3"))
+        #expect(last.contains("c=3"))
+        #expect(last.contains("descs=2"))
+        #expect(last.contains("recipes=1"))
+        // The classification split: one crafting station (the Sawmill), one
+        // storage hut, one unclassified — the empty-workstations tell.
+        #expect(last.contains("wkCraft=1"))
+        #expect(last.contains("wkStore=1"))
+        #expect(last.contains("map=off"))
+    }
+
+    @Test func claimMembershipDecodesInSchemaOrder() throws {
+        // entity_id, claim_entity_id, player_entity_id, user_name, four
+        // permission flags — declaration order (bitjita-schema-region.json).
+        var w = Wire()
+        w.u64(7001); w.u64(2000); w.u64(1000)
+        w.string("Maplesugar")
+        w.boolean(true); w.boolean(true); w.boolean(false); w.boolean(false)
+        let member = try RegionGamedataDecoder.claimMembership(w.data)
+        #expect(member.entityID == 7001)
+        #expect(member.claimEntityID == 2000)
+        #expect(member.playerEntityID == 1000)
+    }
+
+    // MARK: - Claim-resolution fallback (protocol doc §2)
+
+    /// Collecting ingestor + fallback counter for the loop-level tests.
+    private final class LoopHarness: @unchecked Sendable {
+        final class Ingested: IntentIngestor, @unchecked Sendable {
+            private let lock = NSLock()
+            private var _pooledEventCounts: [Int] = []
+            func ingest(_ intent: Sendable) async {
+                guard let changed = intent as? Intent.ClaimBuildingsChanged else { return }
+                lock.withLock { _pooledEventCounts.append(changed.events.count) }
+            }
+            var pooledEventCounts: [Int] { lock.withLock { _pooledEventCounts } }
+        }
+
+        final class Counter: @unchecked Sendable {
+            private let lock = NSLock()
+            private var _calls: [UInt64] = []
+            func record(_ player: UInt64) { lock.withLock { _calls.append(player) } }
+            var calls: [UInt64] { lock.withLock { _calls } }
+        }
+
+        let ingested = Ingested()
+        let fallbackCalls = Counter()
+
+        func adapters(claimBuildings: SimulatedClaimBuildings, membership: UInt64?) -> Adapters {
+            let fallbackCalls = fallbackCalls
+            return Adapters(
+                relay: .init(
+                    resolve: { _ in throw RelayError.notFound },
+                    session: { _ in throw RelayError.notFound },
+                    sessionResources: { _ in throw RelayError.notFound },
+                    resourceDictionary: { _ in throw RelayError.notFound },
+                    worldElevation: { _, _ in throw RelayError.notFound },
+                    openResourceStream: { _ in AsyncStream { _ in } }
+                ),
+                bitCraft: .init(
+                    requestAccessCode: { _ in },
+                    authenticate: { _, _ in "test-token" },
+                    resolveAccountPlayer: { _, _ in throw URLError(.badServerResponse) },
+                    openGlobalSession: { _, _, _ in AsyncStream { _ in } },
+                    syncClaimBuildings: { leg, claim, player in
+                        claimBuildings.open(leg: leg, claim: claim, player: player)
+                    },
+                    resolveOwnClaimMembership: { _, player in
+                        fallbackCalls.record(player)
+                        return membership
+                    }
+                ),
+                loadFoodBuffGamedata: { nil },
+                restoreIdentity: { nil },
+                persistIdentity: { _ in },
+                restoreBitCraftAccount: { nil },
+                persistBitCraftAccount: { _ in },
+                sleep: { _ in } // instant — the wait spins at task speed
+            )
+        }
+    }
+
+    /// The relay never answers the claim: after the carrier wait lapses,
+    /// the loop asks the leg for the player's own membership and syncs the
+    /// claim it names.
+    @Test func claimResolutionFallsBackToMembershipWhenTheRelayNeverAnswers() async {
+        let leg = Self.makeLeg()
+        let claimBuildings = SimulatedClaimBuildings(scripts: [
+            .init(events: [.live, .claim(ClaimHeader(
+                entityID: 2000, name: "Emberfall", ownerPlayerEntityID: 1000, neutral: false
+            ))], hold: false)
+        ])
+        let harness = LoopHarness()
+        let carrier = ClaimCarrier() // never stamped — the relay never answers
+        await Activity.ClaimBuildingsLoop(
+            leg: leg, playerEntityID: 1000, claimCarrier: carrier, cancellable: CancellableTask()
+        ).start(
+            ingestor: harness.ingested,
+            adapters: harness.adapters(claimBuildings: claimBuildings, membership: 2000)
+        )
+
+        #expect(claimBuildings.requests == [.init(claim: 2000, player: 1000)])
+        #expect(harness.fallbackCalls.calls == [1000])
+        #expect(!harness.ingested.pooledEventCounts.isEmpty)
+    }
+
+    /// The relay's answer wins: a stamped carrier means the fallback is
+    /// never asked.
+    @Test func claimResolutionPrefersTheRelayAnswerOverTheFallback() async {
+        let leg = Self.makeLeg()
+        let claimBuildings = SimulatedClaimBuildings(scripts: [
+            .init(events: [.live], hold: false)
+        ])
+        let harness = LoopHarness()
+        let carrier = ClaimCarrier()
+        carrier.claimEntityID = 2001 // the relay already answered
+        await Activity.ClaimBuildingsLoop(
+            leg: leg, playerEntityID: 1000, claimCarrier: carrier, cancellable: CancellableTask()
+        ).start(
+            ingestor: harness.ingested,
+            adapters: harness.adapters(claimBuildings: claimBuildings, membership: 2000)
+        )
+
+        #expect(claimBuildings.requests == [.init(claim: 2001, player: 1000)])
+        #expect(harness.fallbackCalls.calls.isEmpty)
+    }
+
+    // MARK: - Catalog cache (48 h TTL, the food-buff gamedata policy)
+
+    @Test func buildingGamedataCacheRoundTripsAndExpires() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bitme-test-region-gamedata-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let gamedata = BuildingGamedata(
+            buildings: [
+                1200: BuildingDescInfo(id: 1200, name: "Sawmill", functions: [
+                    BuildingFunctionInfo(
+                        functionType: 1, level: 2, craftingSlots: 4, storageSlots: 0,
+                        cargoSlots: 0, refiningSlots: 0, refiningCargoSlots: 0
+                    )
+                ])
+            ],
+            recipeNames: [77: "Oak Plank"],
+            fetchedAt: .now
+        )
+        RegionBuildingsClient.writeBuildingGamedataCache(gamedata, at: url)
+
+        let loaded = RegionBuildingsClient.cachedBuildingGamedata(at: url)
+        #expect(loaded == gamedata)
+        #expect(loaded?.isStale() == false)
+        #expect(loaded?.buildings[1200]?.isCrafting == true)
+        #expect(loaded?.recipeNames[77] == "Oak Plank")
+
+        // The 48 h TTL boundary (inclusive, like FoodBuffGamedata).
+        #expect(gamedata.isStale(now: .now.addingTimeInterval(48 * 3_600)) == true)
+        #expect(gamedata.isStale(now: .now.addingTimeInterval(47 * 3_600)) == false)
+
+        // Missing file → nil, not a crash.
+        #expect(RegionBuildingsClient.cachedBuildingGamedata(
+            at: url.deletingLastPathComponent().appendingPathComponent("does-not-exist.json")
+        ) == nil)
+
+        // Empty reads as always-stale — nothing may be "fresh" about not
+        // having the catalogs.
+        #expect(BuildingGamedata.empty.isStale())
+    }
+
+    /// The workstations channel (`machine.workstationsRep`, the `mapRep`
+    /// precedent): the join's projection publishes when the buildings state
+    /// moves — and only then. Poll-only ingests (stamina ticks, snapshot
+    /// refreshes) land in between without rebroadcasting it; teardown
+    /// publishes the empty projection once.
+    @Test func workstationsChannelPublishesOnlyOnBuildingsChanges() async throws {
+        final class ChannelCollector: @unchecked Sendable {
+            private let lock = NSLock()
+            private var _reps: [WorkstationsRep] = []
+            func append(_ rep: WorkstationsRep) { lock.withLock { _reps.append(rep) } }
+            var count: Int { lock.withLock { _reps.count } }
+            var reps: [WorkstationsRep] { lock.withLock { _reps } }
+        }
+        final class Counter: @unchecked Sendable {
+            private let lock = NSLock()
+            private var _count = 0
+            func bump() { lock.withLock { _count += 1 } }
+            var count: Int { lock.withLock { _count } }
+        }
+
+        let leg = Self.makeLeg()
+        let claimBuildings = SimulatedClaimBuildings(scripts: [Self.syncScript()])
+        let globalSession = AccountDrivenSignInTests.SimulatedGlobalSession(
+            scripts: [.init(events: [.regionLeg(leg), .established], hold: true)]
+        )
+        let machine = AccountDrivenSignInTests().makeMachine(
+            link: .init(outcome: .player(AccountDrivenSignInTests.player)),
+            globalSession: globalSession,
+            claimBuildings: claimBuildings
+        )
+        let traceCount = Counter()
+        await machine.setIngestTracer { _ in traceCount.bump() }
+        let channel = ChannelCollector()
+        let sinkTask = machine.workstationsRep.sink { channel.append($0) }
+        defer { sinkTask.cancel() }
+
+        await machine.start()
+        await machine.ingest(Intent.StartBitCraftSignIn(email: "crafter@example.com"))
+        _ = await collectUntil(machine) { rep in
+            if case .bitCraftSignIn(let signIn) = rep, case .awaitingCode = signIn.phase { return true }
+            return false
+        }
+        await machine.ingest(Intent.SubmitAccessCode(code: "123456"))
+        _ = await collectUntil(machine) { rep in
+            if case .gameSessionPrompt(let prompt) = rep, prompt.claimName != nil { return true }
+            return false
+        }
+        await machine.ingest(Intent.SignInGameSession())
+        // The channel replays .empty on subscribe, then carries the live
+        // projection once the buildings state lands.
+        await Self.waitFor { channel.reps.contains { $0.status == .live && $0.crafts.count == 2 } }
+        let channelCount = channel.count
+        let ingestBaseline = traceCount.count
+
+        // Session polls keep ingesting (stamina/snapshot-only changes) —
+        // after five of them, not one rebroadcast the channel.
+        await Self.waitFor { traceCount.count - ingestBaseline >= 5 }
+        #expect(channel.count == channelCount)
+
+        // Teardown is a buildings-state move: exactly one more publish,
+        // the empty projection.
+        await machine.ingest(Intent.SignOut())
+        await Self.waitFor { channel.reps.last == .empty }
+        #expect(channel.count == channelCount + 1)
+    }
+
     // MARK: - Helpers
+
+    /// Polls a condition with a timeout backstop (positive waits only —
+    /// negative assertions are made only after their causes were observed).
+    private static func waitFor(
+        _ condition: @Sendable () -> Bool,
+        timeout: TimeInterval = 10
+    ) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline && !condition() {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+    }
 
     /// Collects ViewReps until `finished` matches (event-driven — see
     /// `RepCollecting.collect`; the timeout is a broken-flow backstop);

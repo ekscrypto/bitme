@@ -268,7 +268,7 @@ public enum ViewRep: Equatable, Sendable, Codable {
             public var crafts: [Craft]
             public var craftsOverflow: Int
 
-            static let empty = Workstations(status: .idle, error: nil, buildings: [], crafts: [], craftsOverflow: 0)
+            public static let empty = Workstations(status: .idle, error: nil, buildings: [], crafts: [], craftsOverflow: 0)
         }
 
         public var username: String?
@@ -297,6 +297,19 @@ public enum ViewRep: Equatable, Sendable, Codable {
     }
 
     static func from(persistent: PersistentState, ephemeral: EphemeralState) -> ViewRep {
+        from(persistent: persistent, ephemeral: ephemeral, workstations: workstations(from: ephemeral.session))
+    }
+
+    /// The projection entry the machine uses: the workstations join is
+    /// expensive (a busy claim's buildings + capped crafts, sorted), so the
+    /// machine computes it once per buildings-state change (its own
+    /// `workstationsRep` channel) and hands it in — this path never re-runs
+    /// it per ingest.
+    static func from(
+        persistent: PersistentState,
+        ephemeral: EphemeralState,
+        workstations: Session.Workstations
+    ) -> ViewRep {
         let signInOnTop = ephemeral.signInVisible
             // Account-driven apps: with no linked character the screen is the
             // root — there is no onboarding to fall back to.
@@ -515,7 +528,7 @@ public enum ViewRep: Equatable, Sendable, Codable {
             food: food,
             actions: actions,
             resourceMap: resourceMap(from: ephemeral.session),
-            workstations: workstations(from: ephemeral.session)
+            workstations: workstations
         ))
     }
 

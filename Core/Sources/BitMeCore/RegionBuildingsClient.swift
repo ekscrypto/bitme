@@ -37,18 +37,34 @@ public struct ClaimHeader: Equatable, Sendable {
 }
 
 /// The static catalogs the join needs, fetched once per sync
-/// (`building_desc`, `crafting_recipe_desc`). Game updates land on the
-/// next session — the catalogs are effectively immutable while one runs.
-public struct BuildingGamedata: Equatable, Sendable {
+/// (`building_desc`, `crafting_recipe_desc`) and cached on disk for 48 h
+/// (the food-buff gamedata policy): a relaunch paints names and
+/// classification from the cache instead of waiting on the leg's one-offs.
+/// Game updates land on the first session after the TTL lapses.
+public struct BuildingGamedata: Equatable, Sendable, Codable {
+    public static let ttl: TimeInterval = 48 * 60 * 60
+
     public let buildings: [Int32: BuildingDescInfo]
     public let recipeNames: [Int32: String]
+    public let fetchedAt: Date
 
-    init(buildings: [Int32: BuildingDescInfo] = [:], recipeNames: [Int32: String] = [:]) {
+    init(
+        buildings: [Int32: BuildingDescInfo] = [:],
+        recipeNames: [Int32: String] = [:],
+        fetchedAt: Date = .now
+    ) {
         self.buildings = buildings
         self.recipeNames = recipeNames
+        self.fetchedAt = fetchedAt
     }
 
-    public static let empty = BuildingGamedata()
+    public func isStale(now: Date = .now) -> Bool {
+        now.timeIntervalSince(fetchedAt) >= Self.ttl
+    }
+
+    /// `fetchedAt` is the distant past so empty always reads as stale —
+    /// nothing may be "fresh" about not having the catalogs.
+    public static let empty = BuildingGamedata(fetchedAt: .distantPast)
 }
 
 /// One placed building of the pinned claim (`building_state` slice).
@@ -288,14 +304,12 @@ enum RegionBuildingsClient {
         let emit = buffer.push
         do {
             // 1. Static catalogs first so building/recipe names resolve from
-            //    the very first row event on. A failure is not fatal — the
-            //    list falls back to ids until the next session.
-            do {
-                let gamedata = try await fetchGamedata(client: client)
-                emit(.gamedata(gamedata))
-            } catch {
-                coreLog.error("claim buildings: catalog fetch failed: \(String(describing: error), privacy: .public)")
-            }
+            //    the very first row event on — cache-first (48 h TTL, the
+            //    food-buff gamedata policy): a relaunch paints from the cache
+            //    instead of waiting on the leg's one-offs, and a failed fetch
+            //    still serves a stale cache — old catalog data beats none.
+            let gamedata = await loadGamedata(client: client)
+            emit(.gamedata(gamedata))
 
             await client.registerTableRowDecoder(BuildingStateRow.self)
             await client.registerTableRowDecoder(ClaimStateRow.self)
@@ -462,28 +476,94 @@ enum RegionBuildingsClient {
         }
     }
 
-    private static func fetchGamedata(client: SpacetimeDBClient) async throws -> BuildingGamedata {
-        async let descTables = client.oneOffQuery("SELECT * FROM building_desc;", timeout: 20)
-        async let recipeTables = client.oneOffQuery("SELECT * FROM crafting_recipe_desc;", timeout: 20)
+    // MARK: - Catalog cache
 
-        var buildings: [Int32: BuildingDescInfo] = [:]
-        for table in try await descTables where table.tableName == "building_desc" {
-            for row in table.rows.rows {
-                if let info = try? RegionGamedataDecoder.buildingDesc(row) {
-                    buildings[info.id] = info
+    static var cacheURL: URL {
+        FileManager.default
+            .urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("bitme-region-building-gamedata.json")
+    }
+
+    static func cachedBuildingGamedata(at url: URL = cacheURL) -> BuildingGamedata? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(BuildingGamedata.self, from: data)
+    }
+
+    static func writeBuildingGamedataCache(_ gamedata: BuildingGamedata, at url: URL = cacheURL) {
+        guard let data = try? JSONEncoder().encode(gamedata) else { return }
+        try? data.write(to: url, options: .atomic)
+    }
+
+    /// Cache-first catalog load: a fresh cache skips the leg's one-offs
+    /// entirely; otherwise fetch over the leg and re-cache. An empty
+    /// answer is a server-side anomaly, not "no catalogs" — it is never
+    /// pinned over a (possibly stale) cache, and a failed fetch serves
+    /// whatever cache exists.
+    private static func loadGamedata(client: SpacetimeDBClient) async -> BuildingGamedata {
+        let cached = cachedBuildingGamedata()
+        if let cached, !cached.isStale() {
+            coreLog.info("claim buildings: catalogs served from cache (\(cached.buildings.count) buildings, \(cached.recipeNames.count) recipes)")
+            return cached
+        }
+        do {
+            async let descTables = client.oneOffQuery("SELECT * FROM building_desc;", timeout: 20)
+            async let recipeTables = client.oneOffQuery("SELECT * FROM crafting_recipe_desc;", timeout: 20)
+
+            var buildings: [Int32: BuildingDescInfo] = [:]
+            for table in try await descTables where table.tableName == "building_desc" {
+                for row in table.rows.rows {
+                    if let info = try? RegionGamedataDecoder.buildingDesc(row) {
+                        buildings[info.id] = info
+                    }
                 }
             }
-        }
-        var recipes: [Int32: String] = [:]
-        for table in try await recipeTables where table.tableName == "crafting_recipe_desc" {
-            for row in table.rows.rows {
-                if let recipe = try? RegionGamedataDecoder.recipe(row) {
-                    recipes[recipe.id] = recipe.name
+            var recipes: [Int32: String] = [:]
+            for table in try await recipeTables where table.tableName == "crafting_recipe_desc" {
+                for row in table.rows.rows {
+                    if let recipe = try? RegionGamedataDecoder.recipe(row) {
+                        recipes[recipe.id] = recipe.name
+                    }
                 }
             }
+            coreLog.info("claim buildings: catalogs loaded (\(buildings.count) buildings, \(recipes.count) recipes)")
+            if buildings.isEmpty && recipes.isEmpty, let cached {
+                return cached
+            }
+            let fresh = BuildingGamedata(buildings: buildings, recipeNames: recipes, fetchedAt: .now)
+            if !buildings.isEmpty || !recipes.isEmpty {
+                writeBuildingGamedataCache(fresh)
+            }
+            return fresh
+        } catch {
+            coreLog.error("claim buildings: catalog fetch failed: \(String(describing: error), privacy: .public); cached=\(cached != nil)")
+            return cached ?? BuildingGamedata.empty
         }
-        coreLog.info("claim buildings: catalogs loaded (\(buildings.count) buildings, \(recipes.count) recipes)")
-        return BuildingGamedata(buildings: buildings, recipeNames: recipes)
+    }
+
+    /// The claim-resolution fallback (protocol doc §2): the player's own
+    /// `claim_member_state` row over the region leg — used when the relay
+    /// never answered the claim at sign-in. Membership is the safe key
+    /// (claim names are not unique); a player is normally a member of
+    /// exactly one claim, and several rows resolve to the first rather
+    /// than guessing by name. Nil = no answer (leg error or not a member).
+    static func resolveOwnClaim(client: SpacetimeDBClient, player: UInt64) async -> UInt64? {
+        do {
+            let tables = try await client.oneOffQuery(
+                "SELECT * FROM claim_member_state WHERE player_entity_id = \(player);",
+                timeout: 20
+            )
+            for table in tables where table.tableName == "claim_member_state" {
+                for row in table.rows.rows {
+                    if let member = try? RegionGamedataDecoder.claimMembership(row),
+                       member.playerEntityID == player {
+                        return member.claimEntityID
+                    }
+                }
+            }
+        } catch {
+            coreLog.error("claim buildings: membership lookup failed: \(String(describing: error), privacy: .public)")
+        }
+        return nil
     }
 
     // MARK: - Row helpers

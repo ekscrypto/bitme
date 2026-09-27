@@ -4,22 +4,26 @@ import BitMeCore
 /// Pocket Crafter home: renders `ViewRep.Session` for the tracked character
 /// — the claim they stand in, the account surface, and two icon-only tabs:
 /// **Crafting** (stations, the running craft, craft tasks) and **Storage**
-/// (storage buildings and the rest). A busy claim carries hundreds of
-/// buildings and crafts, so each tab's volume lives in a `List` (recycled
-/// rows); the countdown's periodic timeline is scoped to the running-craft
-/// card so its 4 Hz re-eval never touches the long lists.
+/// (storage buildings and the rest). The workstation lists render the
+/// dedicated `WorkstationsRep` channel (published only when the buildings
+/// state moves), so poll-driven session updates never re-diff them. A busy
+/// claim carries hundreds of buildings and crafts, so each tab's volume
+/// lives in a `List` (recycled rows); the countdown's periodic timeline is
+/// scoped to the running-craft card so its 4 Hz re-eval never touches the
+/// long lists.
 struct CrafterHomeView: View {
     let session: ViewRep.Session
+    let workstations: WorkstationsRep
     let ingest: @Sendable (Sendable) async -> Void
 
     var body: some View {
         VStack(spacing: 0) {
             header
             TabView {
-                CraftingTab(session: session)
+                CraftingTab(session: session, workstations: workstations)
                     .tabItem { Image(systemName: "hammer") }
                     .accessibilityLabel("Crafting")
-                StorageTab(session: session)
+                StorageTab(session: session, workstations: workstations)
                     .tabItem { Image(systemName: "shippingbox") }
                     .accessibilityLabel("Storage")
             }
@@ -102,10 +106,11 @@ struct CrafterHomeView: View {
 /// in-flight craft, the claim's stations, and the pending craft tasks.
 private struct CraftingTab: View {
     let session: ViewRep.Session
+    let workstations: WorkstationsRep
     let home: CrafterHomeView? = nil
 
     var body: some View {
-        let stations = session.workstations
+        let stations = workstations
         let crafting = stations.buildings.filter(\.isCrafting)
         List {
             Group {
@@ -191,9 +196,10 @@ private struct CraftingTab: View {
 /// Storage buildings on the claim, with everything else below them.
 private struct StorageTab: View {
     let session: ViewRep.Session
+    let workstations: WorkstationsRep
 
     var body: some View {
-        let stations = session.workstations
+        let stations = workstations
         let storage = stations.buildings.filter { $0.isStorage && !$0.isCrafting }
         let other = stations.buildings.filter { !$0.isCrafting && !$0.isStorage }
         List {

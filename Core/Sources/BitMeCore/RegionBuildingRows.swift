@@ -193,7 +193,7 @@ struct ProgressiveActionRow: BSATNTableWithPrimaryKey, Equatable {
 
 /// One `building_desc.functions` entry — only the slot counts the app
 /// needs; the remaining catalog fields are consumed in order and dropped.
-public struct BuildingFunctionInfo: Equatable, Sendable {
+public struct BuildingFunctionInfo: Equatable, Codable, Sendable {
     let functionType: Int32
     let level: Int32
     let craftingSlots: Int32
@@ -207,7 +207,7 @@ public struct BuildingFunctionInfo: Equatable, Sendable {
 /// entries that decide what a building is. Classification follows the
 /// relay's rule (`relay-cache/src/decode.rs::functions_is_storage`):
 /// crafting ⇔ crafting/refining slots, storage ⇔ item/cargo pockets.
-public struct BuildingDescInfo: Equatable, Sendable {
+public struct BuildingDescInfo: Equatable, Codable, Sendable {
     let id: Int32
     let name: String
     let functions: [BuildingFunctionInfo]
@@ -269,5 +269,17 @@ enum RegionGamedataDecoder {
         let id = try reader.read() as Int32
         let name = try reader.readString()
         return (id, name)
+    }
+
+    /// `claim_member_state` row → the player's own membership (the
+    /// claim-resolution fallback, protocol doc §2). Reads `entity_id`,
+    /// `claim_entity_id`, `player_entity_id` and stops — `user_name` and
+    /// the permission flags stay unread.
+    static func claimMembership(_ data: Data) throws -> (entityID: UInt64, claimEntityID: UInt64, playerEntityID: UInt64) {
+        let reader = BSATNReader(data: data)
+        let entityID = try reader.read() as UInt64
+        let claimEntityID = try reader.read() as UInt64
+        let playerEntityID = try reader.read() as UInt64
+        return (entityID, claimEntityID, playerEntityID)
     }
 }

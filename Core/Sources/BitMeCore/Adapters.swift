@@ -63,19 +63,27 @@ public struct Adapters: Sendable {
         /// sync fails — a terminal `.failed` event always precedes a sync
         /// failure's end.
         public let syncClaimBuildings: @Sendable (_ leg: RegionLeg, _ claimEntityID: UInt64, _ playerEntityID: UInt64) -> AsyncStream<[ClaimBuildingsEvent]>
+        /// Claim-resolution fallback (protocol doc §2): one-off
+        /// `claim_member_state WHERE player_entity_id = <own>` on the
+        /// region leg, for sign-ins where the relay never answers the
+        /// claim. Nil = no answer. Defaults to "no fallback" so hosts and
+        /// tests that never exercise the path stay silent.
+        public let resolveOwnClaimMembership: @Sendable (_ leg: RegionLeg, _ playerEntityID: UInt64) async -> UInt64?
 
         public init(
             requestAccessCode: @escaping @Sendable (String) async throws -> Void,
             authenticate: @escaping @Sendable (String, String) async throws -> String,
             resolveAccountPlayer: @escaping @Sendable (String, String) async throws -> AccountPlayer,
             openGlobalSession: @escaping @Sendable (String, String, Int?) -> AsyncStream<GlobalSessionEvent>,
-            syncClaimBuildings: @escaping @Sendable (RegionLeg, UInt64, UInt64) -> AsyncStream<[ClaimBuildingsEvent]>
+            syncClaimBuildings: @escaping @Sendable (RegionLeg, UInt64, UInt64) -> AsyncStream<[ClaimBuildingsEvent]>,
+            resolveOwnClaimMembership: @escaping @Sendable (RegionLeg, UInt64) async -> UInt64? = { _, _ in nil }
         ) {
             self.requestAccessCode = requestAccessCode
             self.authenticate = authenticate
             self.resolveAccountPlayer = resolveAccountPlayer
             self.openGlobalSession = openGlobalSession
             self.syncClaimBuildings = syncClaimBuildings
+            self.resolveOwnClaimMembership = resolveOwnClaimMembership
         }
     }
 
@@ -146,6 +154,9 @@ public struct Adapters: Sendable {
                 },
                 syncClaimBuildings: { leg, claim, player in
                     RegionBuildingsClient.events(leg: leg, claim: claim, player: player)
+                },
+                resolveOwnClaimMembership: { leg, player in
+                    await RegionBuildingsClient.resolveOwnClaim(client: leg.client, player: player)
                 }
             ),
             loadFoodBuffGamedata: { await GamedataService.loadFoodBuffGamedata() },

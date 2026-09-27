@@ -140,6 +140,11 @@ struct EphemeralState: Sendable {
             var crafts: [UInt64: RegionCraft] = [:]
             /// The tracked player's entity id — the `mine` marker for crafts.
             var playerEntityID: UInt64?
+            /// Bumped on every mutation, and carried forward across resets,
+            /// so it stays monotonic within a session — the machine's
+            /// workstations cache keys on it to skip the join when nothing
+            /// in the buildings state moved.
+            var version = 0
 
             var isEmpty: Bool {
                 claim == nil && buildings.isEmpty && crafts.isEmpty && nicknames.isEmpty

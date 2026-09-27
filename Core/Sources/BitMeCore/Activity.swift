@@ -459,21 +459,14 @@ extension Activity.ClaimBuildingsLoop: AsyncActivity, StampableActivity {
         // Wait for the relay's claim answer. The gate already refused
         // sign-in without one, so this normally resolves immediately; the
         // wait only closes the ordering gap after a launch-restore session
-        // where the first poll may still be in flight.
+        // where the first poll may still be in flight. If the relay still
+        // has not answered after a few poll cycles, the fallback (protocol
+        // doc §2) asks the region leg directly — membership, not the
+        // relay's claim name, is the safe key.
         coreLog.info("claim buildings loop started — waiting for the relay's claim answer")
-        let claim: UInt64
-        while true {
-            if Task.isCancelled { return }
-            if let stamped = claimCarrier.claimEntityID {
-                claim = stamped
-                break
-            }
-            do {
-                try await adapters.sleep(0.5)
-            } catch {
-                return // cancelled
-            }
-        }
+        guard let claim = await Self.resolveClaim(
+            carrier: claimCarrier, leg: leg, playerEntityID: playerEntityID, adapters: adapters
+        ) else { return } // cancelled
         coreLog.info("claim buildings loop syncing claim \(claim, privacy: .public) for player \(self.playerEntityID, privacy: .public)")
         for await events in adapters.bitCraft.syncClaimBuildings(leg, claim, playerEntityID) {
             if Task.isCancelled { return }
@@ -483,5 +476,39 @@ extension Activity.ClaimBuildingsLoop: AsyncActivity, StampableActivity {
         // The stream always carries its own terminal event (`.failed`
         // precedes the end on a sync failure; the leg closing ends both
         // this loop and the game-session loop) — nothing to report here.
+    }
+
+    /// Resolves the claim to sync: the relay's carrier answer when it has
+    /// one, else — after ~5 s of unanswered carrier checks — a one-off
+    /// membership lookup on the region leg, re-attempted on the same
+    /// cadence until either side answers. Patience is unbounded (the relay
+    /// may answer late) and the work is bounded (one indexed one-off per
+    /// cadence); cancellation is the session teardown's job.
+    private static func resolveClaim(
+        carrier: ClaimCarrier,
+        leg: RegionLeg,
+        playerEntityID: UInt64,
+        adapters: Adapters
+    ) async -> UInt64? {
+        // Carrier checks ride the 0.5 s sleep cadence; the fallback fires
+        // on every 10th unanswered check (~5 s in production, near-instant
+        // under the tests' scripted sleep).
+        var checks = 0
+        while true {
+            if Task.isCancelled { return nil }
+            if let stamped = carrier.claimEntityID { return stamped }
+            checks += 1
+            if checks.isMultiple(of: 10) {
+                if let membership = await adapters.bitCraft.resolveOwnClaimMembership(leg, playerEntityID) {
+                    coreLog.info("claim buildings loop: relay had no claim answer — membership resolves to claim \(membership, privacy: .public)")
+                    return membership
+                }
+            }
+            do {
+                try await adapters.sleep(0.5)
+            } catch {
+                return nil // cancelled
+            }
+        }
     }
 }

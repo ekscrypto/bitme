@@ -38,12 +38,24 @@ public final actor StateMachine: IntentIngestor {
     /// window/terrain/dictionary state, published only when it changes.
     /// Same `nonisolated` reasoning as `viewRep`.
     public nonisolated let mapRep: RepBroadcaster<MapRep>
+    /// Claim-buildings channel (`WorkstationsRep`) — the workstations join,
+    /// published only when the buildings state moves (the `mapRep`
+    /// precedent): stamina ticks and poll-only ingests neither re-run the
+    /// join nor rebroadcast it. `ViewRep.Session.workstations` rides the
+    /// same cached projection, so the session channel is no costlier.
+    public nonisolated let workstationsRep: RepBroadcaster<WorkstationsRep>
 
     private let adapters: Adapters
     private var persistentState = PersistentState()
     private var ephemeralState = EphemeralState()
     private var started = false
     private var lastMapRep: MapRep = .empty
+    /// The cached workstations projection and the buildings-state version it
+    /// was computed from (see `ingest`).
+    private var lastWorkstationsRep: WorkstationsRep = .empty
+    private var lastWorkstationsVersion = 0
+    /// Opt-in ingest diagnostics (off by default) — see `setIngestTracer`.
+    private var ingestTracer: (@Sendable (String) -> Void)?
 
     public init(adapters: Adapters, configuration: Configuration = .standard) {
         self.adapters = adapters
@@ -58,6 +70,7 @@ public final actor StateMachine: IntentIngestor {
                 isResolving: false, lookingUpName: nil, error: nil, resolvedOfflineHint: false
               )))
         self.mapRep = RepBroadcaster<MapRep>(initial: .empty)
+        self.workstationsRep = RepBroadcaster<WorkstationsRep>(initial: .empty)
     }
 
     /// Idempotent bootstrap: restore persisted identity, then load gamedata
@@ -86,7 +99,36 @@ public final actor StateMachine: IntentIngestor {
         if let ephemeral = change.ephemeralState {
             ephemeralState = ephemeral
         }
-        await viewRep.send(ViewRep.from(persistent: persistentState, ephemeral: ephemeralState))
+        // Fired before the rep broadcast so the line names exactly the state
+        // the next `ViewRep` projects (see `setIngestTracer`).
+        if let tracer = ingestTracer {
+            let summary = Self.traceSummary(
+                persistent: persistentState, ephemeral: ephemeralState,
+                activityCount: change.activities.count
+            )
+            tracer("\(String(describing: type(of: mutator))) → \(summary)")
+        }
+        // The workstations join (a busy claim's buildings + capped crafts,
+        // sorted) re-runs only when the buildings-state version moved — a
+        // pooled-events ingest, a leg reset, or teardown. Everything else
+        // (polls, stamina, stream ticks) reuses the cached projection for
+        // both the session rep and the workstations channel.
+        let workstations: WorkstationsRep
+        if let session = ephemeralState.session, session.buildings.version != lastWorkstationsVersion {
+            lastWorkstationsVersion = session.buildings.version
+            workstations = ViewRep.workstations(from: session)
+        } else if ephemeralState.session == nil {
+            workstations = .empty
+        } else {
+            workstations = lastWorkstationsRep
+        }
+        await viewRep.send(ViewRep.from(
+            persistent: persistentState, ephemeral: ephemeralState, workstations: workstations
+        ))
+        if workstations != lastWorkstationsRep {
+            lastWorkstationsRep = workstations
+            await workstationsRep.send(workstations)
+        }
         if mutatesPersistentState {
             await adapters.persistIdentity(persistentState.identity)
             await adapters.persistBitCraftAccount(persistentState.bitCraftAccount)
@@ -108,6 +150,136 @@ public final actor StateMachine: IntentIngestor {
             if let stampable = activity as? any StampableActivity {
                 stampable.stampTarget.task = task
             }
+        }
+    }
+
+    // MARK: - Ingest trace (opt-in diagnostics)
+
+    /// Installs (or removes) the ingest tracer: every intent then passes one
+    /// line to the hook — the intent's type name plus a one-line summary of
+    /// the state its mutation produced. The line fires after state
+    /// application and before the rep broadcast, so it describes exactly
+    /// what the UI is about to be told. Mutators stay pure (no logging, no
+    /// clocks — the machine is the logging layer); the summary reads only
+    /// applied state. Off by default.
+    public func setIngestTracer(_ tracer: (@Sendable (String) -> Void)?) {
+        ingestTracer = tracer
+    }
+
+    /// Routes the ingest trace to `coreLog` at debug level (the built-in
+    /// hook — hosts call this to turn live diagnostics on).
+    public func setIngestTracing(_ enabled: Bool) {
+        if enabled {
+            ingestTracer = { line in coreLog.debug("\(line, privacy: .public)") }
+        } else {
+            ingestTracer = nil
+        }
+    }
+
+    /// The trace's one-line state summary. Deliberately broad rather than
+    /// intent-specific: the incidents it exists to make visible (the silent
+    /// sign-in hang, the empty-workstations report) needed different slices,
+    /// so every line carries the screen, the game session, the
+    /// claim-buildings sync, and the map stream. Buildings counts are raw
+    /// state (completed passive crafts included) — the projection's
+    /// filtered/capped view is the ViewRep's business.
+    nonisolated static func traceSummary(
+        persistent: PersistentState,
+        ephemeral: EphemeralState,
+        activityCount: Int
+    ) -> String {
+        var parts: [String]
+        if ephemeral.signInVisible || (ephemeral.accountDrivenSignIn && persistent.identity == nil) {
+            parts = ["screen=signin", "phase=\(name(ephemeral.signIn.phase))"]
+            if let error = ephemeral.signIn.error { parts.append("error=\(quoted(error))") }
+        } else if persistent.identity == nil {
+            var onboardingPhase = "idle"
+            if case .resolving = ephemeral.onboarding { onboardingPhase = "resolving" }
+            parts = ["screen=onboarding", "phase=\(onboardingPhase)"]
+            if let error = ephemeral.resolveError { parts.append("error=\(quoted(error))") }
+        } else if ephemeral.accountDrivenSignIn, ephemeral.preSignInVisible {
+            parts = ["screen=gate"]
+            if let notice = ephemeral.gameSessionNotice { parts.append("notice=\(quoted(notice))") }
+        } else if let session = ephemeral.session {
+            parts = ["screen=session", "conn=\(name(session.connection))"]
+            parts.append("game=\(name(session.gameSession.status))")
+            if let error = session.gameSession.lastError { parts.append("gameError=\(quoted(error))") }
+            parts.append("snap=\(session.snapshot == nil ? "none" : "yes")")
+            let buildings = session.buildings
+            parts.append("wks=\(name(buildings.status))")
+            if let error = buildings.lastError { parts.append("wksError=\(quoted(error))") }
+            if buildings.status != .idle {
+                parts.append("claim=\(quoted(buildings.claim?.name ?? "?"))")
+                parts.append("b=\(buildings.buildings.count)")
+                parts.append("c=\(buildings.crafts.count)")
+                parts.append("descs=\(buildings.gamedata.buildings.count)")
+                parts.append("recipes=\(buildings.gamedata.recipeNames.count)")
+                // The classification split — the empty-workstations
+                // forensics hinge: b>0 with wkCraft=0 wkStore=0 means the
+                // catalogs never landed (descs=0) or the rows all fell to
+                // the unclassified bucket, not "no rows arrived".
+                var wkCraft = 0
+                var wkStore = 0
+                for building in buildings.buildings.values {
+                    let desc = buildings.gamedata.buildings[building.buildingDescriptionID]
+                    if desc?.isCrafting == true { wkCraft += 1 }
+                    if desc?.isStorage == true { wkStore += 1 }
+                }
+                parts.append("wkCraft=\(wkCraft)")
+                parts.append("wkStore=\(wkStore)")
+            }
+            parts.append("map=\(name(session.resourceMap.streamStatus))")
+        } else {
+            parts = ["screen=idle"]
+        }
+        if activityCount > 0 { parts.append("acts=\(activityCount)") }
+        return parts.joined(separator: " ")
+    }
+
+    private nonisolated static func quoted(_ text: String) -> String { "\"\(text)\"" }
+
+    private nonisolated static func name(_ phase: EphemeralState.SignInState.Phase) -> String {
+        switch phase {
+        case .idle: "idle"
+        case .requestingCode: "requestingCode"
+        case .awaitingCode: "awaitingCode"
+        case .authenticating: "authenticating"
+        case .linking: "linking"
+        }
+    }
+
+    private nonisolated static func name(_ connection: EphemeralState.Session.Connection) -> String {
+        switch connection {
+        case .ok: "ok"
+        case .degraded: "degraded"
+        case .down: "down"
+        }
+    }
+
+    private nonisolated static func name(_ status: EphemeralState.Session.GameSessionState.Status) -> String {
+        switch status {
+        case .connecting: "connecting"
+        case .live: "live"
+        case .reconnecting: "reconnecting"
+        case .rejected: "rejected"
+        }
+    }
+
+    private nonisolated static func name(_ status: EphemeralState.Session.BuildingsState.Status) -> String {
+        switch status {
+        case .idle: "idle"
+        case .syncing: "syncing"
+        case .live: "live"
+        case .failed: "failed"
+        }
+    }
+
+    private nonisolated static func name(_ status: EphemeralState.Session.ResourceMapState.StreamStatus) -> String {
+        switch status {
+        case .off: "off"
+        case .connecting: "connecting"
+        case .live: "live"
+        case .reconnecting: "reconnecting"
         }
     }
 }

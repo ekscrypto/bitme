@@ -26,12 +26,14 @@ struct CrafterApp: App {
         )
     )
     @State private var viewRep: ViewRep?
+    @State private var workstations: WorkstationsRep = .empty
 
     var body: some Scene {
         WindowGroup {
             RootView(
                 machine: machine,
                 viewRep: viewRep,
+                workstations: workstations,
                 ingest: { intent in await machine.ingest(intent) }
             )
             .task {
@@ -41,6 +43,21 @@ struct CrafterApp: App {
                 }
             }
             .task {
+                // The workstation domain rides its own channel (the mapRep
+                // precedent): the tabs re-render when the buildings state
+                // moves, not on every session rep (stamina ticks, polls).
+                let stream = machine.workstationsRep.values
+                for await rep in stream {
+                    workstations = rep
+                }
+            }
+            .task {
+                // Debug builds log one line per intent — the state summary
+                // that answers "the UI shows X but the wire said Y" from a
+                // single Console capture. Release stays silent.
+                #if DEBUG
+                await machine.setIngestTracing(true)
+                #endif
                 await machine.start()
             }
         }
@@ -50,6 +67,7 @@ struct CrafterApp: App {
 struct RootView: View {
     let machine: StateMachine
     let viewRep: ViewRep?
+    let workstations: WorkstationsRep
     let ingest: @Sendable (Sendable) async -> Void
 
     var body: some View {
@@ -61,7 +79,7 @@ struct RootView: View {
         case .gameSessionPrompt(let prompt):
             GameSessionPromptView(prompt: prompt, ingest: ingest)
         case .session(let session):
-            CrafterHomeView(session: session, ingest: ingest)
+            CrafterHomeView(session: session, workstations: workstations, ingest: ingest)
         case .onboarding:
             // Name onboarding is unreachable in the account-driven machine —
             // it exists for X-Ray's flow. Render the launch background if a
