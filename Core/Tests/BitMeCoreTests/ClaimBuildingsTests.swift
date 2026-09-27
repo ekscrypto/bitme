@@ -171,6 +171,45 @@ struct ClaimBuildingsTests {
         #expect(projected.craftsOverflow == 8)
     }
 
+    @Test func eventBufferPoolsRowEventsAndFlushesStatusEvents() async {
+        // Lock-protected collector — flush callbacks arrive on timer tasks.
+        final class Collector: @unchecked Sendable {
+            private let lock = NSLock()
+            private var _flushes: [[ClaimBuildingsEvent]] = []
+            func append(_ events: [ClaimBuildingsEvent]) { lock.withLock { _flushes.append(events) } }
+            var all: [ClaimBuildingsEvent] { lock.withLock { _flushes.flatMap { $0 } } }
+            var count: Int { lock.withLock { _flushes.count } }
+        }
+        let collected = Collector()
+        let buffer = RegionBuildingsClient.EventBuffer(flushDelay: 0.05) { events in
+            collected.append(events)
+        }
+
+        // Row events pool until a status event flushes immediately — and
+        // the flush carries them, proving they were held back rather than
+        // delivered per push. (No wall-clock "nothing yet" probe: this
+        // suite's parallel load stalls tasks unpredictably.)
+        buffer.push(.buildingChanged(RegionBuilding(entityID: 3001, claimEntityID: 2000, buildingDescriptionID: 1200)))
+        buffer.push(.craftChanged(RegionCraft(
+            entityID: 5001, ownerEntityID: 1000, buildingEntityID: 3001, recipeID: 77,
+            kind: .passive(status: .processing, startedAtMicros: 0)
+        )))
+        buffer.push(.live)
+        #expect(collected.count == 1)
+        #expect(collected.all.count == 3)
+        #expect(collected.all.contains(.live))
+
+        // Later row events flush on the window (deadline generous for the
+        // same load reasons).
+        buffer.push(.nicknameChanged(entityID: 3001, nickname: "Millie"))
+        let deadline = Date().addingTimeInterval(10)
+        while Date() < deadline && collected.count < 2 {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(collected.count == 2)
+        #expect(collected.all.last == .nicknameChanged(entityID: 3001, nickname: "Millie"))
+    }
+
     @Test func recipeRowStopsAfterName() throws {
         var w = Wire()
         w.i32(77); w.string("Oak Plank")

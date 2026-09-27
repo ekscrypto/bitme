@@ -136,10 +136,13 @@ enum RegionBuildingsClient {
     /// row diffs pool for `flushDelay` (0.5 s — the intent granularity the
     /// product wants) or until the cap, so a snapshot burst of thousands
     /// of diffs becomes a couple of ingests and live craft ticks land at
-    /// most twice a second.
-    private final class EventBuffer: @unchecked Sendable {
+    /// most twice a second. Each drain also logs one debug line with the
+    /// pooled per-table row deltas — the log cadence matches the ingest
+    /// cadence instead of the raw event rate.
+    final class EventBuffer: @unchecked Sendable {
         private let lock = NSLock()
         private var buffer: [ClaimBuildingsEvent] = []
+        private var rowDeltas: [String: (inserts: Int, deletes: Int)] = [:]
         private var drainPending = false
         private let flushDelay: TimeInterval
         private let flush: @Sendable ([ClaimBuildingsEvent]) -> Void
@@ -176,17 +179,37 @@ enum RegionBuildingsClient {
             }
         }
 
-        /// Swap out and deliver whatever is buffered.
+        /// Accumulates per-table row counts for the next drain's summary
+        /// log. Called by the table consumers per batch — cheap counter
+        /// work, no logging until the drain.
+        func recordDelta(table: String, inserts: Int, deletes: Int) {
+            guard inserts > 0 || deletes > 0 else { return }
+            lock.withLock {
+                let current = rowDeltas[table] ?? (inserts: 0, deletes: 0)
+                rowDeltas[table] = (current.inserts + inserts, current.deletes + deletes)
+            }
+        }
+
+        /// Swap out and deliver whatever is buffered, logging the pooled
+        /// row deltas as one line.
         func drain() {
-            let events = lock.withLock {
+            let (events, deltas) = lock.withLock {
                 drainPending = false
                 let events = buffer
                 buffer = []
-                return events
+                let deltas = rowDeltas
+                rowDeltas = [:]
+                return (events, deltas)
             }
-            if !events.isEmpty {
-                flush(events)
+            guard !events.isEmpty else { return }
+            if !deltas.isEmpty {
+                let summary = deltas
+                    .sorted { $0.key < $1.key }
+                    .map { "\($0.key) +\($0.value.inserts) −\($0.value.deletes)" }
+                    .joined(separator: ", ")
+                coreLog.debug("claim buildings: pool \(summary)")
             }
+            flush(events)
         }
     }
 
@@ -246,7 +269,7 @@ enum RegionBuildingsClient {
                 let buffer = EventBuffer(flushDelay: 0.5) { events in
                     continuation.yield(events)
                 }
-                await run(client: leg.client, claim: claim, player: player, emit: buffer.push)
+                await run(client: leg.client, claim: claim, player: player, buffer: buffer)
                 buffer.drain()
                 continuation.finish()
             }
@@ -260,8 +283,9 @@ enum RegionBuildingsClient {
         client: SpacetimeDBClient,
         claim: UInt64,
         player: UInt64,
-        emit: @escaping @Sendable (ClaimBuildingsEvent) -> Void
+        buffer: EventBuffer
     ) async {
+        let emit = buffer.push
         do {
             // 1. Static catalogs first so building/recipe names resolve from
             //    the very first row event on. A failure is not fatal — the
@@ -310,6 +334,7 @@ enum RegionBuildingsClient {
                     } onRemove: { entityID in
                         emit(.buildingRemoved(entityID))
                     } onBatch: { inserted, deleted in
+                        buffer.recordDelta(table: BuildingStateRow.tableName, inserts: inserted.count, deletes: deleted.count)
                         if !deleted.isEmpty {
                             buildings.removed(deleted)
                         }
@@ -328,14 +353,18 @@ enum RegionBuildingsClient {
                             ownerPlayerEntityID: row.ownerPlayerEntityID,
                             neutral: row.neutral
                         )))
-                    } onRemove: { _ in } onBatch: { _, _ in }
+                    } onRemove: { _ in } onBatch: { inserted, deleted in
+                        buffer.recordDelta(table: ClaimStateRow.tableName, inserts: inserted.count, deletes: deleted.count)
+                    }
                 }
                 group.addTask {
                     await Self.consume(nicknameEvents, of: BuildingNicknameRow.self) { row in
                         emit(.nicknameChanged(entityID: row.entityID, nickname: row.nickname))
                     } onRemove: { entityID in
                         emit(.nicknameRemoved(entityID))
-                    } onBatch: { _, _ in }
+                    } onBatch: { inserted, deleted in
+                        buffer.recordDelta(table: BuildingNicknameRow.tableName, inserts: inserted.count, deletes: deleted.count)
+                    }
                 }
                 group.addTask {
                     await Self.consume(passiveCraftEvents, of: PassiveCraftRow.self) { row in
@@ -348,7 +377,9 @@ enum RegionBuildingsClient {
                         )))
                     } onRemove: { entityID in
                         emit(.craftRemoved(entityID))
-                    } onBatch: { _, _ in }
+                    } onBatch: { inserted, deleted in
+                        buffer.recordDelta(table: PassiveCraftRow.tableName, inserts: inserted.count, deletes: deleted.count)
+                    }
                 }
                 group.addTask {
                     await Self.consume(progressiveEvents, of: ProgressiveActionRow.self) { row in
@@ -366,7 +397,9 @@ enum RegionBuildingsClient {
                         )))
                     } onRemove: { entityID in
                         emit(.craftRemoved(entityID))
-                    } onBatch: { _, _ in }
+                    } onBatch: { inserted, deleted in
+                        buffer.recordDelta(table: ProgressiveActionRow.tableName, inserts: inserted.count, deletes: deleted.count)
+                    }
                 }
                 group.addTask {
                     for await event in connectionEvents {
@@ -460,7 +493,8 @@ enum RegionBuildingsClient {
     /// applied before inserts so an update's delete+insert pair lands as
     /// an upsert. The first batch (the subscription's initial snapshot)
     /// logs its row counts at info — the "did we receive the buildings"
-    /// signal — and later diffs log at debug.
+    /// signal; later diffs are counted by the caller into the event
+    /// buffer's pooled summary log.
     private static func consume<R: BSATNTableWithPrimaryKey>(
         _ stream: AsyncStream<TableEvent>,
         of type: R.Type,
@@ -476,8 +510,6 @@ enum RegionBuildingsClient {
             if firstBatch {
                 coreLog.info("claim buildings: \(R.tableName, privacy: .public) snapshot: \(changed.count) rows, \(removed.count) deletes")
                 firstBatch = false
-            } else if !changed.isEmpty || !removed.isEmpty {
-                coreLog.debug("claim buildings: \(R.tableName, privacy: .public) +\(changed.count) −\(removed.count)")
             }
             for id in removed {
                 onRemove(id)

@@ -2,38 +2,29 @@ import SwiftUI
 import BitMeCore
 
 /// Pocket Crafter home: renders `ViewRep.Session` for the tracked character
-/// — the claim they stand in, the account surface, the craft currently
-/// running, and the claim's workstations with their craft tasks.
-///
-/// Rendering note: a busy claim carries hundreds of buildings and crafts,
-/// so the volume lives in a `List` (recycled rows) — a `VStack` in a
-/// `ScrollView` would build every row eagerly. The countdown's periodic
-/// timeline is scoped to the running-craft card so its 4 Hz re-eval never
-/// touches the long lists.
+/// — the claim they stand in, the account surface, and two icon-only tabs:
+/// **Crafting** (stations, the running craft, craft tasks) and **Storage**
+/// (storage buildings and the rest). A busy claim carries hundreds of
+/// buildings and crafts, so each tab's volume lives in a `List` (recycled
+/// rows); the countdown's periodic timeline is scoped to the running-craft
+/// card so its 4 Hz re-eval never touches the long lists.
 struct CrafterHomeView: View {
     let session: ViewRep.Session
     let ingest: @Sendable (Sendable) async -> Void
 
     var body: some View {
-        ZStack {
-            Color(white: 0.05).ignoresSafeArea()
-            List {
-                Group {
-                    header
-                    if session.signedIn == false {
-                        OfflineBanner()
-                    }
-                    RunningCraftCard(action: runningCraft, relayOffsetMs: relayOffsetMs)
-                }
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-
-                workstationSections
+        VStack(spacing: 0) {
+            header
+            TabView {
+                CraftingTab(session: session)
+                    .tabItem { Image(systemName: "hammer") }
+                    .accessibilityLabel("Crafting")
+                StorageTab(session: session)
+                    .tabItem { Image(systemName: "shippingbox") }
+                    .accessibilityLabel("Storage")
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
         }
+        .background(Color(white: 0.05).ignoresSafeArea())
         .preferredColorScheme(.dark)
     }
 
@@ -46,7 +37,7 @@ struct CrafterHomeView: View {
         session.actions.first { $0.actionType == "Craft" }
     }
 
-    // MARK: - Header
+    // MARK: - Header (shared across tabs)
 
     private var header: some View {
         HStack {
@@ -71,7 +62,8 @@ struct CrafterHomeView: View {
             }
             ConnectionPill(connection: session.connection)
         }
-        .padding(.vertical, 6)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 
     /// Account controls. "Switch BitCraft account" reopens the emailed-code
@@ -102,64 +94,63 @@ struct CrafterHomeView: View {
         }
         .accessibilityLabel("Account and settings")
     }
+}
 
-    // MARK: - Workstations
+// MARK: - Crafting tab
 
-    @ViewBuilder
-    private var workstationSections: some View {
+/// Crafting stations with the crafts running at them: the character's
+/// in-flight craft, the claim's stations, and the pending craft tasks.
+private struct CraftingTab: View {
+    let session: ViewRep.Session
+    let home: CrafterHomeView? = nil
+
+    var body: some View {
         let stations = session.workstations
-        if stations.status == .idle && stations.buildings.isEmpty {
-            Section {
-                ContentUnavailableView {
-                    Label("No claim synced", systemImage: "wrench.and.screwdriver")
-                } description: {
-                    Text("The workstations of \(session.claimName ?? "your claim") appear here while the game session is held.")
+        let crafting = stations.buildings.filter(\.isCrafting)
+        List {
+            Group {
+                if session.signedIn == false {
+                    OfflineBanner()
                 }
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-                .padding(.vertical, 24)
+                RunningCraftCard(action: session.actions.first { $0.actionType == "Craft" }, relayOffsetMs: relayOffsetMs)
+                SyncStatusRow(status: stations.status, error: stations.error)
             }
-        } else {
-            Section {
-                syncStatusRow(stations)
-            } header: {
-                Label("Workstations", systemImage: "wrench.and.screwdriver")
-                    .font(.subheadline.bold())
-            }
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
 
-            let crafting = stations.buildings.filter(\.isCrafting)
-            let storage = stations.buildings.filter { $0.isStorage && !$0.isCrafting }
-            let other = stations.buildings.filter { !$0.isCrafting && !$0.isStorage }
-            if !crafting.isEmpty {
-                stationSection("Crafting stations", icon: "hammer", buildings: crafting)
-            }
-            if !storage.isEmpty {
-                stationSection("Storage", icon: "shippingbox", buildings: storage)
-            }
-            if !other.isEmpty {
-                stationSection("Other buildings", icon: "house", buildings: other)
-            }
-            if !stations.crafts.isEmpty || stations.craftsOverflow > 0 {
-                craftTasks(stations)
+            if crafting.isEmpty && stations.crafts.isEmpty && stations.status == .live {
+                emptyState(
+                    "No crafting stations",
+                    "Crafting stations on \(session.claimName ?? "your claim") appear here."
+                )
+            } else {
+                if !crafting.isEmpty {
+                    stationSection("Crafting stations", icon: "hammer", buildings: crafting)
+                }
+                if !stations.crafts.isEmpty || stations.craftsOverflow > 0 {
+                    craftTasks(stations)
+                }
             }
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
     }
 
-    @ViewBuilder
-    private func syncStatusRow(_ stations: ViewRep.Session.Workstations) -> some View {
-        switch stations.status {
-        case .idle, .live:
-            EmptyView()
-        case .syncing:
-            HStack(spacing: 6) {
-                ProgressView().controlSize(.small)
-                Text("Syncing claim…").font(.caption).foregroundStyle(.secondary)
-            }
-        case .failed:
-            Label(stations.error ?? "Sync stopped", systemImage: "exclamationmark.triangle")
-                .font(.caption)
-                .foregroundStyle(.orange)
+    /// Converts device time to relay-clock ms (snapshot anchors are relay ms).
+    private var relayOffsetMs: Double {
+        session.nowMs.map { now in now - Date().timeIntervalSince1970 * 1_000 } ?? 0
+    }
+
+    private func emptyState(_ title: String, _ message: String) -> some View {
+        ContentUnavailableView {
+            Label(title, systemImage: "hammer")
+        } description: {
+            Text(message)
         }
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+        .padding(.vertical, 24)
     }
 
     private func stationSection(
@@ -189,6 +180,59 @@ struct CrafterHomeView: View {
             }
         } header: {
             Label("Craft tasks", systemImage: "hourglass")
+                .font(.caption.bold())
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+// MARK: - Storage tab
+
+/// Storage buildings on the claim, with everything else below them.
+private struct StorageTab: View {
+    let session: ViewRep.Session
+
+    var body: some View {
+        let stations = session.workstations
+        let storage = stations.buildings.filter { $0.isStorage && !$0.isCrafting }
+        let other = stations.buildings.filter { !$0.isCrafting && !$0.isStorage }
+        List {
+            SyncStatusRow(status: stations.status, error: stations.error)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+
+            if storage.isEmpty && other.isEmpty && stations.status == .live {
+                ContentUnavailableView {
+                    Label("No storage", systemImage: "shippingbox")
+                } description: {
+                    Text("Storage buildings on \(session.claimName ?? "your claim") appear here.")
+                }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .padding(.vertical, 24)
+            } else {
+                if !storage.isEmpty {
+                    storageSection("Storage", icon: "shippingbox", buildings: storage)
+                }
+                if !other.isEmpty {
+                    storageSection("Other buildings", icon: "house", buildings: other)
+                }
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+    }
+
+    private func storageSection(
+        _ title: String, icon: String, buildings: [ViewRep.Session.Workstations.Building]
+    ) -> some View {
+        Section {
+            ForEach(buildings, id: \.entityID) { building in
+                BuildingRow(building: building)
+            }
+        } header: {
+            Label(title, systemImage: icon)
                 .font(.caption.bold())
                 .foregroundStyle(.secondary)
         }
@@ -252,6 +296,29 @@ private struct CraftRow: View {
             CraftPhaseBadge(craft: craft)
         }
         .padding(.vertical, 2)
+    }
+}
+
+/// The claim-buildings sync state — busy while pooling the snapshot, the
+/// error otherwise silent rows would hide.
+private struct SyncStatusRow: View {
+    let status: ViewRep.Session.Workstations.Status
+    let error: String?
+
+    var body: some View {
+        switch status {
+        case .idle, .live:
+            EmptyView()
+        case .syncing:
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text("Syncing claim…").font(.caption).foregroundStyle(.secondary)
+            }
+        case .failed:
+            Label(error ?? "Sync stopped", systemImage: "exclamationmark.triangle")
+                .font(.caption)
+                .foregroundStyle(.orange)
+        }
     }
 }
 

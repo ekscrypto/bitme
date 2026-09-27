@@ -477,6 +477,7 @@ extension Activity.ClaimBuildingsLoop: AsyncActivity, StampableActivity {
         coreLog.info("claim buildings loop syncing claim \(claim, privacy: .public) for player \(self.playerEntityID, privacy: .public)")
         for await events in adapters.bitCraft.syncClaimBuildings(leg, claim, playerEntityID) {
             if Task.isCancelled { return }
+            coreLog.debug("claim buildings loop received \(events.count, privacy: .public) pooled event(s)")
             await ingestor.ingest(Intent.ClaimBuildingsChanged(events: events))
         }
         // The stream always carries its own terminal event (`.failed`
