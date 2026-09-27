@@ -160,6 +160,7 @@ public enum ViewRep: Equatable, Sendable, Codable {
         /// despawn feed maintained from the change stream. A compact,
         /// renderer-friendly projection — the raw tile words stay in state.
         public struct ResourceMap: Equatable, Sendable, Codable {
+
             public enum StreamStatus: String, Equatable, Sendable, Codable {
                 case off
                 case connecting
@@ -210,6 +211,66 @@ public enum ViewRep: Equatable, Sendable, Codable {
             )
         }
 
+        /// The pinned claim's workstations (Pocket Crafter): every building
+        /// in the claim joined with the catalogs, nicknames, and the crafts
+        /// running at them — the live state of the claim-buildings sync.
+        public struct Workstations: Equatable, Sendable, Codable {
+            public enum Status: String, Equatable, Sendable, Codable {
+                case idle
+                case syncing
+                case live
+                case failed
+            }
+
+            public enum CraftPhase: String, Equatable, Sendable, Codable {
+                case queued
+                case processing
+                case complete
+                case active
+                case preparing
+            }
+
+            public struct Building: Equatable, Sendable, Codable {
+                public let entityID: String
+                /// Nickname, else catalog name, else "Building <entity id>".
+                public let name: String
+                public let catalogName: String?
+                /// Any function entry advertises crafting/refining slots.
+                public let isCrafting: Bool
+                /// Any function entry advertises item/cargo pockets.
+                public let isStorage: Bool
+                /// Crafts at this station (active + queued, anyone's).
+                public let craftCount: Int
+            }
+
+            public struct Craft: Equatable, Sendable, Codable {
+                public let entityID: String
+                /// Catalog recipe name; nil until the catalog lands.
+                public let recipeName: String?
+                /// Joined station name; nil for crafts at unknown stations.
+                public let stationName: String?
+                public let mine: Bool
+                public let phase: CraftPhase
+                /// Active crafts: completed actions of `craftCount`.
+                public let progress: Int?
+                public let craftCount: Int?
+            }
+
+            public var status: Status
+            public var error: String?
+            /// Crafting stations first, then storage, then the rest —
+            /// name-sorted within each group.
+            public var buildings: [Building]
+            /// The player's own pending crafts first, then the claim's,
+            /// each station-then-name sorted. Completed passive crafts are
+            /// collected in game and stay out of the list; `craftsOverflow`
+            /// counts what the cap dropped.
+            public var crafts: [Craft]
+            public var craftsOverflow: Int
+
+            static let empty = Workstations(status: .idle, error: nil, buildings: [], crafts: [], craftsOverflow: 0)
+        }
+
         public var username: String?
         public var entityID: String?
         public var region: Int?
@@ -232,6 +293,7 @@ public enum ViewRep: Equatable, Sendable, Codable {
         public var food: Food
         public var actions: [RunningAction]
         public var resourceMap: ResourceMap
+        public var workstations: Workstations = .empty
     }
 
     static func from(persistent: PersistentState, ephemeral: EphemeralState) -> ViewRep {
@@ -452,8 +514,109 @@ public enum ViewRep: Equatable, Sendable, Codable {
             stamina: stamina,
             food: food,
             actions: actions,
-            resourceMap: resourceMap(from: ephemeral.session)
+            resourceMap: resourceMap(from: ephemeral.session),
+            workstations: workstations(from: ephemeral.session)
         ))
+    }
+
+    /// Projects the claim-buildings sync state: the claim's buildings joined
+    /// with the catalogs and nicknames, plus the pending crafts the
+    /// subscriptions delivered (the player's own anywhere, anyone's at claim
+    /// stations). Completed passive crafts are dropped — they are collected
+    /// in game and would otherwise dominate a busy claim's list — and the
+    /// list is capped (`craftsOverflow` carries what fell off).
+    static func workstations(from session: EphemeralState.Session?, cap: Int = 200) -> Session.Workstations {
+        guard let session else { return .empty }
+        let state = session.buildings
+        guard state.status != .idle, !state.isEmpty else { return .empty }
+
+        let status: Session.Workstations.Status
+        switch state.status {
+        case .idle: status = .idle
+        case .syncing: status = .syncing
+        case .live: status = .live
+        case .failed: status = .failed
+        }
+
+        let isPending: (RegionCraft) -> Bool = { craft in
+            if case .passive(.complete, _) = craft.kind { return false }
+            return true
+        }
+
+        var craftsByBuilding: [UInt64: Int] = [:]
+        for craft in state.crafts.values where isPending(craft) {
+            craftsByBuilding[craft.buildingEntityID, default: 0] += 1
+        }
+
+        let buildings: [Session.Workstations.Building] = state.buildings.values
+            .map { building in
+                let desc = state.gamedata.buildings[building.buildingDescriptionID]
+                let nickname = state.nicknames[building.entityID]
+                return Session.Workstations.Building(
+                    entityID: String(building.entityID),
+                    name: nickname ?? desc?.name ?? "Building \(building.entityID)",
+                    catalogName: desc?.name,
+                    isCrafting: desc?.isCrafting ?? false,
+                    isStorage: desc?.isStorage ?? false,
+                    craftCount: craftsByBuilding[building.entityID] ?? 0
+                )
+            }
+            .sorted { lhs, rhs in
+                let lRank = (lhs.isCrafting ? 0 : lhs.isStorage ? 1 : 2, lhs.name, lhs.entityID)
+                let rRank = (rhs.isCrafting ? 0 : rhs.isStorage ? 1 : 2, rhs.name, rhs.entityID)
+                return lRank < rRank
+            }
+
+        let playerID = state.playerEntityID
+        let nameByBuilding = Dictionary(uniqueKeysWithValues: buildings.map { (UInt64($0.entityID) ?? 0, $0.name) })
+        let pending = state.crafts.values
+            .filter { isPending($0) }
+            .filter { craft in
+                // Anything the subscriptions delivered is in scope by
+                // construction (personal set, per-building claim sets);
+                // the filter keeps stragglers from removed stations honest.
+                state.buildings[craft.buildingEntityID] != nil
+                    || craft.ownerEntityID == playerID
+            }
+            .sorted { lhs, rhs in
+                let lRank = (lhs.ownerEntityID == playerID ? 0 : 1, lhs.buildingEntityID, lhs.entityID)
+                let rRank = (rhs.ownerEntityID == playerID ? 0 : 1, rhs.buildingEntityID, rhs.entityID)
+                return lRank < rRank
+            }
+        var crafts: [Session.Workstations.Craft] = []
+        crafts.reserveCapacity(min(pending.count, cap))
+        for craft in pending.prefix(cap) {
+            let phase: Session.Workstations.CraftPhase
+            var progress: Int?
+            var craftCount: Int?
+            switch craft.kind {
+            case .passive(let status, _):
+                switch status {
+                case .queued: phase = .queued
+                case .processing: phase = .processing
+                case .complete: phase = .complete
+                }
+            case .active(let rawProgress, let count, let preparation, _):
+                phase = preparation ? .preparing : .active
+                progress = Int(rawProgress)
+                craftCount = Int(count)
+            }
+            crafts.append(Session.Workstations.Craft(
+                entityID: String(craft.entityID),
+                recipeName: state.gamedata.recipeNames[craft.recipeID],
+                stationName: nameByBuilding[craft.buildingEntityID],
+                mine: craft.ownerEntityID == playerID,
+                phase: phase,
+                progress: progress,
+                craftCount: craftCount
+            ))
+        }
+
+        return Session.Workstations(
+            status: status, error: state.lastError,
+            buildings: buildings, crafts: crafts,
+            craftsOverflow: max(0, pending.count - cap)
+        )
     }
 
     /// Projects the session's resource-map state: aggregates the tile tally

@@ -10,7 +10,9 @@ Two mobile companion apps for BitCraft, one shared core:
   claim's workstations and craft tasks on the go. Signs in with the BitCraft
   account (email → emailed access code) and tracks the account's own player,
   located over the game's global database — no character-name entry. The
-  workstation / public + personal task list is waiting on its data source.
+  game session's region-shard leg carries a live claim-buildings sync (the
+  pinned claim's buildings, catalogs, nicknames, and crafts — see
+  [docs/protocol/region-claim-buildings.md](docs/protocol/region-claim-buildings.md)).
   The map stack is disabled at construction (see `StateMachine.Configuration`).
 
 Both are thin clients over the `relay.bitcraftsync.app` **Bit-Me API**
@@ -27,6 +29,8 @@ reference scenario for X-Ray's dashboard.
 | [docs/tutorial-onboarding-and-polling.md](docs/tutorial-onboarding-and-polling.md) | **Tutorial 1** — name → character resolution, readiness probe, a production-shaped 1 Hz polling client with clock-skew correction and backoff. |
 | [docs/tutorial-harvest-session.md](docs/tutorial-harvest-session.md) | **Tutorial 2** — snapshot → screen state: bush countdown, citric detection, food-buff and stamina alerts; lifecycle (backgrounding, deploys) and a playtest checklist. |
 | [docs/relay-data-requirements.md](docs/relay-data-requirements.md) | Design history — the original data-requirements spec sent to the relay team (superseded; static-gamedata list §6 still applies). |
+| [docs/protocol/session-2026-09-25-tap-analysis.md](docs/protocol/session-2026-09-25-tap-analysis.md) | **Protocol: global-DB tap** — auth flow, connection topology, v2.bsatn wire facts, the desktop client's subscription/reducer catalog. |
+| [docs/protocol/region-claim-buildings.md](docs/protocol/region-claim-buildings.md) | **Protocol: claim-buildings sync** — the region tables behind a claim's workstations (shapes, indexes, guardrails) and the subscription set Pocket Crafter rides on the game session's region leg. |
 
 ## External sources of truth
 
@@ -125,7 +129,7 @@ stamina regen constants need gamedata + playtest confirmation.
   **Resource-map APIs live** (2026-09-24, first shipped on the X-Ray web
   client): BMR1 session/world windows, region dictionaries, BME1 terrain,
   and the BMD1 change-stream WebSocket.
-- Core + CLI: state machine, API, ViewRep extracted; 79 unit tests; CLI
+- Core + CLI: state machine, API, ViewRep extracted; 101 unit tests; CLI
   verified against production (resolve, live watch, live resource map —
   window + dictionary + stream). The session/map loops also survive the
   CLI's start → SignOut → resolve race (late bootstraps can no longer
@@ -137,6 +141,8 @@ stamina regen constants need gamedata + playtest confirmation.
   panel with persisted tracked set, gathering HUD) with the activity
   dashboard (big countdown with learned pacing, citric banner, stamina
   projection, food-buff classification, nearby-resources feed) now a
-  cover over the map. **Pocket Crafter** is the stub described above
-  (real claim header + running-craft card + sign-in; workstation list
-  pending its data source).
+  cover over the map. **Pocket Crafter** pairs the claim header +
+  running-craft card + sign-in with the live workstation list (the
+  claim-buildings sync over the game session's region leg — crafting
+  stations, storage, and craft tasks, joined with the game's own
+  catalogs).

@@ -2,13 +2,40 @@ import SwiftUI
 import BitMeCore
 
 /// Pocket Crafter home: renders `ViewRep.Session` for the tracked character
-/// — the claim they stand in, the account surface, and the craft currently
-/// running. The workstation list (public + personal tasks per station, with
-/// resume) is a placeholder until its data source lands; everything shown
-/// today is real relay data.
+/// — the claim they stand in, the account surface, the craft currently
+/// running, and the claim's workstations with their craft tasks.
+///
+/// Rendering note: a busy claim carries hundreds of buildings and crafts,
+/// so the volume lives in a `List` (recycled rows) — a `VStack` in a
+/// `ScrollView` would build every row eagerly. The countdown's periodic
+/// timeline is scoped to the running-craft card so its 4 Hz re-eval never
+/// touches the long lists.
 struct CrafterHomeView: View {
     let session: ViewRep.Session
     let ingest: @Sendable (Sendable) async -> Void
+
+    var body: some View {
+        ZStack {
+            Color(white: 0.05).ignoresSafeArea()
+            List {
+                Group {
+                    header
+                    if session.signedIn == false {
+                        OfflineBanner()
+                    }
+                    RunningCraftCard(action: runningCraft, relayOffsetMs: relayOffsetMs)
+                }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+
+                workstationSections
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+        }
+        .preferredColorScheme(.dark)
+    }
 
     /// Converts device time to relay-clock ms (snapshot anchors are relay ms).
     private var relayOffsetMs: Double {
@@ -17,27 +44,6 @@ struct CrafterHomeView: View {
 
     private var runningCraft: ViewRep.Session.RunningAction? {
         session.actions.first { $0.actionType == "Craft" }
-    }
-
-    var body: some View {
-        TimelineView(.periodic(from: .now, by: 0.25)) { _ in
-            let nowMs = Date().timeIntervalSince1970 * 1_000 + relayOffsetMs
-            ZStack {
-                Color(white: 0.05).ignoresSafeArea()
-                ScrollView {
-                    VStack(spacing: 14) {
-                        header
-                        if session.signedIn == false {
-                            OfflineBanner()
-                        }
-                        craftCard(nowMs: nowMs)
-                        workstationsPlaceholder
-                    }
-                    .padding()
-                }
-            }
-        }
-        .preferredColorScheme(.dark)
     }
 
     // MARK: - Header
@@ -65,6 +71,7 @@ struct CrafterHomeView: View {
             }
             ConnectionPill(connection: session.connection)
         }
+        .padding(.vertical, 6)
     }
 
     /// Account controls. "Switch BitCraft account" reopens the emailed-code
@@ -96,55 +103,193 @@ struct CrafterHomeView: View {
         .accessibilityLabel("Account and settings")
     }
 
-    // MARK: - Running craft (real data)
+    // MARK: - Workstations
 
-    /// The character's in-flight Craft action, when there is one: the
-    /// station being worked (the snapshot target while crafting) and a live
-    /// progress bar anchored to relay clock.
     @ViewBuilder
-    private func craftCard(nowMs: Double) -> some View {
-        if let craft = runningCraft {
-            let remaining = craft.endsAtMs - nowMs
-            let progress = craft.durationMs > 0
-                ? min(1, max(0, (nowMs - craft.startsAtMs) / craft.durationMs))
-                : 1
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Label("Crafting", systemImage: "hammer")
-                        .font(.subheadline.bold())
-                    Spacer()
-                    Text(remaining > 0 ? "\(Format.mmss(remaining)) left" : "finishing…")
-                        .font(.subheadline.monospacedDigit())
-                        .foregroundStyle(.secondary)
+    private var workstationSections: some View {
+        let stations = session.workstations
+        if stations.status == .idle && stations.buildings.isEmpty {
+            Section {
+                ContentUnavailableView {
+                    Label("No claim synced", systemImage: "wrench.and.screwdriver")
+                } description: {
+                    Text("The workstations of \(session.claimName ?? "your claim") appear here while the game session is held.")
                 }
-                Text(craft.targetName ?? "at a workstation")
-                    .font(.title3)
-                    .lineLimit(1)
-                ProgressView(value: progress)
-                    .tint(.orange)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .padding(.vertical, 24)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-            .background(Color(white: 0.1), in: RoundedRectangle(cornerRadius: 16))
+        } else {
+            Section {
+                syncStatusRow(stations)
+            } header: {
+                Label("Workstations", systemImage: "wrench.and.screwdriver")
+                    .font(.subheadline.bold())
+            }
+
+            let crafting = stations.buildings.filter(\.isCrafting)
+            let storage = stations.buildings.filter { $0.isStorage && !$0.isCrafting }
+            let other = stations.buildings.filter { !$0.isCrafting && !$0.isStorage }
+            if !crafting.isEmpty {
+                stationSection("Crafting stations", icon: "hammer", buildings: crafting)
+            }
+            if !storage.isEmpty {
+                stationSection("Storage", icon: "shippingbox", buildings: storage)
+            }
+            if !other.isEmpty {
+                stationSection("Other buildings", icon: "house", buildings: other)
+            }
+            if !stations.crafts.isEmpty || stations.craftsOverflow > 0 {
+                craftTasks(stations)
+            }
         }
     }
 
-    // MARK: - Workstations (placeholder)
+    @ViewBuilder
+    private func syncStatusRow(_ stations: ViewRep.Session.Workstations) -> some View {
+        switch stations.status {
+        case .idle, .live:
+            EmptyView()
+        case .syncing:
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text("Syncing claim…").font(.caption).foregroundStyle(.secondary)
+            }
+        case .failed:
+            Label(stations.error ?? "Sync stopped", systemImage: "exclamationmark.triangle")
+                .font(.caption)
+                .foregroundStyle(.orange)
+        }
+    }
 
-    /// The product's centerpiece — every workstation in the claim with its
-    /// public queue and the player's personal tasks — is waiting on a data
-    /// source (relay endpoints or the direct SpacetimeDB connection). The
-    /// seam is ready: this becomes a list once the Core grows the domain.
-    private var workstationsPlaceholder: some View {
-        VStack(spacing: 10) {
-            ContentUnavailableView {
-                Label("Workstations", systemImage: "wrench.and.screwdriver")
-            } description: {
-                Text("Every workstation in \(session.claimName ?? "your claim"), with public queues and your personal tasks, arrives here once the crafting data source is wired up.")
+    private func stationSection(
+        _ title: String, icon: String, buildings: [ViewRep.Session.Workstations.Building]
+    ) -> some View {
+        Section {
+            ForEach(buildings, id: \.entityID) { building in
+                BuildingRow(building: building)
+            }
+        } header: {
+            Label(title, systemImage: icon)
+                .font(.caption.bold())
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// Craft tasks: the player's own pending crafts first, then the claim's.
+    private func craftTasks(_ stations: ViewRep.Session.Workstations) -> some View {
+        Section {
+            ForEach(stations.crafts, id: \.entityID) { craft in
+                CraftRow(craft: craft)
+            }
+            if stations.craftsOverflow > 0 {
+                Text("+\(stations.craftsOverflow) more")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Label("Craft tasks", systemImage: "hourglass")
+                .font(.caption.bold())
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+// MARK: - Rows
+
+/// One workstation: display name (nickname over catalog), catalog subtitle,
+/// and the pending-craft count badge.
+private struct BuildingRow: View {
+    let building: ViewRep.Session.Workstations.Building
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(building.name)
+                    .font(.subheadline)
+                    .lineLimit(1)
+                if building.name != building.catalogName, let catalog = building.catalogName {
+                    Text(catalog)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer()
+            if building.craftCount > 0 {
+                Text("\(building.craftCount)")
+                    .font(.caption.monospacedDigit().bold())
+                    .padding(.horizontal, 8).padding(.vertical, 2)
+                    .background(.orange.opacity(0.25), in: Capsule())
+                    .foregroundStyle(.orange)
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
+        .padding(.vertical, 2)
+    }
+}
+
+/// One pending craft task: recipe, station, ownership icon, and phase chip.
+private struct CraftRow: View {
+    let craft: ViewRep.Session.Workstations.Craft
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: craft.mine ? "person.fill" : "person")
+                .font(.caption2)
+                .foregroundStyle(craft.mine ? .orange : .secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(craft.recipeName ?? "Recipe \(craft.entityID)")
+                    .font(.subheadline)
+                    .lineLimit(1)
+                if let station = craft.stationName {
+                    Text(station)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer()
+            CraftPhaseBadge(craft: craft)
+        }
+        .padding(.vertical, 2)
+    }
+}
+
+/// The character's in-flight Craft action: the station being worked and a
+/// live progress bar. Owns the periodic timeline — the only part of the
+/// screen that needs sub-second updates.
+private struct RunningCraftCard: View {
+    let action: ViewRep.Session.RunningAction?
+    let relayOffsetMs: Double
+
+    var body: some View {
+        if let craft = action {
+            TimelineView(.periodic(from: .now, by: 0.25)) { _ in
+                let nowMs = Date().timeIntervalSince1970 * 1_000 + relayOffsetMs
+                let remaining = craft.endsAtMs - nowMs
+                let progress = craft.durationMs > 0
+                    ? min(1, max(0, (nowMs - craft.startsAtMs) / craft.durationMs))
+                    : 1
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Label("Crafting", systemImage: "hammer")
+                            .font(.subheadline.bold())
+                        Spacer()
+                        Text(remaining > 0 ? "\(Format.mmss(remaining)) left" : "finishing…")
+                            .font(.subheadline.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(craft.targetName ?? "at a workstation")
+                        .font(.title3)
+                        .lineLimit(1)
+                    ProgressView(value: progress)
+                        .tint(.orange)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(Color(white: 0.1), in: RoundedRectangle(cornerRadius: 16))
+            }
+        }
     }
 }
 
@@ -219,5 +364,42 @@ private struct OfflineBanner: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)
             .background(.blue.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+/// A craft task's state chip: passive crafts carry their queue state,
+/// at-the-bench crafts their action progress.
+private struct CraftPhaseBadge: View {
+    let craft: ViewRep.Session.Workstations.Craft
+
+    var body: some View {
+        Text(label)
+            .font(.caption2.monospacedDigit().bold())
+            .padding(.horizontal, 8).padding(.vertical, 3)
+            .background(tint.opacity(0.22), in: Capsule())
+            .foregroundStyle(tint)
+    }
+
+    private var label: String {
+        switch craft.phase {
+        case .queued: "Queued"
+        case .processing: "Crafting"
+        case .complete: "Done"
+        case .preparing: "Preparing"
+        case .active:
+            if let progress = craft.progress, let count = craft.craftCount, count > 0 {
+                "\(min(progress, count))/\(count)"
+            } else {
+                "Active"
+            }
+        }
+    }
+
+    private var tint: Color {
+        switch craft.phase {
+        case .queued: .secondary
+        case .processing, .preparing, .active: .orange
+        case .complete: .green
+        }
     }
 }

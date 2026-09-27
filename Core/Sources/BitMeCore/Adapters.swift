@@ -54,17 +54,28 @@ public struct Adapters: Sendable {
         /// when any leg ends; reconnection is the caller's policy
         /// (`Activity.GameSessionLoop`).
         public let openGlobalSession: @Sendable (_ token: String, _ entityID: String, _ regionID: Int?) -> AsyncStream<GlobalSessionEvent>
+        /// Live claim-buildings sync over the game session's region leg
+        /// (docs/protocol/region-claim-buildings.md): static catalogs via
+        /// one-off queries, then subscriptions for the claim's buildings,
+        /// the claim header, nicknames, and the scoped craft tables. Row
+        /// events arrive coalesced — one array per ~0.5 s pool, one intent
+        /// per array. The returned stream ends when the leg closes or the
+        /// sync fails — a terminal `.failed` event always precedes a sync
+        /// failure's end.
+        public let syncClaimBuildings: @Sendable (_ leg: RegionLeg, _ claimEntityID: UInt64, _ playerEntityID: UInt64) -> AsyncStream<[ClaimBuildingsEvent]>
 
         public init(
             requestAccessCode: @escaping @Sendable (String) async throws -> Void,
             authenticate: @escaping @Sendable (String, String) async throws -> String,
             resolveAccountPlayer: @escaping @Sendable (String, String) async throws -> AccountPlayer,
-            openGlobalSession: @escaping @Sendable (String, String, Int?) -> AsyncStream<GlobalSessionEvent>
+            openGlobalSession: @escaping @Sendable (String, String, Int?) -> AsyncStream<GlobalSessionEvent>,
+            syncClaimBuildings: @escaping @Sendable (RegionLeg, UInt64, UInt64) -> AsyncStream<[ClaimBuildingsEvent]>
         ) {
             self.requestAccessCode = requestAccessCode
             self.authenticate = authenticate
             self.resolveAccountPlayer = resolveAccountPlayer
             self.openGlobalSession = openGlobalSession
+            self.syncClaimBuildings = syncClaimBuildings
         }
     }
 
@@ -132,6 +143,9 @@ public struct Adapters: Sendable {
                         return AsyncStream { $0.finish() }
                     }
                     return GlobalSessionClient.events(token: token, entityID: entity, regionID: regionID)
+                },
+                syncClaimBuildings: { leg, claim, player in
+                    RegionBuildingsClient.events(leg: leg, claim: claim, player: player)
                 }
             ),
             loadFoodBuffGamedata: { await GamedataService.loadFoodBuffGamedata() },

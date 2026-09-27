@@ -198,10 +198,25 @@ extension Intent {
     }
 
     /// The connection holding the game session ended — kicked by another
-    /// sign-in (the desktop client), dropped, or refused. The machine
+    /// sign_in (the desktop client), dropped, or refused. The machine
     /// returns to the pre-sign-in gate; the session is never re-taken
     /// automatically.
     struct GameSessionEnded: Sendable {}
+
+    // Claim buildings (account-driven apps) — feedback from the region leg.
+
+    /// The game session's region-shard leg signed in: carries the live
+    /// connection the claim-buildings sync subscribes on.
+    struct GameSessionRegionLegReady: Sendable {
+        let leg: RegionLeg
+    }
+
+    /// A pooled batch of claim-buildings sync events (row diffs, catalog
+    /// loads, status changes) applied to the session's buildings state in
+    /// one mutation — one ingest, one rep broadcast per ~0.5 s of rows.
+    struct ClaimBuildingsChanged: Sendable {
+        let events: [ClaimBuildingsEvent]
+    }
 }
 
 /// Reference carrier the session loop and the intents share (ADR-014: the
@@ -237,6 +252,7 @@ private func startSession(
     ephemeral.session?.loop.cancel()
     ephemeral.session?.streamLoop?.cancel()
     ephemeral.session?.gameSessionLoop?.cancel()
+    ephemeral.session?.buildingsLoop?.cancel()
     let loop = CancellableTask()
     let streamLoop = CancellableTask()
     let session = EphemeralState.Session(entityID: entityID, loop: loop, streamLoop: streamLoop)
@@ -368,6 +384,13 @@ extension Intent.SessionPolled: StateMutator {
         let config = GameConfig.shared
         let live = snapshot.signedIn != false && (snapshot.position?.dimension ?? 1) == 1
         session.streamCarrier.wanted = live && ephemeral.resourceMapEnabled
+
+        // Claim-buildings sync: stamp the claim the character stands in —
+        // the entity id the pre-sign-in gate validated. The sync pins the
+        // first value it sees (one claim per session, by product scope).
+        if let idText = snapshot.claim?.entityID, let claimID = UInt64(idText) {
+            session.claimCarrier.claimEntityID = claimID
+        }
         var activities: [any AsyncActivity] = []
         if live, ephemeral.resourceMapEnabled {
             var need = session.resourceMap.window == nil
@@ -660,9 +683,84 @@ extension Intent.GameSessionEnded: StateMutator {
         session.gameSessionLoop?.cancel()
         session.gameSessionLoop = nil
         session.gameSession = EphemeralState.Session.GameSessionState()
+        // The region leg (and its buildings sync) died with the session.
+        session.buildingsLoop?.cancel()
+        session.buildingsLoop = nil
+        session.regionLeg = nil
+        session.buildings = EphemeralState.Session.BuildingsState()
+        session.claimCarrier.claimEntityID = nil
         ephemeral.session = session
         ephemeral.preSignInVisible = true
         ephemeral.gameSessionNotice = notice
+        return StateChange(ephemeral: ephemeral)
+    }
+}
+
+// MARK: - Claim-buildings mutations (account-driven apps)
+
+extension Intent.GameSessionRegionLegReady: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        guard var session = ephemeral.session,
+              // Only a held game session owns a region leg — a late arrival
+              // after GameSessionEnded must not resurrect the sync.
+              session.gameSessionLoop != nil,
+              session.regionLeg == nil,
+              let playerEntityID = UInt64(session.entityID) else {
+            return .noChange
+        }
+        session.regionLeg = leg
+        var buildings = EphemeralState.Session.BuildingsState()
+        buildings.playerEntityID = playerEntityID
+        buildings.status = .syncing
+        session.buildings = buildings
+        let buildingsLoop = CancellableTask()
+        session.buildingsLoop = buildingsLoop
+        ephemeral.session = session
+        return StateChange(ephemeral: ephemeral, activities: [
+            Activity.ClaimBuildingsLoop(
+                leg: leg,
+                playerEntityID: playerEntityID,
+                claimCarrier: session.claimCarrier,
+                cancellable: buildingsLoop
+            )
+        ])
+    }
+}
+
+extension Intent.ClaimBuildingsChanged: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        guard var session = ephemeral.session else { return .noChange }
+        for event in events {
+            switch event {
+            case .syncing:
+                session.buildings.status = .syncing
+            case .live:
+                session.buildings.status = .live
+                session.buildings.lastError = nil
+            case .claim(let header):
+                session.buildings.claim = header
+            case .gamedata(let gamedata):
+                session.buildings.gamedata = gamedata
+            case .buildingChanged(let building):
+                session.buildings.buildings[building.entityID] = building
+            case .buildingRemoved(let entityID):
+                session.buildings.buildings[entityID] = nil
+            case .nicknameChanged(let entityID, let nickname):
+                session.buildings.nicknames[entityID] = nickname
+            case .nicknameRemoved(let entityID):
+                session.buildings.nicknames[entityID] = nil
+            case .craftChanged(let craft):
+                session.buildings.crafts[craft.entityID] = craft
+            case .craftRemoved(let entityID):
+                session.buildings.crafts[entityID] = nil
+            case .failed(let message):
+                session.buildings.status = .failed
+                session.buildings.lastError = message
+            }
+        }
+        ephemeral.session = session
         return StateChange(ephemeral: ephemeral)
     }
 }
@@ -674,6 +772,7 @@ extension Intent.SignOut: StateMutator {
         ephemeral.session?.loop.cancel()
         ephemeral.session?.streamLoop?.cancel()
         ephemeral.session?.gameSessionLoop?.cancel()
+        ephemeral.session?.buildingsLoop?.cancel()
         ephemeral.session = nil
         persistent.identity = nil
         if ephemeral.accountDrivenSignIn {

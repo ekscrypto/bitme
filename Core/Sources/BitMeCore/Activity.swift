@@ -411,6 +411,10 @@ extension Activity.GameSessionLoop: AsyncActivity, StampableActivity {
         for await event in adapters.bitCraft.openGlobalSession(token, entityID, regionID) {
                 if Task.isCancelled { return }
                 switch event {
+                case .regionLeg(let leg):
+                    // The shard leg is live — hand it to the machine, which
+                    // starts the claim-buildings sync on this connection.
+                    await ingestor.ingest(Intent.GameSessionRegionLegReady(leg: leg))
                 case .established:
                     coreLog.info("game session holding for \(self.entityID, privacy: .public)")
                     await ingestor.ingest(Intent.GameSessionStatusChanged(status: .live, message: nil))
@@ -424,5 +428,59 @@ extension Activity.GameSessionLoop: AsyncActivity, StampableActivity {
         // by design — report it and stop; the gate decides what happens
         // next.
         await ingestor.ingest(Intent.GameSessionEnded())
+    }
+}
+
+// MARK: - Claim buildings
+
+extension Activity {
+    /// The claim-buildings sync on the game session's region leg
+    /// (`RegionBuildingsClient`): catalogs, then the pinned claim's
+    /// buildings and crafts, streamed as pooled row-event batches (one
+    /// ingest per ~0.5 s of rows). Runs for the life of the leg — the
+    /// sync pins the first claim the carrier names (the one the
+    /// pre-sign-in gate validated) and follows it live; buildings placed
+    /// or deconstructed mid-session arrive as row diffs.
+    struct ClaimBuildingsLoop: Sendable {
+        let leg: RegionLeg
+        let playerEntityID: UInt64
+        /// Stamped by `Intent.SessionPolled` with the relay's claim answer.
+        let claimCarrier: ClaimCarrier
+        /// Machine-stamped with the spawned task; stored in session state by
+        /// the starting intent so session teardown can cancel it.
+        let cancellable: CancellableTask
+    }
+}
+
+extension Activity.ClaimBuildingsLoop: AsyncActivity, StampableActivity {
+    var stampTarget: CancellableTask { cancellable }
+
+    func start(ingestor: IntentIngestor, adapters: Adapters) async {
+        // Wait for the relay's claim answer. The gate already refused
+        // sign-in without one, so this normally resolves immediately; the
+        // wait only closes the ordering gap after a launch-restore session
+        // where the first poll may still be in flight.
+        coreLog.info("claim buildings loop started — waiting for the relay's claim answer")
+        let claim: UInt64
+        while true {
+            if Task.isCancelled { return }
+            if let stamped = claimCarrier.claimEntityID {
+                claim = stamped
+                break
+            }
+            do {
+                try await adapters.sleep(0.5)
+            } catch {
+                return // cancelled
+            }
+        }
+        coreLog.info("claim buildings loop syncing claim \(claim, privacy: .public) for player \(self.playerEntityID, privacy: .public)")
+        for await events in adapters.bitCraft.syncClaimBuildings(leg, claim, playerEntityID) {
+            if Task.isCancelled { return }
+            await ingestor.ingest(Intent.ClaimBuildingsChanged(events: events))
+        }
+        // The stream always carries its own terminal event (`.failed`
+        // precedes the end on a sync failure; the leg closing ends both
+        // this loop and the game-session loop) — nothing to report here.
     }
 }

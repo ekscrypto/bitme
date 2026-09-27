@@ -107,6 +107,44 @@ struct EphemeralState: Sendable {
         /// one-live-session slot (account-driven apps only).
         var gameSessionLoop: CancellableTask?
         var gameSession = GameSessionState()
+        /// The game session's region-shard leg, once its `sign_in` commits
+        /// (nil for global-only sessions). The claim-buildings sync
+        /// subscribes on this connection — the game allows one live
+        /// session per account per database, so all region traffic shares it.
+        var regionLeg: RegionLeg?
+        /// Shared with the claim-buildings loop; poll intents stamp the
+        /// relay's current claim entity id here (ADR-014 carrier pattern).
+        let claimCarrier = ClaimCarrier()
+        /// Machine-stamped with the spawned claim-buildings sync task.
+        var buildingsLoop: CancellableTask?
+        /// The pinned claim's buildings, catalogs, and crafts (Pocket
+        /// Crafter's workstation domain). Pinned once at sync start — the
+        /// product scope is one claim per session.
+        var buildings = BuildingsState()
+
+        /// Client-side state of the claim-buildings sync.
+        struct BuildingsState: Sendable {
+            enum Status: Equatable, Sendable {
+                case idle
+                case syncing
+                case live
+                case failed
+            }
+
+            var status: Status = .idle
+            var lastError: String?
+            var claim: ClaimHeader?
+            var gamedata = BuildingGamedata.empty
+            var buildings: [UInt64: RegionBuilding] = [:]
+            var nicknames: [UInt64: String] = [:]
+            var crafts: [UInt64: RegionCraft] = [:]
+            /// The tracked player's entity id — the `mine` marker for crafts.
+            var playerEntityID: UInt64?
+
+            var isEmpty: Bool {
+                claim == nil && buildings.isEmpty && crafts.isEmpty && nicknames.isEmpty
+            }
+        }
 
         /// Projection-facing state of the game-session loop.
         struct GameSessionState: Sendable {
@@ -208,5 +246,19 @@ final class ResourceStreamCarrier: @unchecked Sendable {
     var wanted: Bool {
         get { lock.withLock { _wanted } }
         set { lock.withLock { _wanted = newValue } }
+    }
+}
+
+/// ADR-014 carrier for the claim-buildings loop: poll intents stamp the
+/// relay's answer for the claim the character stands in (the entity id the
+/// gate already validated before the session was taken); the loop reads it
+/// at startup and never reads machine state.
+final class ClaimCarrier: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _claimEntityID: UInt64?
+
+    var claimEntityID: UInt64? {
+        get { lock.withLock { _claimEntityID } }
+        set { lock.withLock { _claimEntityID = newValue } }
     }
 }

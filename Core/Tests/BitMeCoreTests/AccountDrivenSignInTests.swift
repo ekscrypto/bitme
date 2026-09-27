@@ -183,9 +183,10 @@ struct AccountDrivenSignInTests {
 
     // MARK: - Harness
 
-    private func makeMachine(
+    func makeMachine(
         link: SimulatedLink,
         globalSession: SimulatedGlobalSession = SimulatedGlobalSession(scripts: [.established]),
+        claimBuildings: SimulatedClaimBuildings = SimulatedClaimBuildings(),
         restoredAccount: BitCraftAccount? = nil,
         restoredIdentity: StoredIdentity? = nil,
         accountStore: AccountStore? = nil,
@@ -212,6 +213,9 @@ struct AccountDrivenSignInTests {
                 },
                 openGlobalSession: { token, entityID, regionID in
                     globalSession.open(token: token, entityID: entityID, regionID: regionID)
+                },
+                syncClaimBuildings: { leg, claim, player in
+                    claimBuildings.open(leg: leg, claim: claim, player: player)
                 }
             ),
             loadFoodBuffGamedata: { nil },

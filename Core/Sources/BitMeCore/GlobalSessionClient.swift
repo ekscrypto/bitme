@@ -13,6 +13,11 @@ import os
 public enum GlobalSessionEvent: Equatable, Sendable {
     /// `sign_in` committed — this connection owns the account's session.
     case established
+    /// The region-shard leg's `sign_in` committed. Carries the leg so the
+    /// claim-buildings sync can subscribe on the same websocket — the game
+    /// allows one live session per account per database, so region traffic
+    /// must share this connection. Yielded before `.established`.
+    case regionLeg(RegionLeg)
     /// The reducer (or the protocol) refused the sign-in. The stream
     /// finishes right after this event.
     case rejected(String)
@@ -55,27 +60,60 @@ struct GlobalSessionClient: Sendable {
     static func events(token: String, entityID: UInt64, regionID: Int?) -> AsyncStream<GlobalSessionEvent> {
         AsyncStream { continuation in
             let task = Task {
+                coreLog.info("game session: resolving the global database address")
                 guard let connection = try? await BitCraftAuthClient.production.connectionInfo() else {
                     coreLog.error("global database lookup failed for the game session")
                     continuation.finish()
                     return
                 }
                 let arguments = signInArguments(entityID: entityID)
+                coreLog.info("game session: connecting legs at \(connection.uri, privacy: .public) (databases: \(self.databases(regionID: regionID).joined(separator: ", "), privacy: .public))")
 
                 var clients: [SpacetimeDBClient] = []
                 do {
                     for database in databases(regionID: regionID) {
                         let client = try SpacetimeDBClient(host: connection.uri, db: database)
+                        // The SDK's connect() returns before the websocket
+                        // handshake completes; the lifecycle below is the
+                        // truth: `.connected` = the server's InitialConnection
+                        // (handshake + token accepted + first frame decoded).
+                        let lifecycle = Task {
+                            for await event in await client.connectionEvents {
+                                switch event {
+                                case .connected(let identity, _, _):
+                                    coreLog.info("game session: leg \(database, privacy: .public) InitialConnection (identity \(String(describing: identity), privacy: .public))")
+                                case .reconnecting(let attempt):
+                                    coreLog.info("game session: leg \(database, privacy: .public) reconnecting (attempt \(attempt, privacy: .public))")
+                                case .disconnected(let reason):
+                                    coreLog.error("game session: leg \(database, privacy: .public) connection lost (\(reason ?? "no reason", privacy: .public))")
+                                    return
+                                case .error(let message):
+                                    coreLog.error("game session: leg \(database, privacy: .public) connection error (\(message, privacy: .public))")
+                                    return
+                                }
+                            }
+                        }
+                        coreLog.info("game session: opening leg \(database, privacy: .public) (handshake in progress)")
                         try await client.connect(
                             token: AuthenticationToken(rawValue: token),
                             enableAutoReconnect: false
                         )
-                        _ = try await client.callReducer(
-                            name: "sign_in",
-                            encodedArguments: arguments
-                        )
+                        coreLog.info("game session: calling sign_in on leg \(database, privacy: .public)")
+                        _ = try await Self.withTimeout(seconds: 20) {
+                            try await client.callReducer(
+                                name: "sign_in",
+                                encodedArguments: arguments
+                            )
+                        }
+                        lifecycle.cancel()
                         clients.append(client)
                         coreLog.info("game session leg committed: \(database, privacy: .public)")
+                        if database != "bitcraft-live-global" {
+                            // The shard leg is live: hand it to the machine
+                            // so the claim-buildings sync can ride it.
+                            coreLog.info("game session: region leg live — starting the claim-buildings sync")
+                            continuation.yield(.regionLeg(RegionLeg(client: client)))
+                        }
                     }
                 } catch let error as ReducerCallError {
                     coreLog.error("game session sign_in rejected: \(String(describing: error), privacy: .public)")
@@ -142,6 +180,37 @@ struct GlobalSessionClient: Sendable {
                 return text
             }
             return "the game refused the sign-in"
+        }
+    }
+
+    // MARK: - Sign-in deadline
+
+    private enum Timeout: Error {
+        case timedOut(String)
+    }
+
+    /// A `callReducer` whose result can never arrive (handshake that never
+    /// completed, server silence) suspends forever — the SDK resolves
+    /// pending calls when the transport *fails*, not when it stalls. Race
+    /// the sign-in against a deadline so a zombie connection surfaces as
+    /// a logged failure instead of a silent hang.
+    private static func withTimeout<T: Sendable>(
+        seconds: Double, _ operation: @escaping @Sendable () async throws -> T
+    ) async throws -> T {
+        try await withThrowingTaskGroup(of: T?.self) { group in
+            group.addTask {
+                try await operation()
+            }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(seconds))
+                return nil
+            }
+            let first = try await group.next() ?? nil
+            group.cancelAll()
+            guard let first else {
+                throw Timeout.timedOut("no sign_in answer within \(Int(seconds)) s")
+            }
+            return first
         }
     }
 }
