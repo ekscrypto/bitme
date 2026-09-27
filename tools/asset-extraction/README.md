@@ -19,6 +19,15 @@ python3 -m venv .venv
 First checkout: `git clone git@github.com:ekscrypto/bitme-resources.git
 bitme-resources` inside the `bitme` repo root.
 
+## Finding assets
+
+- `find_assets.py 'regex'` — search the extraction by file path; add
+  `--catalog` to also list matching sprites that exist in the game client
+  but aren't extracted.
+- `make_gallery.py` — (re)generates `GameAssets/index.html`, a searchable
+  gallery of every extracted asset (category chips + regex filter). Open it
+  in a browser; regenerate after extraction refreshes.
+
 ## Notes
 
 - The script locates the bundle by glob (`remoteassets_assets__*.bundle`), so it
