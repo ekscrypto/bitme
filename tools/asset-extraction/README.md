@@ -27,6 +27,12 @@ bitme-resources` inside the `bitme` repo root.
 - `make_gallery.py` — (re)generates `GameAssets/index.html`, a searchable
   gallery of every extracted asset (category chips + regex filter). Open it
   in a browser; regenerate after extraction refreshes.
+- `install_app_icons.sh` — populates the (gitignored)
+  `Crafter/Assets.xcassets` with the twelve profession icons from the
+  extraction, so game art never lands in this public repo. The app falls
+  back to SF Symbols when the catalog is absent. Run it after cloning and
+  after game-update refreshes; the Scholar icon is the game UI's Book
+  (the game ships no skill icon for Scholar).
 
 ## Notes
 

@@ -6,6 +6,7 @@ xcuserdata/
 *.xcuserstate
 .build/
 build/
+Core/.swiftpm/
 
 # ZCode agent workspace
 .zcode/
@@ -16,3 +17,7 @@ tools/tap/captures/
 
 # Extracted game art lives in its own private repo (github.com/ekscrypto/bitme-resources)
 bitme-resources/
+
+# App asset catalogs built from that art (tools/asset-extraction/install_app_icons.sh);
+# SF Symbol fallbacks keep a public-only clone building without them.
+Crafter/Assets.xcassets/
