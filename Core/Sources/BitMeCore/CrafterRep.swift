@@ -259,7 +259,9 @@ public struct WorkstationsRep: Equatable, Sendable, Codable {
 
     public struct Craft: Equatable, Sendable, Codable {
         public let entityID: String
-        /// Catalog recipe name; nil until the catalog lands.
+        /// Catalog recipe name with its template placeholders resolved
+        /// ("Braid {0} from {1}" → "Braid Rough Rope from Rough Cloth
+        /// Strip"); nil until the catalog lands.
         public let recipeName: String?
         /// Joined station name; nil for crafts at unknown stations.
         public let stationName: String?
@@ -373,7 +375,7 @@ public struct WorkstationsRep: Equatable, Sendable, Codable {
             }
             crafts.append(Craft(
                 entityID: String(craft.entityID),
-                recipeName: state.gamedata.recipeNames[craft.recipeID],
+                recipeName: state.gamedata.recipeDisplayName(craft.recipeID),
                 stationName: nameByBuilding[craft.buildingEntityID],
                 mine: craft.ownerEntityID == playerID,
                 phase: phase,

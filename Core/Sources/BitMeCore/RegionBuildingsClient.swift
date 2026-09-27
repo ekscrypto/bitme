@@ -37,12 +37,13 @@ public struct ClaimHeader: Equatable, Sendable {
 }
 
 /// The static catalogs the join needs, fetched once per sync
-/// (`building_desc`, `crafting_recipe_desc`, `tool_type_desc`) and cached
-/// on disk for 48 h (the food-buff gamedata policy): a relaunch paints
-/// names and classification from the cache instead of waiting on the
-/// leg's one-offs. Game updates land on the first session after the TTL
-/// lapses. (A cache written before a field was added fails to decode and
-/// self-refetches — one cold load per schema change.)
+/// (`building_desc`, `crafting_recipe_desc`, `tool_type_desc`,
+/// `item_desc`, `cargo_desc`) and cached on disk for 48 h (the food-buff
+/// gamedata policy): a relaunch paints names and classification from the
+/// cache instead of waiting on the leg's one-offs. Game updates land on
+/// the first session after the TTL lapses. (A cache written before a
+/// field was added fails to decode and self-refetches — one cold load
+/// per schema change.)
 public struct BuildingGamedata: Equatable, Sendable, Codable {
     public static let ttl: TimeInterval = 48 * 60 * 60
 
@@ -53,18 +54,64 @@ public struct BuildingGamedata: Equatable, Sendable, Codable {
     /// tool type's skill via `tool_type_desc` (e.g. the Machete →
     /// Foraging). Feeds `WorkstationsRep.Craft.profession`.
     public let recipeSkills: [Int32: Int32]
+    /// Recipe id → first `consumed_item_stacks` entry — the name
+    /// template's {1}.
+    public let recipeInputs: [Int32: ItemStackRef]
+    /// Recipe id → first `crafted_item_stacks` entry — the name
+    /// template's {0}.
+    public let recipeOutputs: [Int32: ItemStackRef]
+    /// `item_desc` id → name — resolves Item-typed stack refs.
+    public let itemNames: [Int32: String]
+    /// `cargo_desc` id → name — resolves Cargo-typed stack refs.
+    public let cargoNames: [Int32: String]
     public let fetchedAt: Date
 
     init(
         buildings: [Int32: BuildingDescInfo] = [:],
         recipeNames: [Int32: String] = [:],
         recipeSkills: [Int32: Int32] = [:],
+        recipeInputs: [Int32: ItemStackRef] = [:],
+        recipeOutputs: [Int32: ItemStackRef] = [:],
+        itemNames: [Int32: String] = [:],
+        cargoNames: [Int32: String] = [:],
         fetchedAt: Date = .now
     ) {
         self.buildings = buildings
         self.recipeNames = recipeNames
         self.recipeSkills = recipeSkills
+        self.recipeInputs = recipeInputs
+        self.recipeOutputs = recipeOutputs
+        self.itemNames = itemNames
+        self.cargoNames = cargoNames
         self.fetchedAt = fetchedAt
+    }
+
+    /// The recipe's display name. All but ~50 of the ~7.8k recipes carry
+    /// a .NET-style `name` template — "Braid {0} from {1}" — whose {0} is
+    /// the first crafted stack's item and {1} the first consumed one;
+    /// resolved against the item/cargo name catalogs. Literal names pass
+    /// through, and a template whose referenced stack is missing falls
+    /// back to the raw column rather than half-substituting.
+    public func recipeDisplayName(_ recipeID: Int32) -> String? {
+        guard let template = recipeNames[recipeID] else { return nil }
+        var name = template
+        if name.contains("{0}") {
+            guard let output = recipeOutputs[recipeID].flatMap({ itemName(of: $0) }) else {
+                return template
+            }
+            name = name.replacingOccurrences(of: "{0}", with: output)
+        }
+        if name.contains("{1}") {
+            guard let input = recipeInputs[recipeID].flatMap({ itemName(of: $0) }) else {
+                return template
+            }
+            name = name.replacingOccurrences(of: "{1}", with: input)
+        }
+        return name
+    }
+
+    private func itemName(of stack: ItemStackRef) -> String? {
+        stack.isCargo ? cargoNames[stack.id] : itemNames[stack.id]
     }
 
     public func isStale(now: Date = .now) -> Bool {
@@ -140,7 +187,9 @@ public enum ClaimBuildingsEvent: Equatable, Sendable {
 /// (docs/protocol/region-claim-buildings.md):
 ///
 /// 1. one-off queries load the static catalogs (`building_desc`,
-///    `crafting_recipe_desc`) — names/classification for the join;
+///    `crafting_recipe_desc`, `tool_type_desc`, plus `item_desc` and
+///    `cargo_desc` for the recipe-name templates) — names/classification
+///    for the join;
 /// 2. one subscription set covers the claim slice (`building_state WHERE
 ///    claim_entity_id`, `claim_state`, whole-table `building_nickname_state`
 ///    — low churn, the relay mirror subscribes it the same way) plus the
@@ -518,6 +567,8 @@ enum RegionBuildingsClient {
             async let descTables = client.oneOffQuery("SELECT * FROM building_desc;", timeout: 20)
             async let recipeTables = client.oneOffQuery("SELECT * FROM crafting_recipe_desc;", timeout: 20)
             async let toolTables = client.oneOffQuery("SELECT * FROM tool_type_desc;", timeout: 20)
+            async let itemTables = client.oneOffQuery("SELECT * FROM item_desc;", timeout: 20)
+            async let cargoTables = client.oneOffQuery("SELECT * FROM cargo_desc;", timeout: 20)
 
             var buildings: [Int32: BuildingDescInfo] = [:]
             for table in try await descTables where table.tableName == "building_desc" {
@@ -537,21 +588,46 @@ enum RegionBuildingsClient {
             }
             var recipes: [Int32: String] = [:]
             var recipeSkills: [Int32: Int32] = [:]
+            var recipeInputs: [Int32: ItemStackRef] = [:]
+            var recipeOutputs: [Int32: ItemStackRef] = [:]
             for table in try await recipeTables where table.tableName == "crafting_recipe_desc" {
                 for row in table.rows.rows {
                     if let recipe = try? RegionGamedataDecoder.recipe(row) {
                         recipes[recipe.id] = recipe.name
                         recipeSkills[recipe.id] = recipe.skillID
                             ?? recipe.toolTypeID.flatMap { toolSkillByType[$0] }
+                        if let input = recipe.input { recipeInputs[recipe.id] = input }
+                        if let output = recipe.output { recipeOutputs[recipe.id] = output }
                     }
                 }
             }
-            coreLog.info("claim buildings: catalogs loaded (\(buildings.count) buildings, \(recipes.count) recipes, \(toolSkillByType.count) tool types)")
+            // The name catalogs resolve the recipe templates' stack refs —
+            // `item_desc` covers Item-typed entries, `cargo_desc` the
+            // Cargo-typed ones (package recipes craft cargo).
+            var itemNames: [Int32: String] = [:]
+            for table in try await itemTables where table.tableName == "item_desc" {
+                for row in table.rows.rows {
+                    if let entry = try? RegionGamedataDecoder.idName(row) {
+                        itemNames[entry.id] = entry.name
+                    }
+                }
+            }
+            var cargoNames: [Int32: String] = [:]
+            for table in try await cargoTables where table.tableName == "cargo_desc" {
+                for row in table.rows.rows {
+                    if let entry = try? RegionGamedataDecoder.idName(row) {
+                        cargoNames[entry.id] = entry.name
+                    }
+                }
+            }
+            coreLog.info("claim buildings: catalogs loaded (\(buildings.count) buildings, \(recipes.count) recipes, \(toolSkillByType.count) tool types, \(itemNames.count) items, \(cargoNames.count) cargo)")
             if buildings.isEmpty && recipes.isEmpty, let cached {
                 return cached
             }
             let fresh = BuildingGamedata(
-                buildings: buildings, recipeNames: recipes, recipeSkills: recipeSkills, fetchedAt: .now
+                buildings: buildings, recipeNames: recipes, recipeSkills: recipeSkills,
+                recipeInputs: recipeInputs, recipeOutputs: recipeOutputs,
+                itemNames: itemNames, cargoNames: cargoNames, fetchedAt: .now
             )
             if !buildings.isEmpty || !recipes.isEmpty {
                 writeBuildingGamedataCache(fresh)

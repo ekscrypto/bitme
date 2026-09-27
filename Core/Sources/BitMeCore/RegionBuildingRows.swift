@@ -221,12 +221,26 @@ public struct BuildingDescInfo: Equatable, Codable, Sendable {
     }
 }
 
+/// A recipe stack entry's identity half — the id plus which catalog
+/// names it (`item_type` tag: Item → `item_desc`, Cargo → `cargo_desc`).
+public struct ItemStackRef: Equatable, Codable, Sendable {
+    let id: Int32
+    let isCargo: Bool
+
+    init(id: Int32, isCargo: Bool) {
+        self.id = id
+        self.isCargo = isCargo
+    }
+}
+
 /// `crafting_recipe_desc` row → the fields the workstation join needs:
-/// id, name, and the profession signals — the first `level_requirements`
+/// id, name, the profession signals — the first `level_requirements`
 /// skill id (the profession gate), else the first `tool_requirements` tool
 /// type (e.g. Foraging's Machete; resolved against `tool_type_desc` at
-/// load). Reads through `tool_requirements` (field 8) and stops; trailing
-/// fields stay unread in the row buffer.
+/// load) — and the first consumed/crafted stack entries, the arguments
+/// the `name` template's {1}/{0} refer to. Reads through
+/// `crafted_item_stacks` (field 13) and stops; trailing fields stay
+/// unread in the row buffer.
 public struct RecipeInfo: Equatable, Codable, Sendable {
     let id: Int32
     let name: String
@@ -235,6 +249,10 @@ public struct RecipeInfo: Equatable, Codable, Sendable {
     let skillID: Int32?
     /// First `tool_requirements` entry's `tool_type` — nil for hand recipes.
     let toolTypeID: Int32?
+    /// First `consumed_item_stacks` entry — the name template's {1}.
+    let input: ItemStackRef?
+    /// First `crafted_item_stacks` entry — the name template's {0}.
+    let output: ItemStackRef?
 }
 
 /// `tool_type_desc` row → the tool→skill join (e.g. Machete → Foraging).
@@ -286,10 +304,12 @@ enum RegionGamedataDecoder {
         return BuildingDescInfo(id: id, name: name, functions: functions)
     }
 
-    /// `crafting_recipe_desc` row → id, name, and the profession signals.
-    /// Reads fields in schema order through `tool_requirements`: the
-    /// `building_requirement` option (some: building_type + tier) rides a
-    /// tag byte, exactly like the craft-row's optional slot.
+    /// `crafting_recipe_desc` row → id, name, the profession signals, and
+    /// the name-template stack refs. Reads fields in schema order through
+    /// `crafted_item_stacks`: the `building_requirement` option (some:
+    /// building_type + tier) and the stack `durability` option ride tag
+    /// bytes, exactly like the craft-row's optional slot; the stack
+    /// `item_type` is a tag too (declaration order: 0 Item, 1 Cargo).
     static func recipe(_ data: Data) throws -> RecipeInfo {
         let reader = BSATNReader(data: data)
         let id = try reader.read() as Int32
@@ -311,7 +331,41 @@ enum RegionGamedataDecoder {
             _ = try reader.read() as Int32 // power
             return tool
         }.first
-        return RecipeInfo(id: id, name: name, skillID: skillID, toolTypeID: toolTypeID)
+        let input = try reader.readTypedArray { () throws -> ItemStackRef in
+            let itemID = try reader.read() as Int32 // item_id
+            _ = try reader.read() as Int32 // quantity
+            let isCargo = try reader.read() as UInt8 == 1 // item_type tag
+            _ = try reader.read() as Int32 // discovery_score
+            _ = try reader.read() as Float // consumption_chance
+            return ItemStackRef(id: itemID, isCargo: isCargo)
+        }.first
+        _ = try reader.readTypedArray { try reader.read() as Int32 } // discovery_triggers
+        _ = try reader.read() as Int32 // required_claim_tech_id
+        _ = try reader.read() as Int32 // full_discovery_score
+        _ = try reader.readTypedArray { () throws -> Void in
+            _ = try reader.read() as Int32 // skill_id
+            _ = try reader.read() as Float // quantity
+        } // experience_per_progress
+        let output = try reader.readTypedArray { () throws -> ItemStackRef in
+            let itemID = try reader.read() as Int32 // item_id
+            _ = try reader.read() as Int32 // quantity
+            let isCargo = try reader.read() as UInt8 == 1 // item_type tag
+            _ = try reader.readOptional { () throws -> Int32 in try reader.read() as Int32 } // durability
+            return ItemStackRef(id: itemID, isCargo: isCargo)
+        }.first
+        return RecipeInfo(
+            id: id, name: name, skillID: skillID, toolTypeID: toolTypeID,
+            input: input, output: output
+        )
+    }
+
+    /// `item_desc` / `cargo_desc` row head → id and name. Both catalogs
+    /// open with the same two fields; the rest stays unread.
+    static func idName(_ data: Data) throws -> (id: Int32, name: String) {
+        let reader = BSATNReader(data: data)
+        let id = try reader.read() as Int32
+        let name = try reader.readString()
+        return (id, name)
     }
 
     /// `tool_type_desc` row → id, name, skill_id (the first three fields).

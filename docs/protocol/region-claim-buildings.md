@@ -55,6 +55,8 @@ SELECT * FROM building_desc
 SELECT * FROM building_type_desc
 SELECT * FROM building_function_type_mapping_desc
 SELECT * FROM crafting_recipe_desc
+SELECT * FROM item_desc        -- recipe-name templates resolve {0}/{1} against this
+SELECT * FROM cargo_desc       -- …and Cargo-typed stack refs against this
 SELECT * FROM building_nickname_state
 
 -- craft tasks: per-building equality for each building id in the claim
@@ -80,6 +82,9 @@ subscriptions — the list stays live with no re-querying.
 | `claim_local_state` | `entity_id: u64, supplies: i32, building_maintenance: f32, num_tiles: i32, num_tile_neighbors: u32, location: Option<Ref>, treasury: u32, …` | entity_id |
 | `claim_member_state` | (see §2) | player_entity_id, claim_entity_id, … |
 | `passive_craft_state` | `entity_id: u64, owner_entity_id: u64, recipe_id: i32, building_entity_id: u64, timestamp: micros-since-epoch (i64), status: Queued\|Processing\|Complete, slot: Option<u32>` | building_entity_id, entity_id, owner_entity_id |
+| `crafting_recipe_desc` | `id: i32, name: string, time_requirement: f32, stamina_requirement: f32, tool_durability_lost: i32, building_requirement: Option<{building_type: i32, tier: i32}>, level_requirements: [{skill_id: i32, level: i32}], tool_requirements: [{tool_type: i32, level: i32, power: i32}], consumed_item_stacks: [{item_id: i32, quantity: i32, item_type: Item\|Cargo, discovery_score: i32, consumption_chance: f32}], discovery_triggers: [i32], required_claim_tech_id: i32, full_discovery_score: i32, experience_per_progress: [{skill_id: i32, quantity: f32}], crafted_item_stacks: [{item_id: i32, quantity: i32, item_type: Item\|Cargo, durability: Option<i32>}], actions_required: i32, …` | id |
+| `item_desc` | `id: i32, name: string, description: string, volume: i32, …` | id |
+| `cargo_desc` | `id: i32, name: string, description: string, volume: i32, …` | id |
 | `progressive_action_state` | `entity_id: u64, building_entity_id: u64, function_type: i32, progress: i32, recipe_id: i32, craft_count: i32, last_crit_outcome: i32, owner_entity_id: u64, lock_expiration: micros, preparation: bool` | building_entity_id, entity_id, owner_entity_id |
 | `inventory_state` | `entity_id: u64, pockets: [ { volume: i32, contents: Option<{item_id, quantity, item_type, durability}>, locked: bool } ], inventory_index: i32, cargo_index: i32, owner_entity_id: u64, player_owner_entity_id: u64` | entity_id, **owner_entity_id**, player_owner_entity_id |
 
@@ -97,6 +102,19 @@ encoding.)
 - **storage** ⇔ any entry has `storage_slots > 0` or `cargo_slots > 0`;
 - buildings whose `name` contains "bank" are personal storage, excluded
   from claim rollups (BitJita policy — the relay does the same).
+
+### Recipe names
+
+`crafting_recipe_desc.name` is a format template for all but ~50 of the
+~7.8k recipes — 54 shapes, dominated by `Craft {0}` (×2257), `Scrap {1}`
+(×1849), and `Recraft {1}` (×1471). `{0}` is the first
+`crafted_item_stacks` entry's name and `{1}` the first
+`consumed_item_stacks` entry's ("Braid {0} from {1}" → "Braid Rough Rope
+from Rough Cloth Strip"); some templates reference only `{1}`. Each
+stack's `item_type` tag picks the name catalog: 0 Item → `item_desc`
+(8.4k rows), 1 Cargo → `cargo_desc` (636 rows — package recipes craft
+cargo). The first-stack rule resolves all but a handful of recipes; a
+template whose referenced stack is missing falls back to the raw column.
 
 ## 4. Protocol notes
 

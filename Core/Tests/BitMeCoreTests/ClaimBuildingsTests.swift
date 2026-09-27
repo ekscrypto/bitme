@@ -172,6 +172,33 @@ struct ClaimBuildingsTests {
         #expect(projected.craftsOverflow == 8)
     }
 
+    @Test func projectionFormatsRecipeTemplateNames() {
+        var session = EphemeralState.Session(
+            entityID: "1000", loop: CancellableTask(), streamLoop: CancellableTask()
+        )
+        session.buildings.status = .live
+        session.buildings.playerEntityID = 1000
+        session.buildings.buildings = [
+            3001: RegionBuilding(entityID: 3001, claimEntityID: 2000, buildingDescriptionID: 1200)
+        ]
+        session.buildings.crafts = [
+            1: RegionCraft(
+                entityID: 1, ownerEntityID: 1000, buildingEntityID: 3001, recipeID: 109005,
+                kind: .passive(status: .processing, startedAtMicros: 0)
+            )
+        ]
+        session.buildings.gamedata = BuildingGamedata(
+            recipeNames: [109005: "Braid {0} from {1}"],
+            recipeInputs: [109005: ItemStackRef(id: 1_464_553_255, isCargo: false)],
+            recipeOutputs: [109005: ItemStackRef(id: 1_090_004, isCargo: false)],
+            itemNames: [1_090_004: "Rough Rope", 1_464_553_255: "Rough Cloth Strip"]
+        )
+
+        let projected = WorkstationsRep.from(session: session)
+        #expect(projected.crafts.count == 1)
+        #expect(projected.crafts.first?.recipeName == "Braid Rough Rope from Rough Cloth Strip")
+    }
+
     @Test func eventBufferPoolsRowEventsAndFlushesStatusEvents() async {
         // Lock-protected collector — flush callbacks arrive on timer tasks.
         final class Collector: @unchecked Sendable {
@@ -213,10 +240,14 @@ struct ClaimBuildingsTests {
 
     /// A `crafting_recipe_desc` row body — id and name, then exactly the
     /// field prefix the decoder walks: floats, durability, the
-    /// building_requirement option, level_requirements, tool_requirements.
+    /// building_requirement option, level_requirements, tool_requirements,
+    /// consumed_item_stacks, the skip fields, experience_per_progress,
+    /// crafted_item_stacks.
     private static func recipeRow(
         id: Int32, name: String,
-        levelSkills: [Int32] = [], toolTypes: [Int32] = []
+        levelSkills: [Int32] = [], toolTypes: [Int32] = [],
+        inputs: [(id: Int32, isCargo: Bool)] = [],
+        outputs: [(id: Int32, isCargo: Bool)] = []
     ) -> Data {
         var w = Wire()
         w.i32(id)
@@ -232,6 +263,24 @@ struct ClaimBuildingsTests {
         w.u32(UInt32(toolTypes.count))
         for tool in toolTypes {
             w.i32(tool); w.i32(3); w.i32(20) // tool_type, level, power
+        }
+        w.u32(UInt32(inputs.count)) // consumed_item_stacks
+        for input in inputs {
+            w.i32(input.id); w.i32(1) // item_id, quantity
+            w.u8(input.isCargo ? 1 : 0) // item_type tag: 0 Item, 1 Cargo
+            w.i32(0) // discovery_score
+            w.f32(1) // consumption_chance
+        }
+        w.u32(0) // discovery_triggers
+        w.i32(0) // required_claim_tech_id
+        w.i32(0) // full_discovery_score
+        w.u32(1) // experience_per_progress
+        w.i32(3); w.f32(0.5) // skill_id, quantity
+        w.u32(UInt32(outputs.count)) // crafted_item_stacks
+        for output in outputs {
+            w.i32(output.id); w.i32(1) // item_id, quantity
+            w.u8(output.isCargo ? 1 : 0) // item_type tag: 0 Item, 1 Cargo
+            w.u8(1) // durability: none
         }
         return w.data
     }
@@ -253,6 +302,90 @@ struct ClaimBuildingsTests {
         )
         #expect(tooled.skillID == nil)
         #expect(tooled.toolTypeID == 14)
+    }
+
+    @Test func recipeRowDecodesTemplateStackRefs() throws {
+        // Real shapes from the catalogs: the braid crafts Rough Rope (item
+        // 1090004) from Rough Cloth Strip (1464553255)…
+        let braid = try RegionGamedataDecoder.recipe(
+            Self.recipeRow(
+                id: 109005, name: "Braid {0} from {1}", toolTypes: [8],
+                inputs: [(id: 1_464_553_255, isCargo: false)],
+                outputs: [(id: 1_090_004, isCargo: false)]
+            )
+        )
+        #expect(braid.input == ItemStackRef(id: 1_464_553_255, isCargo: false))
+        #expect(braid.output == ItemStackRef(id: 1_090_004, isCargo: false))
+
+        // …and package recipes craft cargo (Rough Wood Log Package,
+        // cargo 150000) from an item.
+        let pack = try RegionGamedataDecoder.recipe(
+            Self.recipeRow(
+                id: 60001, name: "Package {1} into {0}",
+                inputs: [(id: 1_010_001, isCargo: false)],
+                outputs: [(id: 150_000, isCargo: true)]
+            )
+        )
+        #expect(pack.input == ItemStackRef(id: 1_010_001, isCargo: false))
+        #expect(pack.output == ItemStackRef(id: 150_000, isCargo: true))
+
+        // No stacks on file → nil refs, the raw-name passthrough case.
+        let bare = try RegionGamedataDecoder.recipe(
+            Self.recipeRow(id: 79, name: "Scrap {1}", toolTypes: [4])
+        )
+        #expect(bare.input == nil)
+        #expect(bare.output == nil)
+    }
+
+    @Test func idNameDecodesItemAndCargoHeads() throws {
+        // `item_desc` and `cargo_desc` open with the same id/name pair.
+        var w = Wire()
+        w.i32(1_090_004); w.string("Rough Rope")
+        let item = try RegionGamedataDecoder.idName(w.data)
+        #expect(item.id == 1_090_004)
+        #expect(item.name == "Rough Rope")
+
+        var c = Wire()
+        c.i32(150_000); c.string("Rough Wood Log Package")
+        let cargo = try RegionGamedataDecoder.idName(c.data)
+        #expect(cargo.id == 150_000)
+        #expect(cargo.name == "Rough Wood Log Package")
+    }
+
+    @Test func recipeDisplayNamesResolveTemplates() {
+        let gamedata = BuildingGamedata(
+            recipeNames: [
+                109005: "Braid {0} from {1}",
+                14000: "Craft {0}",
+                60001: "Package {1} into {0}",
+                77: "Oak Plank",
+                78: "Scrap {1}"
+            ],
+            recipeInputs: [
+                109005: ItemStackRef(id: 1_464_553_255, isCargo: false),
+                60001: ItemStackRef(id: 1_010_001, isCargo: false)
+            ],
+            recipeOutputs: [
+                109005: ItemStackRef(id: 1_090_004, isCargo: false),
+                14000: ItemStackRef(id: 11_014, isCargo: false),
+                60001: ItemStackRef(id: 150_000, isCargo: true)
+            ],
+            itemNames: [
+                1_090_004: "Rough Rope", 1_464_553_255: "Rough Cloth Strip",
+                11_014: "Flint Axe", 1_010_001: "Rough Wood Log"
+            ],
+            cargoNames: [150_000: "Rough Wood Log Package"]
+        )
+        #expect(gamedata.recipeDisplayName(109005) == "Braid Rough Rope from Rough Cloth Strip")
+        #expect(gamedata.recipeDisplayName(14000) == "Craft Flint Axe")
+        #expect(gamedata.recipeDisplayName(60001) == "Package Rough Wood Log into Rough Wood Log Package")
+        // Literal names pass through untouched.
+        #expect(gamedata.recipeDisplayName(77) == "Oak Plank")
+        // Unknown recipe → nil (the view's "Recipe <id>" fallback).
+        #expect(gamedata.recipeDisplayName(999) == nil)
+        // A template whose referenced stack is missing keeps the raw
+        // column — never a half-substituted string.
+        #expect(gamedata.recipeDisplayName(78) == "Scrap {1}")
     }
 
     @Test func toolTypeDescRowDecodes() throws {
