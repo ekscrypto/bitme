@@ -58,3 +58,38 @@ copy of the **BitCraft module schemas**: `bitjita-schema-global.json` and
 `player_username_state`, `user_state`, `region_connection_info`, … — and are
 what `docs/relay-data-requirements.md` was prepared from. Check them first
 when a question is "does the game have a table/field for X?".
+
+## Working notes (hard-won, 2026-09 claim-buildings work)
+
+- **Claim-buildings sync**: reference is
+  [docs/protocol/region-claim-buildings.md](docs/protocol/region-claim-buildings.md).
+  All region-DB traffic rides the single region-leg websocket
+  (`GlobalSessionClient` yields it as `.regionLeg`) — the game allows one
+  live session per account per database; never open a second region
+  connection. Row events pool 0.5 s in `RegionBuildingsClient.EventBuffer`
+  (one intent per pool); new tables go through `consume()` + `recordDelta`.
+  Phone guardrails: never subscribe `building_state` (~74K rows/region) or
+  `location_state` (~13M) unfiltered; `inventory_state` per-owner only.
+  The projection drops completed passive crafts and caps at 200
+  (`craftsOverflow`).
+- **spacetimedb-swift-sdk (our fork)**: `connect()` returns *before* the
+  handshake — `.connected` means InitialConnection. Attach `tableEvents`
+  streams *before* `subscribe`, or the initial snapshot is missed.
+  Transport death fails pending calls and emits `.disconnected` (fixed
+  2026-09-26; it used to hang callers silently). App tests do not cover
+  this layer — adapters stub it; suspect the SDK fork first when only
+  live behavior breaks.
+- **Architecture discipline that bites**: mutators are pure — no logging,
+  no clocks; diagnose at the activity/adapter level (e.g. the loop's
+  "received N pooled event(s)" debug line). Activities read no state —
+  use the carrier pattern (`ClaimCarrier`, `ResourceStreamCarrier`).
+- **Testing**: the full suite runs in <1 s — run it after every edit.
+  Waits are event-driven (`RepCollecting.collect`); never write
+  wall-clock "nothing happened within X ms" assertions — they go flaky
+  under load. Machine-flow tests drive the real machine over scripted
+  adapters (see the `AccountDrivenSignInTests` harness).
+- **Protocol facts**: the server answers `sign_in` with a ReducerResult
+  in ~200 ms — anything slower is a dead handshake, not server slowness.
+  BSATN row decoders pin schema field order; after a game update,
+  re-verify against `bitjita-schema-region.json`. Tap captures
+  (gitignored, `tools/tap/captures/`) decode via `tools/tap/decode.js`.
