@@ -108,25 +108,21 @@ struct SignInFlowTests {
         ))
     }
 
-    /// Collects ViewReps until `finished` matches, with a timeout backstop.
-    /// `dispatch` runs after subscribing so no intermediate rep is missed.
+    /// Collects ViewReps until `finished` matches. `dispatch` runs after
+    /// subscribing so no intermediate rep is missed; the wait itself is
+    /// event-driven — see `RepCollecting.collect`.
     private func collect(
         _ machine: StateMachine,
         dispatch: (@Sendable () async -> Void)? = nil,
         until finished: @Sendable @escaping (ViewRep) -> Bool,
-        timeout: TimeInterval = 5
+        timeout: TimeInterval = 10
     ) async -> RepCollector {
         let collector = RepCollector()
-        let task = machine.viewRep.sink { rep in
-            collector.append(rep)
-        }
-        await dispatch?()
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if collector.contains(finished) { break }
-            try? await Task.sleep(for: .milliseconds(5))
-        }
-        task.cancel()
+        await RepCollecting.collect(
+            machine, dispatch: dispatch,
+            onRep: { collector.append($0) },
+            until: finished, timeout: timeout
+        )
         return collector
     }
 
@@ -247,9 +243,17 @@ struct SignInFlowTests {
         let account = BitCraftAccount(email: "ekscrypto@gmail.com", token: "jwt")
         let auth = SimulatedAuth()
         let machine = makeMachine(auth: auth, restoredAccount: account)
-        await collect(machine, until: { rep in
+        let reps = await collect(machine, dispatch: {
+            await machine.start()
+        }, until: { rep in
             guard case .onboarding(let onboarding) = rep else { return false }
             return onboarding.bitCraftAccountEmail == "ekscrypto@gmail.com"
+        })
+        #expect(reps.contains { rep in
+            if case .onboarding(let onboarding) = rep {
+                return onboarding.bitCraftAccountEmail == "ekscrypto@gmail.com"
+            }
+            return false
         })
     }
 

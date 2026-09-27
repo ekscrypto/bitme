@@ -243,23 +243,19 @@ struct StateMachineTests {
         var count: Int { lock.withLock { reps.count } }
     }
 
-    /// Collects ViewReps until `finished` matches, with a timeout backstop.
-    /// `dispatch` runs after subscribing so no intermediate rep is missed
-    /// (the broadcaster replays only the latest value).
+    /// Collects ViewReps until `finished` matches. `dispatch` runs after
+    /// subscribing so no intermediate rep is missed (the broadcaster replays
+    /// only the latest value). The wait itself is event-driven — see
+    /// `RepCollecting.collect`.
     func collect(_ machine: StateMachine, dispatch: (@Sendable () async -> Void)? = nil,
                  until finished: @Sendable @escaping (ViewRep) -> Bool,
-                 timeout: TimeInterval = 5) async -> RepCollector {
+                 timeout: TimeInterval = 10) async -> RepCollector {
         let collector = RepCollector()
-        let task = machine.viewRep.sink { rep in
-            collector.append(rep)
-        }
-        await dispatch?()
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if collector.contains(finished) { break }
-            try? await Task.sleep(for: .milliseconds(5))
-        }
-        task.cancel()
+        await RepCollecting.collect(
+            machine, dispatch: dispatch,
+            onRep: { collector.append($0) },
+            until: finished, timeout: timeout
+        )
         return collector
     }
 
@@ -325,6 +321,7 @@ struct StateMachineTests {
         // Depletion anchor needs the learned pacing — nil on the first poll.
         #expect(session.bush?.depletesAtMs == nil)
         #expect(session.bush?.harvestedPct != nil)
+        await machine.ingest(Intent.SignOut()) // retire the loops
     }
 
     /// 2026-09 playtest regression: T2 event berry bushes report null health
@@ -360,6 +357,7 @@ struct StateMachineTests {
         #expect(bushRep.harvestedPct == nil)
         #expect(bushRep.depletesAtMs == nil)
         #expect(bushRep.windowEndsAtMs == Double(Self.nowMs + 480_000))
+        await machine.ingest(Intent.SignOut()) // retire the loops
     }
 
     @Test func restoredIdentitySkipsOnboarding() async {
@@ -388,6 +386,7 @@ struct StateMachineTests {
             if case .onboarding(let o) = rep { return o.isResolving }
             return false
         } == false)
+        await machine.ingest(Intent.SignOut()) // retire the loops
     }
 
     @Test func citricSpawnAppearsInViewRep() async {
@@ -417,6 +416,7 @@ struct StateMachineTests {
         }
         #expect(citricRep.entityID == "9000")
         #expect(citricRep.isNewlySpawned == true)
+        await machine.ingest(Intent.SignOut()) // retire the loops
     }
 
     @Test func liveBuffsCarryGamedataNamesAndStats() async {
@@ -464,6 +464,7 @@ struct StateMachineTests {
         // Stamina regen sorts ahead of health regen for display.
         #expect(rep.stats.map(\.statID) == [3, 2])
         #expect(rep.stats.first?.displayValue == "+19")
+        await machine.ingest(Intent.SignOut()) // retire the loops
     }
 
     @Test func signOutClearsIdentity() async {
@@ -558,6 +559,7 @@ struct StateMachineTests {
         #expect(map.nearby.first?.resourceID == 38)
         // No stream scripted — the parked connection never goes live.
         #expect(map.stream != .live)
+        await machine.ingest(Intent.SignOut()) // retire the loops
     }
 
     @Test func streamDeltasMaintainTallyAndSpawnFeed() async {
@@ -610,6 +612,7 @@ struct StateMachineTests {
         #expect(map.nearby.map { "\($0.name ?? "?")×\($0.count)" }
                 == ["Baited School Of Muddy Auratus×1", "Giant Bountiful Strawberry Bush×1"])
         #expect(map.populatedTiles == 2)
+        await machine.ingest(Intent.SignOut()) // retire the loops
     }
 
     @Test func resyncRefetchesTheWindow() async {
@@ -628,6 +631,7 @@ struct StateMachineTests {
         await machine.ingest(Intent.ResolvePlayer(name: "whisper"))
         await waitFor { relay.totalWindowFetches >= 2 }
         #expect(relay.totalWindowFetches >= 2)
+        await machine.ingest(Intent.SignOut()) // retire the loops
     }
 
     @Test func deltaFromAMismatchedDictionaryRefetches() async {
@@ -650,6 +654,7 @@ struct StateMachineTests {
         await machine.ingest(Intent.ResolvePlayer(name: "whisper"))
         await waitFor { relay.totalWindowFetches >= 2 }
         #expect(relay.totalWindowFetches >= 2)
+        await machine.ingest(Intent.SignOut()) // retire the loops
     }
 
     @Test func streamStaysOffWhilePlayerNotLive() async {
@@ -679,6 +684,7 @@ struct StateMachineTests {
         }
         #expect(relay.stream?.connectCount == 0)
         #expect(session.resourceMap.stream == .off)
+        await machine.ingest(Intent.SignOut()) // retire the loops
     }
 
     /// Pocket-Crafter configuration: a live overworld player, but the map
@@ -716,6 +722,7 @@ struct StateMachineTests {
         #expect(relay.stream?.connectCount == 0)
         #expect(session.resourceMap.stream == .off)
         #expect(session.resourceMap.nearby.isEmpty)
+        await machine.ingest(Intent.SignOut()) // retire the loops
     }
 
     /// Terrain plane whose super grid covers the fixture window's center
@@ -788,6 +795,7 @@ struct StateMachineTests {
         #expect(collector.contains { $0.tally[3] == 1 })
         // The stream's anchor rides along once subscribed.
         #expect(collector.contains { $0.anchorX == 100 && $0.anchorZ == 100 })
+        await machine.ingest(Intent.SignOut()) // retire the loops
     }
 
     /// Regression for the render cache key: tile-affecting changes bump
@@ -811,6 +819,7 @@ struct StateMachineTests {
         let versions = collector.compactVersions
         #expect(versions.count >= 1)
         #expect(versions.max()! - versions.min()! <= 2) // window + dictionary bumps only
+        await machine.ingest(Intent.SignOut()) // retire the loops
     }
 
     @Test func runningActionsSurfaceBaseFirstWithResolvedTargets() async {
@@ -860,6 +869,7 @@ struct StateMachineTests {
         #expect(session.actions.first?.targetName == "Flint Pile")
         #expect(session.actions.last?.targetName == nil)
         #expect(session.actions.first?.endsAtMs == Double(Self.nowMs + 4_000))
+        await machine.ingest(Intent.SignOut()) // retire the loops
     }
 
     /// Polls a condition with a timeout backstop (for effects visible only
@@ -908,6 +918,7 @@ struct StateMachineTests {
         #expect(session.entityID == "1000")
         #expect(session.username == "Whisper")
         #expect(!reps.contains { sessionRep($0)?.entityID == "2000" })
+        await machine.ingest(Intent.SignOut()) // retire the loops
     }
 
     /// Regression: resolving a *different* character while a session is
@@ -937,9 +948,7 @@ struct StateMachineTests {
         }, until: { rep in
             guard let session = sessionRep(rep) else { return false }
             return session.entityID == "3000" && !session.resourceMap.nearby.isEmpty
-        }, timeout: 15) // full-suite parallelism can starve this chain
-                         // (poll → window fetch → dictionary) past the 5 s
-                         // default; solo it finishes in milliseconds.
+        })
         guard case .session(let session)? = second.last(where: {
             sessionRep($0)?.entityID == "3000"
         }) else {
@@ -950,6 +959,7 @@ struct StateMachineTests {
         // The replacement carries its own resource map (window refetched for
         // the new entity, not inherited stale state).
         #expect(session.resourceMap.nearby.isEmpty == false)
+        await machine.ingest(Intent.SignOut()) // retire the loops
     }
 }
 

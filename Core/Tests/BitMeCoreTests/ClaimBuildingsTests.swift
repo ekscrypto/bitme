@@ -343,6 +343,7 @@ struct ClaimBuildingsTests {
         #expect(stations.crafts[1].phase == .active)
         #expect(stations.crafts[1].progress == 3)
         #expect(stations.crafts[1].craftCount == 5)
+        await machine.ingest(Intent.SignOut()) // retire the loops
     }
 
     @Test func endedSessionTearsDownTheSync() async throws {
@@ -383,27 +384,25 @@ struct ClaimBuildingsTests {
             return false
         }
         #expect(await Self.waitForTermination(of: claimBuildings))
+        await machine.ingest(Intent.SignOut()) // retire the loops
     }
 
     // MARK: - Helpers
 
-    /// Collects ViewReps until `finished` matches (timeout backstop);
+    /// Collects ViewReps until `finished` matches (event-driven — see
+    /// `RepCollecting.collect`; the timeout is a broken-flow backstop);
     /// returns the first matching rep.
     private func collectUntil(
         _ machine: StateMachine,
         until finished: @Sendable @escaping (ViewRep) -> Bool,
-        timeout: TimeInterval = 20
+        timeout: TimeInterval = 10
     ) async -> ViewRep? {
         let collector = AccountDrivenSignInTests.RepCollector()
-        let task = machine.viewRep.sink { collector.append($0) }
-        defer { task.cancel() }
-        await Task.detached(priority: .high) {
-            let deadline = Date().addingTimeInterval(timeout)
-            while Date() < deadline {
-                if collector.contains(finished) { break }
-                try? await Task.sleep(for: .milliseconds(5))
-            }
-        }.value
+        await RepCollecting.collect(
+            machine,
+            onRep: { collector.append($0) },
+            until: finished, timeout: timeout
+        )
         return collector.last(where: finished)
     }
 

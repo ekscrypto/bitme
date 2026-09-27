@@ -256,29 +256,22 @@ struct AccountDrivenSignInTests {
 
     }
 
-    /// Collects ViewReps until `finished` matches, with a timeout backstop.
+    /// Collects ViewReps until `finished` matches. The wait is event-driven —
+    /// see `RepCollecting.collect` — so `timeout` is a backstop for a broken
+    /// flow, never a cost on the happy path (the old 5 ms polling stretched
+    /// to its deadline whenever the suite ran loaded).
     private func collect(
         _ machine: StateMachine,
         dispatch: (@Sendable () async -> Void)? = nil,
         until finished: @Sendable @escaping (ViewRep) -> Bool,
-        // Full-suite parallelism can starve the staged waits past the 5 s
-        // default (same as StateMachineTests' replacement-session test);
-        // solo, every flow here finishes in milliseconds.
-        timeout: TimeInterval = 20
+        timeout: TimeInterval = 10
     ) async -> RepCollector {
         let collector = RepCollector()
-        let task = machine.viewRep.sink { collector.append($0) }
-        await dispatch?()
-        // Poll off the main actor — under full-suite load the main actor's
-        // queue can starve a Task.sleep-based loop past any deadline.
-        await Task.detached(priority: .high) {
-            let deadline = Date().addingTimeInterval(timeout)
-            while Date() < deadline {
-                if collector.contains(finished) { break }
-                try? await Task.sleep(for: .milliseconds(5))
-            }
-        }.value
-        task.cancel()
+        await RepCollecting.collect(
+            machine, dispatch: dispatch,
+            onRep: { collector.append($0) },
+            until: finished, timeout: timeout
+        )
         return collector
     }
 
