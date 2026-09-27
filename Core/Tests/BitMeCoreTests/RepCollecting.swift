@@ -9,25 +9,35 @@ import Foundation
 /// awaited rep had long since arrived.
 enum RepCollecting {
 
-    /// Subscribes `onRep` to the machine's rep stream — the single
-    /// subscription for the wait, since the broadcaster replays only the
-    /// latest value and a second subscriber would miss intermediate reps —
-    /// runs `dispatch`, and returns as soon as `until` matches any rep.
-    /// The match is evaluated inside the sink callback, off every actor the
-    /// test or machine occupies, so the wait costs nothing beyond the
-    /// flow's own latency. `timeout` is a backstop paid only when the flow
-    /// under test is broken, never on the happy path.
-    static func collect(
-        _ machine: StateMachine,
+    /// Subscribes `onRep` to the given rep channel (the machine's screen
+    /// channel for its configuration — `machine.viewRep` or
+    /// `machine.crafterRep` — or a domain channel like
+    /// `machine.workstationsRep`) — the single subscription for the wait,
+    /// since the broadcaster replays only the latest value and a second
+    /// subscriber would miss intermediate reps — runs `dispatch`, and
+    /// returns as soon as `until` matches any rep (returning that rep; nil
+    /// only on timeout). The broadcaster's replay makes a collect issued
+    /// after an `ingest` still see that ingest's final rep. The match is
+    /// evaluated inside the sink callback, off every actor the test or
+    /// machine occupies, so the wait costs nothing beyond the flow's own
+    /// latency. `timeout` is a backstop paid only when the flow under test
+    /// is broken, never on the happy path.
+    @discardableResult
+    static func collect<Rep: Sendable>(
+        _ channel: RepBroadcaster<Rep>,
         dispatch: (@Sendable () async -> Void)? = nil,
-        onRep: @Sendable @escaping (ViewRep) -> Void,
-        until finished: @Sendable @escaping (ViewRep) -> Bool,
+        onRep: @Sendable @escaping (Rep) -> Void = { _ in },
+        until finished: @Sendable @escaping (Rep) -> Bool,
         timeout: TimeInterval = 10
-    ) async {
+    ) async -> Rep? {
+        let matchedRep = MatchedRep<Rep>()
         let matched = AsyncStream<Void> { continuation in
-            let task = machine.viewRep.sink { rep in
+            let task = channel.sink { rep in
                 onRep(rep)
-                if finished(rep) { continuation.yield(()) }
+                if finished(rep) {
+                    matchedRep.set(rep)
+                    continuation.yield(())
+                }
             }
             continuation.onTermination = { _ in task.cancel() }
         }
@@ -44,5 +54,16 @@ enum RepCollecting {
             _ = await group.next()
             group.cancelAll()
         }
+        return matchedRep.rep
     }
+}
+
+/// Lock-protected box for the matched rep — sink callbacks arrive off the
+/// waiting task.
+private final class MatchedRep<Rep: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _rep: Rep?
+
+    func set(_ rep: Rep) { lock.withLock { _rep = rep } }
+    var rep: Rep? { lock.withLock { _rep } }
 }

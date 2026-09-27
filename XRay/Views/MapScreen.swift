@@ -79,7 +79,7 @@ struct MapScreen: View {
                 switch viewRep {
                 case .session(let session): self.session = session
                 case .onboarding: self.session = nil
-                case .bitCraftSignIn, .gameSessionPrompt: break // no session while signing in
+                case .signIn: break // no session while signing in
                 }
             }
         }

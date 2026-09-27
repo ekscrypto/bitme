@@ -65,11 +65,8 @@ public actor RepBroadcaster<Rep: Sendable> {
     }
 }
 
-/// The screen-shaped projection the UI (and CLI) subscribe to.
+/// The name-driven screen projection's channel (X-Ray, the CLI).
 public typealias ViewRepBroadcaster = RepBroadcaster<ViewRep>
 
-/// The claim-buildings projection (`ViewRep.Session.Workstations`) as its
-/// own channel — hosts whose whole screen is the workstation list
-/// (Pocket Crafter) subscribe `workstationsRep` and re-render only when
-/// the buildings state moves, not on every session rep.
-public typealias WorkstationsRep = ViewRep.Session.Workstations
+/// The account-driven screen projection's channel (Pocket Crafter).
+public typealias CrafterRepBroadcaster = RepBroadcaster<CrafterRep>

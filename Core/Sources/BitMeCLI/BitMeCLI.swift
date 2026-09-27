@@ -53,13 +53,8 @@ struct BitMeCLI {
                         print("exit: resolve failed")
                         exit(1)
                     }
-                case .bitCraftSignIn:
+                case .signIn:
                     break // the CLI never drives the sign-in flow
-                case .gameSessionPrompt(let prompt):
-                    // Account-driven apps only — the CLI resolves by name
-                    // and never reaches the game-session gate.
-                    print("game-session gate: \(prompt.username ?? "?")"
-                        + " signed_in_elsewhere=\(prompt.signedInElsewhere.map(String.init) ?? "unknown")")
                 case .session(let session):
                     if command == "resolve" {
                         // Wait for the first poll so signed_in is live.

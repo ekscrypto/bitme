@@ -4,10 +4,12 @@ import os
 /// The single source of truth (fenex-light ADR-001): a `final actor` owning
 /// all `PersistentState` and `EphemeralState`, processing intents serially
 /// (the actor's isolation is the guarantee — no locks), spawning activities
-/// for async work, and publishing a derived `ViewRep` the UI subscribes to.
+/// for async work, and publishing the derived screen rep the UI subscribes
+/// to: `viewRep` (name-driven — X-Ray, the CLI) or `crafterRep`
+/// (account-driven — Pocket Crafter), chosen by configuration.
 ///
 /// Internal state is not queryable (ADR-014): it is read only inside intent
-/// mutations and `ViewRep.from`. Observers use `viewRep.values`.
+/// mutations and the rep projections. Observers use the channel's `.values`.
 public final actor StateMachine: IntentIngestor {
     /// Optional subsystems an app host turns on or off at construction.
     /// Seeded into ephemeral state once; intents gate their activity spawns
@@ -31,9 +33,14 @@ public final actor StateMachine: IntentIngestor {
         }
     }
 
-    /// The UI subscribes here. `nonisolated` so callers can reach `.values`
-    /// without an actor hop.
+    /// The screen channel name-driven hosts (X-Ray, the CLI) subscribe to.
+    /// `nonisolated` so callers can reach `.values` without an actor hop.
     public nonisolated let viewRep: ViewRepBroadcaster
+    /// The screen channel for the account-driven host (Pocket Crafter) —
+    /// same broadcaster, its own projection (`CrafterRep`). Exactly one of
+    /// the two screen channels is ever published: the configuration picks
+    /// it at construction, and the other keeps its bootstrap rep forever.
+    public nonisolated let crafterRep: CrafterRepBroadcaster
     /// Tile-data channel for the hex-grid map renderer (`MapRep`) — the raw
     /// window/terrain/dictionary state, published only when it changes.
     /// Same `nonisolated` reasoning as `viewRep`.
@@ -41,8 +48,8 @@ public final actor StateMachine: IntentIngestor {
     /// Claim-buildings channel (`WorkstationsRep`) — the workstations join,
     /// published only when the buildings state moves (the `mapRep`
     /// precedent): stamina ticks and poll-only ingests neither re-run the
-    /// join nor rebroadcast it. `ViewRep.Session.workstations` rides the
-    /// same cached projection, so the session channel is no costlier.
+    /// join nor rebroadcast it. Account-driven hosts render this channel
+    /// directly — the session rep does not carry a copy.
     public nonisolated let workstationsRep: RepBroadcaster<WorkstationsRep>
 
     private let adapters: Adapters
@@ -61,14 +68,17 @@ public final actor StateMachine: IntentIngestor {
         self.adapters = adapters
         self.ephemeralState.resourceMapEnabled = configuration.resourceMapEnabled
         self.ephemeralState.accountDrivenSignIn = configuration.accountDrivenSignIn
-        // Bootstrap rep: the first frame an app renders. Account-driven apps
-        // open on email entry; a restored account/character takes over on
-        // bootstrap (or the link resumes) within a frame or two.
-        self.viewRep = ViewRepBroadcaster(initial: configuration.accountDrivenSignIn
-            ? .bitCraftSignIn(ViewRep.BitCraftSignIn(phase: .idle, error: nil, canDismiss: false))
-            : .onboarding(ViewRep.Onboarding(
-                isResolving: false, lookingUpName: nil, error: nil, resolvedOfflineHint: false
-              )))
+        // Bootstrap reps: the first frame an app renders. Name-driven
+        // hosts open on name entry; account-driven hosts on email entry
+        // (a restored account/character takes over on bootstrap — or the
+        // link resumes — within a frame or two). The channel the other
+        // flow would use keeps its bootstrap rep; it is never published.
+        self.viewRep = ViewRepBroadcaster(initial: .onboarding(ViewRep.Onboarding(
+            isResolving: false, lookingUpName: nil, error: nil, resolvedOfflineHint: false
+        )))
+        self.crafterRep = CrafterRepBroadcaster(initial: .signIn(BitCraftSignIn(
+            phase: .idle, error: nil, canDismiss: false
+        )))
         self.mapRep = RepBroadcaster<MapRep>(initial: .empty)
         self.workstationsRep = RepBroadcaster<WorkstationsRep>(initial: .empty)
     }
@@ -112,19 +122,30 @@ public final actor StateMachine: IntentIngestor {
         // sorted) re-runs only when the buildings-state version moved — a
         // pooled-events ingest, a leg reset, or teardown. Everything else
         // (polls, stamina, stream ticks) reuses the cached projection for
-        // both the session rep and the workstations channel.
+        // the workstations channel. (Name-driven machines never move the
+        // buildings state — no game session, no region leg — so the join
+        // never runs for them.)
         let workstations: WorkstationsRep
         if let session = ephemeralState.session, session.buildings.version != lastWorkstationsVersion {
             lastWorkstationsVersion = session.buildings.version
-            workstations = ViewRep.workstations(from: session)
+            workstations = WorkstationsRep.from(session: session)
         } else if ephemeralState.session == nil {
             workstations = .empty
         } else {
             workstations = lastWorkstationsRep
         }
-        await viewRep.send(ViewRep.from(
-            persistent: persistentState, ephemeral: ephemeralState, workstations: workstations
-        ))
+        // The configuration picks the screen channel: the account-driven
+        // projection for Pocket Crafter, the name-driven one for X-Ray and
+        // the CLI. The unpublished channel keeps its bootstrap rep.
+        if ephemeralState.accountDrivenSignIn {
+            await crafterRep.send(CrafterRep.from(
+                persistent: persistentState, ephemeral: ephemeralState
+            ))
+        } else {
+            await viewRep.send(ViewRep.from(
+                persistent: persistentState, ephemeral: ephemeralState
+            ))
+        }
         if workstations != lastWorkstationsRep {
             lastWorkstationsRep = workstations
             await workstationsRep.send(workstations)

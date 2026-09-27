@@ -232,43 +232,43 @@ struct AccountDrivenSignInTests {
         ))
     }
 
-    /// Lock-protected ViewRep collector — sink callbacks arrive off-main.
+    /// Lock-protected CrafterRep collector — sink callbacks arrive off-main.
     final class RepCollector: @unchecked Sendable {
         private let lock = NSLock()
-        private var reps: [ViewRep] = []
+        private var reps: [CrafterRep] = []
 
-        func append(_ rep: ViewRep) {
+        func append(_ rep: CrafterRep) {
             lock.withLock { reps.append(rep) }
         }
 
-        func contains(_ predicate: (ViewRep) -> Bool) -> Bool {
+        func contains(_ predicate: (CrafterRep) -> Bool) -> Bool {
             lock.withLock { reps.contains(where: predicate) }
         }
 
-        func last(where predicate: (ViewRep) -> Bool) -> ViewRep? {
+        func last(where predicate: (CrafterRep) -> Bool) -> CrafterRep? {
             lock.withLock { reps.last(where: predicate) }
         }
 
-        var lastRep: ViewRep? {
+        var lastRep: CrafterRep? {
             lock.withLock { reps.last }
         }
 
 
     }
 
-    /// Collects ViewReps until `finished` matches. The wait is event-driven —
+    /// Collects CrafterReps until `finished` matches. The wait is event-driven —
     /// see `RepCollecting.collect` — so `timeout` is a backstop for a broken
     /// flow, never a cost on the happy path (the old 5 ms polling stretched
     /// to its deadline whenever the suite ran loaded).
     private func collect(
         _ machine: StateMachine,
         dispatch: (@Sendable () async -> Void)? = nil,
-        until finished: @Sendable @escaping (ViewRep) -> Bool,
+        until finished: @Sendable @escaping (CrafterRep) -> Bool,
         timeout: TimeInterval = 10
     ) async -> RepCollector {
         let collector = RepCollector()
         await RepCollecting.collect(
-            machine, dispatch: dispatch,
+            machine.crafterRep, dispatch: dispatch,
             onRep: { collector.append($0) },
             until: finished, timeout: timeout
         )
@@ -277,19 +277,16 @@ struct AccountDrivenSignInTests {
 
     // MARK: - Tests
 
-    /// The machine's very first rep is email entry — the character-name
-    /// onboarding screen is never projected in this mode.
+    /// The machine's very first rep is email entry. (That the name-driven
+    /// onboarding screen can never appear in this mode is now a property
+    /// of the type — `CrafterRep` has no onboarding case.)
     @Test func initialRepIsEmailEntry() async {
         let machine = makeMachine(link: SimulatedLink(outcome: .player(Self.player)))
         let reps = await collect(machine, until: { rep in
-            guard case .bitCraftSignIn(let signIn) = rep else { return false }
+            guard case .signIn(let signIn) = rep else { return false }
             return signIn.phase == .idle
         })
-        #expect(reps.contains { rep in
-            if case .onboarding = rep { return true }
-            return false
-        } == false)
-        guard case .bitCraftSignIn(let signIn)? = reps.lastRep else {
+        guard case .signIn(let signIn)? = reps.lastRep else {
             Issue.record("expected the email sign-in rep")
             return
         }
@@ -308,7 +305,7 @@ struct AccountDrivenSignInTests {
         await collect(machine, dispatch: {
             await machine.ingest(Intent.StartBitCraftSignIn(email: " Maplesugar@Gmail.com "))
         }, until: { rep in
-            guard case .bitCraftSignIn(let signIn) = rep,
+            guard case .signIn(let signIn) = rep,
                   case .awaitingCode(let email) = signIn.phase else { return false }
             return email == "maplesugar@gmail.com"
         })
@@ -321,7 +318,7 @@ struct AccountDrivenSignInTests {
         })
         // The linking step was published between authentication and the gate.
         #expect(reps.contains { rep in
-            guard case .bitCraftSignIn(let signIn) = rep,
+            guard case .signIn(let signIn) = rep,
                   case .linking(let email) = signIn.phase else { return false }
             return email == "maplesugar@gmail.com" && signIn.error == nil
         })
@@ -373,7 +370,7 @@ struct AccountDrivenSignInTests {
         await collect(machine, dispatch: {
             await machine.ingest(Intent.StartBitCraftSignIn(email: "a@b.c"))
         }, until: { rep in
-            guard case .bitCraftSignIn(let signIn) = rep,
+            guard case .signIn(let signIn) = rep,
                   case .awaitingCode = signIn.phase else { return false }
             return true
         })
@@ -391,11 +388,11 @@ struct AccountDrivenSignInTests {
         let after = await collect(machine, dispatch: {
             await machine.ingest(Intent.SignOut())
         }, until: { rep in
-            guard case .bitCraftSignIn(let signIn) = rep else { return false }
+            guard case .signIn(let signIn) = rep else { return false }
             return signIn.phase == .idle && signIn.error == nil && signIn.canDismiss == false
         })
         #expect(after.contains { rep in
-            if case .bitCraftSignIn(let signIn) = rep, case .idle = signIn.phase {
+            if case .signIn(let signIn) = rep, case .idle = signIn.phase {
                 return signIn.canDismiss == false
             }
             return false
@@ -415,14 +412,14 @@ struct AccountDrivenSignInTests {
         await collect(machine, dispatch: {
             await machine.ingest(Intent.StartBitCraftSignIn(email: "a@b.c"))
         }, until: { rep in
-            guard case .bitCraftSignIn(let signIn) = rep,
+            guard case .signIn(let signIn) = rep,
                   case .awaitingCode = signIn.phase else { return false }
             return true
         })
         await collect(machine, dispatch: {
             await machine.ingest(Intent.SubmitAccessCode(code: "GOOD12"))
         }, until: { rep in
-            guard case .bitCraftSignIn(let signIn) = rep,
+            guard case .signIn(let signIn) = rep,
                   case .linking = signIn.phase else { return false }
             return signIn.error != nil
         })
@@ -450,48 +447,81 @@ struct AccountDrivenSignInTests {
         await collect(machine, dispatch: {
             await machine.ingest(Intent.StartBitCraftSignIn(email: "a@b.c"))
         }, until: { rep in
-            guard case .bitCraftSignIn(let signIn) = rep,
+            guard case .signIn(let signIn) = rep,
                   case .awaitingCode = signIn.phase else { return false }
             return true
         })
         let reps = await collect(machine, dispatch: {
             await machine.ingest(Intent.SubmitAccessCode(code: "GOOD12"))
         }, until: { rep in
-            guard case .bitCraftSignIn(let signIn) = rep,
+            guard case .signIn(let signIn) = rep,
                   case .linking = signIn.phase else { return false }
             return signIn.error?.contains("no character yet") == true
         })
         #expect(reps.contains { rep in
-            if case .bitCraftSignIn(let signIn) = rep { return signIn.error?.contains("no character yet") == true }
+            if case .signIn(let signIn) = rep { return signIn.error?.contains("no character yet") == true }
             return false
         })
     }
 
     /// Relaunch with an account but no linked character (previous link
-    /// failed / identity file gone): bootstrap resumes the link.
-    @Test func bootstrapResumesTheLinkForAnUnlinkedAccount() async {
+    /// failed / identity file gone): the persisted JWT skips the email
+    /// screen — the gate shows immediately in its resuming state, and the
+    /// link fills in the character when it lands.
+    @Test func bootstrapResumesOnTheGateForAnUnlinkedAccount() async {
         let link = SimulatedLink(outcome: .player(Self.player))
         let machine = makeMachine(
             link: link,
             restoredAccount: BitCraftAccount(email: "a@b.c", token: Self.token())
         )
-        // Let the sink attach before the (instant) bootstrap runs, so the
-        // replayed initial rep is the email screen, not the final gate.
         let reps = await collect(machine, dispatch: {
             try? await Task.sleep(for: .milliseconds(50))
             await machine.start()
         }, until: { rep in
-            if case .gameSessionPrompt = rep { return true }
+            if case .gameSessionPrompt(let prompt) = rep, prompt.username == "Maplesugar" {
+                return !prompt.resuming
+            }
             return false
         })
+        // The email screen never engaged — the initial (pre-bootstrap)
+        // replay may show its idle placeholder, but no phase ever moved.
+        #expect(!reps.contains { rep in
+            guard case .signIn(let signIn) = rep else { return false }
+            if case .idle = signIn.phase { return false }
+            return true
+        })
         #expect(reps.contains { rep in
-            guard case .bitCraftSignIn(let signIn) = rep,
-                  case .linking(let email) = signIn.phase else { return false }
-            return email == "a@b.c"
+            guard case .gameSessionPrompt(let prompt) = rep else { return false }
+            return prompt.resuming && prompt.username == nil
         })
         #expect(reps.contains { rep in
             if case .gameSessionPrompt(let prompt) = rep { return prompt.username == "Maplesugar" }
             return false
+        })
+        await machine.ingest(Intent.SignOut()) // retire the poll loop
+    }
+
+    /// A failed startup resume falls back to the sign-in screen's linking
+    /// step with the error — the account is verified, so retry needs no
+    /// new code, and the email entry is never the landing screen.
+    @Test func failedResumeFallsBackToTheSignInScreen() async {
+        let link = SimulatedLink(outcome: .noPlayer)
+        let machine = makeMachine(
+            link: link,
+            restoredAccount: BitCraftAccount(email: "a@b.c", token: Self.token())
+        )
+        let reps = await collect(machine, dispatch: {
+            try? await Task.sleep(for: .milliseconds(50))
+            await machine.start()
+        }, until: { rep in
+            guard case .signIn(let signIn) = rep,
+                  case .linking = signIn.phase,
+                  signIn.error != nil else { return false }
+            return true
+        })
+        #expect(reps.contains { rep in
+            guard case .gameSessionPrompt(let prompt) = rep else { return false }
+            return prompt.resuming
         })
         await machine.ingest(Intent.SignOut()) // retire the poll loop
     }
@@ -532,7 +562,7 @@ struct AccountDrivenSignInTests {
         await collect(machine, dispatch: {
             await machine.ingest(Intent.StartBitCraftSignIn(email: "a@b.c"))
         }, until: { rep in
-            guard case .bitCraftSignIn(let signIn) = rep,
+            guard case .signIn(let signIn) = rep,
                   case .awaitingCode = signIn.phase else { return false }
             return true
         })
@@ -547,7 +577,7 @@ struct AccountDrivenSignInTests {
     /// From the gate, taps the sign-in action and collects until the game
     /// session reaches `status`.
     private func signInUntilGameSession(
-        _ machine: StateMachine, status: ViewRep.Session.GameSession.Status
+        _ machine: StateMachine, status: CrafterRep.Session.GameSession.Status
     ) async -> RepCollector {
         await collect(machine, dispatch: {
             await machine.ingest(Intent.SignInGameSession())
@@ -607,7 +637,7 @@ struct AccountDrivenSignInTests {
         await collect(machine, dispatch: {
             await machine.ingest(Intent.StartBitCraftSignIn(email: "a@b.c"))
         }, until: { rep in
-            guard case .bitCraftSignIn(let signIn) = rep,
+            guard case .signIn(let signIn) = rep,
                   case .awaitingCode = signIn.phase else { return false }
             return true
         })
@@ -656,6 +686,38 @@ struct AccountDrivenSignInTests {
         // …and the same action now takes the session.
         _ = await signInUntilGameSession(machine, status: .live)
         #expect(gameSession.connections.count == 1)
+        await machine.ingest(Intent.SignOut()) // retire the loops
+    }
+
+    /// A sign-in attempt that dies before any session exists (transport
+    /// loss mid handshake, sign-in deadline) returns to the gate with the
+    /// failure reason instead of hanging in `.connecting` forever; acting
+    /// again retries.
+    @Test func failedSignInReturnsToTheGateWithNoticeAndRetryTakesIt() async {
+        let gameSession = SimulatedGlobalSession(scripts: [
+            SimulatedGlobalSession.Script(events: [.failed("dead handshake")], hold: false),
+            .established,
+        ])
+        let machine = makeMachine(link: SimulatedLink(outcome: .player(Self.player)), globalSession: gameSession)
+        await machine.start()
+        await driveToGate(machine)
+
+        let failed = await collect(machine, dispatch: {
+            await machine.ingest(Intent.SignInGameSession())
+        }, until: { rep in
+            guard case .gameSessionPrompt(let prompt) = rep else { return false }
+            return prompt.notice?.contains("dead handshake") == true
+        })
+        // The attempt's failure reached the gate as its notice — the user
+        // sees why the tabs never filled instead of an eternal spinner.
+        #expect(failed.contains { rep in
+            guard case .gameSessionPrompt(let prompt) = rep else { return false }
+            return prompt.notice?.contains("dead handshake") == true
+        })
+        #expect(gameSession.connections.count == 1)
+        // Acting again retries and takes the session.
+        _ = await signInUntilGameSession(machine, status: .live)
+        #expect(gameSession.connections.count == 2)
         await machine.ingest(Intent.SignOut()) // retire the loops
     }
 

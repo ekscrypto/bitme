@@ -58,11 +58,11 @@ struct RootView: View {
                 appTitle: "BitMe X-Ray",
                 tagline: "The live resource map"
             )
-        case .bitCraftSignIn, .gameSessionPrompt:
-            // Unreachable in X-Ray: nothing dispatches `ShowBitCraftSignIn`,
-            // and the pre-sign-in gate is account-driven apps only. Fall
-            // through to the placeholder — the next rep restores a real
-            // screen (a hidden restored account never opens the flow).
+        case .signIn:
+            // The BitCraft sign-in screen is a machine capability in this
+            // flow too, but no X-Ray view dispatches `ShowBitCraftSignIn` —
+            // the account entry belongs to Pocket Crafter. Fall through to
+            // the placeholder; the next rep restores a real screen.
             Color(white: 0.05).ignoresSafeArea()
         case .session:
             MapScreen(machine: machine, ingest: ingest)

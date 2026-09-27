@@ -37,24 +37,33 @@ public struct ClaimHeader: Equatable, Sendable {
 }
 
 /// The static catalogs the join needs, fetched once per sync
-/// (`building_desc`, `crafting_recipe_desc`) and cached on disk for 48 h
-/// (the food-buff gamedata policy): a relaunch paints names and
-/// classification from the cache instead of waiting on the leg's one-offs.
-/// Game updates land on the first session after the TTL lapses.
+/// (`building_desc`, `crafting_recipe_desc`, `tool_type_desc`) and cached
+/// on disk for 48 h (the food-buff gamedata policy): a relaunch paints
+/// names and classification from the cache instead of waiting on the
+/// leg's one-offs. Game updates land on the first session after the TTL
+/// lapses. (A cache written before a field was added fails to decode and
+/// self-refetches — one cold load per schema change.)
 public struct BuildingGamedata: Equatable, Sendable, Codable {
     public static let ttl: TimeInterval = 48 * 60 * 60
 
     public let buildings: [Int32: BuildingDescInfo]
     public let recipeNames: [Int32: String]
+    /// Recipe id → profession (game skill id), resolved at load: the
+    /// recipe's own `level_requirements` skill when present, else its
+    /// tool type's skill via `tool_type_desc` (e.g. the Machete →
+    /// Foraging). Feeds `WorkstationsRep.Craft.profession`.
+    public let recipeSkills: [Int32: Int32]
     public let fetchedAt: Date
 
     init(
         buildings: [Int32: BuildingDescInfo] = [:],
         recipeNames: [Int32: String] = [:],
+        recipeSkills: [Int32: Int32] = [:],
         fetchedAt: Date = .now
     ) {
         self.buildings = buildings
         self.recipeNames = recipeNames
+        self.recipeSkills = recipeSkills
         self.fetchedAt = fetchedAt
     }
 
@@ -508,6 +517,7 @@ enum RegionBuildingsClient {
         do {
             async let descTables = client.oneOffQuery("SELECT * FROM building_desc;", timeout: 20)
             async let recipeTables = client.oneOffQuery("SELECT * FROM crafting_recipe_desc;", timeout: 20)
+            async let toolTables = client.oneOffQuery("SELECT * FROM tool_type_desc;", timeout: 20)
 
             var buildings: [Int32: BuildingDescInfo] = [:]
             for table in try await descTables where table.tableName == "building_desc" {
@@ -517,19 +527,32 @@ enum RegionBuildingsClient {
                     }
                 }
             }
+            var toolSkillByType: [Int32: Int32] = [:]
+            for table in try await toolTables where table.tableName == "tool_type_desc" {
+                for row in table.rows.rows {
+                    if let info = try? RegionGamedataDecoder.toolTypeDesc(row) {
+                        toolSkillByType[info.id] = info.skillID
+                    }
+                }
+            }
             var recipes: [Int32: String] = [:]
+            var recipeSkills: [Int32: Int32] = [:]
             for table in try await recipeTables where table.tableName == "crafting_recipe_desc" {
                 for row in table.rows.rows {
                     if let recipe = try? RegionGamedataDecoder.recipe(row) {
                         recipes[recipe.id] = recipe.name
+                        recipeSkills[recipe.id] = recipe.skillID
+                            ?? recipe.toolTypeID.flatMap { toolSkillByType[$0] }
                     }
                 }
             }
-            coreLog.info("claim buildings: catalogs loaded (\(buildings.count) buildings, \(recipes.count) recipes)")
+            coreLog.info("claim buildings: catalogs loaded (\(buildings.count) buildings, \(recipes.count) recipes, \(toolSkillByType.count) tool types)")
             if buildings.isEmpty && recipes.isEmpty, let cached {
                 return cached
             }
-            let fresh = BuildingGamedata(buildings: buildings, recipeNames: recipes, fetchedAt: .now)
+            let fresh = BuildingGamedata(
+                buildings: buildings, recipeNames: recipes, recipeSkills: recipeSkills, fetchedAt: .now
+            )
             if !buildings.isEmpty || !recipes.isEmpty {
                 writeBuildingGamedataCache(fresh)
             }

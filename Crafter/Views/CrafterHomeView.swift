@@ -1,7 +1,7 @@
 import SwiftUI
 import BitMeCore
 
-/// Pocket Crafter home: renders `ViewRep.Session` for the tracked character
+/// Pocket Crafter home: renders `CrafterRep.Session` for the tracked character
 /// — the claim they stand in, the account surface, and two icon-only tabs:
 /// **Crafting** (stations, the running craft, craft tasks) and **Storage**
 /// (storage buildings and the rest). The workstation lists render the
@@ -12,7 +12,7 @@ import BitMeCore
 /// scoped to the running-craft card so its 4 Hz re-eval never touches the
 /// long lists.
 struct CrafterHomeView: View {
-    let session: ViewRep.Session
+    let session: CrafterRep.Session
     let workstations: WorkstationsRep
     let ingest: @Sendable (Sendable) async -> Void
 
@@ -37,7 +37,7 @@ struct CrafterHomeView: View {
         session.nowMs.map { now in now - Date().timeIntervalSince1970 * 1_000 } ?? 0
     }
 
-    private var runningCraft: ViewRep.Session.RunningAction? {
+    private var runningCraft: RunningAction? {
         session.actions.first { $0.actionType == "Craft" }
     }
 
@@ -102,12 +102,38 @@ struct CrafterHomeView: View {
 
 // MARK: - Crafting tab
 
-/// Crafting stations with the crafts running at them: the character's
-/// in-flight craft, the claim's stations, and the pending craft tasks.
+/// Crafting stations and craft tasks, regrouped under collapsible
+/// profession headers (the workstation families of the catalog: Carpentry,
+/// …, Tailoring; everything else — Cooking, workbenches, taming — under
+/// "Other"). A profession's station list comes from the catalog name; its
+/// craft tasks from the recipe's profession, so a task follows its recipe
+/// even when the station itself is unknown.
 private struct CraftingTab: View {
-    let session: ViewRep.Session
+    let session: CrafterRep.Session
     let workstations: WorkstationsRep
-    let home: CrafterHomeView? = nil
+
+    /// Collapsed by default — a busy claim carries many stations, and the
+    /// running-craft card already surfaces the active work on top.
+    @State private var expanded: Set<Profession> = []
+
+    private struct ProfessionGroup {
+        let profession: Profession
+        let stations: [WorkstationsRep.Building]
+        let crafts: [WorkstationsRep.Craft]
+    }
+
+    /// The professions that have something to show, in `Profession.allCases`
+    /// order (the named twelve, then Other).
+    private var groups: [ProfessionGroup] {
+        let crafting = workstations.buildings.filter(\.isCrafting)
+        return Profession.allCases.compactMap { profession in
+            let stations = crafting.filter { ($0.profession ?? .other) == profession }
+            let crafts = workstations.crafts.filter { ($0.profession ?? .other) == profession }
+            return stations.isEmpty && crafts.isEmpty
+                ? nil
+                : ProfessionGroup(profession: profession, stations: stations, crafts: crafts)
+        }
+    }
 
     var body: some View {
         let stations = workstations
@@ -130,11 +156,24 @@ private struct CraftingTab: View {
                     "Crafting stations on \(session.claimName ?? "your claim") appear here."
                 )
             } else {
-                if !crafting.isEmpty {
-                    stationSection("Crafting stations", icon: "hammer", buildings: crafting)
-                }
-                if !stations.crafts.isEmpty || stations.craftsOverflow > 0 {
-                    craftTasks(stations)
+                ForEach(groups, id: \.profession) { group in
+                    DisclosureGroup(isExpanded: isExpanded(group.profession)) {
+                        ForEach(group.stations, id: \.entityID) { building in
+                            BuildingRow(building: building)
+                        }
+                        ForEach(group.crafts, id: \.entityID) { craft in
+                            CraftRow(craft: craft)
+                        }
+                        if group.profession == .other && stations.craftsOverflow > 0 {
+                            Text("+\(stations.craftsOverflow) more")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } label: {
+                        groupHeader(group)
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 2, leading: 16, bottom: 2, trailing: 16))
                 }
             }
         }
@@ -147,6 +186,45 @@ private struct CraftingTab: View {
         session.nowMs.map { now in now - Date().timeIntervalSince1970 * 1_000 } ?? 0
     }
 
+    private func isExpanded(_ profession: Profession) -> Binding<Bool> {
+        Binding(
+            get: { expanded.contains(profession) },
+            set: { isExpanded in
+                if isExpanded {
+                    expanded.insert(profession)
+                } else {
+                    expanded.remove(profession)
+                }
+            }
+        )
+    }
+
+    /// The collapsible header: profession icon, name, and what's inside.
+    private func groupHeader(_ group: ProfessionGroup) -> some View {
+        HStack {
+            ProfessionIcon(profession: group.profession)
+                .frame(width: 22, height: 22)
+            Text(group.profession.displayName)
+                .font(.subheadline.bold())
+            Spacer()
+            Text(countLabel(group))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+        .contentShape(Rectangle())
+    }
+
+    private func countLabel(_ group: ProfessionGroup) -> String {
+        var parts: [String] = []
+        if !group.stations.isEmpty {
+            parts.append("\(group.stations.count) station\(group.stations.count == 1 ? "" : "s")")
+        }
+        if !group.crafts.isEmpty {
+            parts.append("\(group.crafts.count) craft\(group.crafts.count == 1 ? "" : "s")")
+        }
+        return parts.joined(separator: " · ")
+    }
+
     private func emptyState(_ title: String, _ message: String) -> some View {
         ContentUnavailableView {
             Label(title, systemImage: "hammer")
@@ -157,45 +235,13 @@ private struct CraftingTab: View {
         .listRowSeparator(.hidden)
         .padding(.vertical, 24)
     }
-
-    private func stationSection(
-        _ title: String, icon: String, buildings: [ViewRep.Session.Workstations.Building]
-    ) -> some View {
-        Section {
-            ForEach(buildings, id: \.entityID) { building in
-                BuildingRow(building: building)
-            }
-        } header: {
-            Label(title, systemImage: icon)
-                .font(.caption.bold())
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    /// Craft tasks: the player's own pending crafts first, then the claim's.
-    private func craftTasks(_ stations: ViewRep.Session.Workstations) -> some View {
-        Section {
-            ForEach(stations.crafts, id: \.entityID) { craft in
-                CraftRow(craft: craft)
-            }
-            if stations.craftsOverflow > 0 {
-                Text("+\(stations.craftsOverflow) more")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        } header: {
-            Label("Craft tasks", systemImage: "hourglass")
-                .font(.caption.bold())
-                .foregroundStyle(.secondary)
-        }
-    }
 }
 
 // MARK: - Storage tab
 
 /// Storage buildings on the claim, with everything else below them.
 private struct StorageTab: View {
-    let session: ViewRep.Session
+    let session: CrafterRep.Session
     let workstations: WorkstationsRep
 
     var body: some View {
@@ -231,7 +277,7 @@ private struct StorageTab: View {
     }
 
     private func storageSection(
-        _ title: String, icon: String, buildings: [ViewRep.Session.Workstations.Building]
+        _ title: String, icon: String, buildings: [WorkstationsRep.Building]
     ) -> some View {
         Section {
             ForEach(buildings, id: \.entityID) { building in
@@ -247,10 +293,71 @@ private struct StorageTab: View {
 
 // MARK: - Rows
 
+/// A profession's header icon. Prefers the game's own skill icon from the
+/// asset catalog (`tools/asset-extraction/install_app_icons.sh` copies the
+/// twelve in from the private bitme-resources checkout; Scholar borrows the
+/// game UI's Book icon — the game ships no skill icon for it). When the
+/// catalog is absent — a public-only clone — SF Symbols stand in so the
+/// design never renders an empty slot.
+private struct ProfessionIcon: View {
+    let profession: Profession
+
+    var body: some View {
+        if let gameIcon, let uiImage = UIImage(named: gameIcon) {
+            Image(uiImage: uiImage)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+        } else {
+            Image(systemName: symbol)
+                .font(.body)
+                .foregroundStyle(.tint)
+        }
+    }
+
+    /// The asset-catalog name, when the game set has one for the profession.
+    private var gameIcon: String? {
+        switch profession {
+        case .carpentry: "SkillIconCarpentry"
+        case .farming: "SkillIconFarming"
+        case .fishing: "SkillIconFishing"
+        case .foraging: "SkillIconForaging"
+        case .forestry: "SkillIconForestry"
+        case .hunting: "SkillIconHunting"
+        case .leatherworking: "SkillIconLeatherworking"
+        case .masonry: "SkillIconMasonry"
+        case .mining: "SkillIconMining"
+        case .smithing: "SkillIconSmithing"
+        case .tailoring: "SkillIconTailoring"
+        case .scholar: "SkillIconScholar"
+        case .other: nil
+        }
+    }
+
+    /// The SF Symbol fallback (also the permanent art for Other).
+    private var symbol: String {
+        switch profession {
+        case .carpentry: "square.and.pencil"
+        case .farming: "leaf"
+        case .fishing: "fish"
+        case .foraging: "carrot"
+        case .forestry: "tree"
+        case .hunting: "scope"
+        case .leatherworking: "handbag"
+        case .masonry: "wallpaper"
+        case .mining: "mountain.2"
+        case .smithing: "hammer"
+        case .tailoring: "scissors"
+        case .scholar: "book"
+        case .other: "ellipsis"
+        }
+    }
+}
+
 /// One workstation: display name (nickname over catalog), catalog subtitle,
 /// and the pending-craft count badge.
 private struct BuildingRow: View {
-    let building: ViewRep.Session.Workstations.Building
+    let building: WorkstationsRep.Building
 
     var body: some View {
         HStack {
@@ -280,7 +387,7 @@ private struct BuildingRow: View {
 
 /// One pending craft task: recipe, station, ownership icon, and phase chip.
 private struct CraftRow: View {
-    let craft: ViewRep.Session.Workstations.Craft
+    let craft: WorkstationsRep.Craft
 
     var body: some View {
         HStack(spacing: 8) {
@@ -308,7 +415,7 @@ private struct CraftRow: View {
 /// The claim-buildings sync state — busy while pooling the snapshot, the
 /// error otherwise silent rows would hide.
 private struct SyncStatusRow: View {
-    let status: ViewRep.Session.Workstations.Status
+    let status: WorkstationsRep.Status
     let error: String?
 
     var body: some View {
@@ -332,7 +439,7 @@ private struct SyncStatusRow: View {
 /// live progress bar. Owns the periodic timeline — the only part of the
 /// screen that needs sub-second updates.
 private struct RunningCraftCard: View {
-    let action: ViewRep.Session.RunningAction?
+    let action: RunningAction?
     let relayOffsetMs: Double
 
     var body: some View {
@@ -369,7 +476,7 @@ private struct RunningCraftCard: View {
 // MARK: - Banners & pills
 
 private struct ConnectionPill: View {
-    let connection: ViewRep.Session.Connection
+    let connection: SessionConnection
 
     var body: some View {
         Text(label)
@@ -400,7 +507,7 @@ private struct ConnectionPill: View {
 /// global database. The game allows one live session per account: while
 /// this reads "held", the desktop client has been kicked (and vice versa).
 private struct GameSessionPill: View {
-    let status: ViewRep.Session.GameSession.Status
+    let status: CrafterRep.Session.GameSession.Status
 
     var body: some View {
         Text(label)
@@ -443,7 +550,7 @@ private struct OfflineBanner: View {
 /// A craft task's state chip: passive crafts carry their queue state,
 /// at-the-bench crafts their action progress.
 private struct CraftPhaseBadge: View {
-    let craft: ViewRep.Session.Workstations.Craft
+    let craft: WorkstationsRep.Craft
 
     var body: some View {
         Text(label)

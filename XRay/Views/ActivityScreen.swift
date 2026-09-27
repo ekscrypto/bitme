@@ -29,7 +29,7 @@ struct ActivityScreen: View {
                 switch viewRep {
                 case .session(let next):
                     session = next
-                case .onboarding, .bitCraftSignIn, .gameSessionPrompt:
+                case .onboarding, .signIn:
                     // e.g. "Switch character" dispatched below — hand the
                     // screen back to the root (onboarding) immediately.
                     session = nil
@@ -371,7 +371,7 @@ private struct StreamPill: View {
 // MARK: - Banners & pills
 
 private struct ConnectionPill: View {
-    let connection: ViewRep.Session.Connection
+    let connection: SessionConnection
 
     var body: some View {
         Text(label)

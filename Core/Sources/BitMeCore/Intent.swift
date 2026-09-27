@@ -201,7 +201,17 @@ extension Intent {
     /// sign_in (the desktop client), dropped, or refused. The machine
     /// returns to the pre-sign-in gate; the session is never re-taken
     /// automatically.
-    struct GameSessionEnded: Sendable {}
+    struct GameSessionEnded: Sendable {
+        /// Why the session ended, when the ending path knows — a failed
+        /// connection attempt carries its error so the gate can say more
+        /// than "ended". Nil falls back to what the machine last knew
+        /// (a refusal message, or the generic ending).
+        var notice: String?
+
+        init(notice: String? = nil) {
+            self.notice = notice
+        }
+    }
 
     // Claim buildings (account-driven apps) — feedback from the region leg.
 
@@ -337,14 +347,16 @@ extension Intent.BootstrapCompleted: StateMutator {
         // Account-driven apps: an account with no linked character resumes
         // the link (a previous link failed, or the identity file is gone).
         // With a character, the restore above already started the session.
+        // A persisted JWT never re-opens the email screen — the gate shows
+        // immediately in its resuming state while the link re-locates the
+        // character over the global database.
         if ephemeral.accountDrivenSignIn, let bitCraftAccount,
            persistent.identity == nil, ephemeral.session == nil {
-            // The sign-in screen is showing this link (it is the root while
-            // no character is linked) — flag it so the link's result counts.
             ephemeral.signIn = EphemeralState.SignInState(
                 phase: .linking(email: bitCraftAccount.email)
             )
-            ephemeral.signInVisible = true
+            ephemeral.preSignInVisible = true
+            ephemeral.resumingAccount = bitCraftAccount.email
             activities.append(Activity.LinkAccountPlayer(account: bitCraftAccount))
         } else if ephemeral.accountDrivenSignIn, persistent.identity != nil {
             // A restored launch lands on the pre-sign-in gate, not in a
@@ -671,11 +683,14 @@ extension Intent.GameSessionEnded: StateMutator {
         var ephemeral = ephemeral
         guard var session = ephemeral.session else { return .noChange }
         // What the machine knows decides the gate's notice: a refused
-        // sign-in carries the server's message; anything else is simply a
-        // session that ended (the gate's live presence line tells the user
-        // whether another device now holds it).
+        // sign-in carries the server's message; an ended-path notice (a
+        // failed connection attempt) wins over both; anything else is
+        // simply a session that ended (the gate's live presence line tells
+        // the user whether another device now holds it).
         let notice: String
-        if session.gameSession.status == .rejected, let error = session.gameSession.lastError {
+        if let endedNotice = self.notice {
+            notice = endedNotice
+        } else if session.gameSession.status == .rejected, let error = session.gameSession.lastError {
             notice = "The game refused the sign-in: \(error)"
         } else {
             notice = "The game session ended."
@@ -930,11 +945,12 @@ extension Intent.AccountPlayerLinked: StateMutator {
     func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
         var persistent = persistent
         var ephemeral = ephemeral
-        // Only the live link counts: the newest account wins, and a link the
-        // user walked away from (screen closed, phase moved on) drops.
+        // Only the live link counts: the newest account wins, and a link
+        // whose screen was left (sign-in closed, or the startup resume
+        // gave way to something else) drops.
         guard ephemeral.accountDrivenSignIn,
               persistent.bitCraftAccount?.email == accountEmail,
-              ephemeral.signInVisible,
+              ephemeral.signInVisible || ephemeral.resumingAccount == accountEmail,
               case .linking(let pending) = ephemeral.signIn.phase, pending == accountEmail else {
             return .noChange
         }
@@ -946,6 +962,7 @@ extension Intent.AccountPlayerLinked: StateMutator {
         )
         ephemeral.signIn = EphemeralState.SignInState()
         ephemeral.signInVisible = false
+        ephemeral.resumingAccount = nil
         let started = startSession(
             entityID: player.entityID,
             in: ephemeral
@@ -968,8 +985,17 @@ extension Intent.AccountPlayerLinkFailed: StateMutator {
         var ephemeral = ephemeral
         guard ephemeral.accountDrivenSignIn,
               persistent.bitCraftAccount?.email == accountEmail,
+              ephemeral.signInVisible || ephemeral.resumingAccount == accountEmail,
               case .linking(let pending) = ephemeral.signIn.phase, pending == accountEmail else {
             return .noChange
+        }
+        // A failed startup resume falls back to the sign-in screen (the
+        // account is verified, so its error + retry live on the linking
+        // step); a link the user is watching fails in place.
+        if ephemeral.resumingAccount == accountEmail {
+            ephemeral.resumingAccount = nil
+            ephemeral.preSignInVisible = false
+            ephemeral.signInVisible = true
         }
         // Stay on the linking step with the error — the account is already
         // verified, so retrying needs no new code.

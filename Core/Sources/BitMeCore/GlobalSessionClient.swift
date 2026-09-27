@@ -21,6 +21,13 @@ public enum GlobalSessionEvent: Equatable, Sendable {
     /// The reducer (or the protocol) refused the sign-in. The stream
     /// finishes right after this event.
     case rejected(String)
+    /// The attempt died before any session existed — transport loss mid
+    /// handshake, the sign-in deadline (the server answers `sign_in` in
+    /// ~200 ms; silence past the deadline is a dead connection, not
+    /// slowness), or an unresolvable server address. The stream finishes
+    /// right after this event. Distinct from `.rejected`, where the
+    /// server answered with a refusal.
+    case failed(String)
 }
 
 /// The account's game session: connections to the game's databases that
@@ -55,15 +62,29 @@ struct GlobalSessionClient: Sendable {
     /// Production entry: resolves the global database address (unauth
     /// REST), connects every leg, signs each in, and holds all of them.
     /// The stream yields `.established` once every leg has committed, and
-    /// ends when any leg ends (kicked by another sign_in, dropped) or the
+    /// ends when any leg ends (kicked by another sign_in, dropped), any
+    /// sign-in attempt fails (`.failed`/`.rejected` then end), or the
     /// consumer cancels. No auto-reconnect — re-taking is a user action.
     static func events(token: String, entityID: UInt64, regionID: Int?) -> AsyncStream<GlobalSessionEvent> {
         AsyncStream { continuation in
             let task = Task {
+                // Every exit path must end the stream: a failure that only
+                // logs leaves the consumer suspended in `.connecting`
+                // forever — the loop's `for await` never returns, and the
+                // app hangs on a dead handshake with no event, no finish.
+                defer { continuation.finish() }
+                // The leg's last transport failure text (e.g. the 401 from
+                // a rejected token) — the lifecycle task records it, the
+                // failure catch classifies on it. Verified live 2026-09-27:
+                // the game servers keep authenticated websockets and kill
+                // anonymous ones after the upgrade, and a stale token is
+                // refused with 401 — both must be told apart from network
+                // loss for the gate to say what to do next.
+                let transportFailure = FailureReason()
                 coreLog.info("game session: resolving the global database address")
                 guard let connection = try? await BitCraftAuthClient.production.connectionInfo() else {
                     coreLog.error("global database lookup failed for the game session")
-                    continuation.finish()
+                    continuation.yield(.failed("Could not resolve the game server address."))
                     return
                 }
                 let arguments = signInArguments(entityID: entityID)
@@ -86,9 +107,11 @@ struct GlobalSessionClient: Sendable {
                                     coreLog.info("game session: leg \(database, privacy: .public) reconnecting (attempt \(attempt, privacy: .public))")
                                 case .disconnected(let reason):
                                     coreLog.error("game session: leg \(database, privacy: .public) connection lost (\(reason ?? "no reason", privacy: .public))")
+                                    transportFailure.record(reason)
                                     return
                                 case .error(let message):
                                     coreLog.error("game session: leg \(database, privacy: .public) connection error (\(message, privacy: .public))")
+                                    transportFailure.record(message)
                                     return
                                 }
                             }
@@ -120,8 +143,34 @@ struct GlobalSessionClient: Sendable {
                     continuation.yield(.rejected(Self.message(for: error)))
                     Self.tearDown(clients: clients)
                     return
+                } catch Timeout.timedOut(let detail) {
+                    coreLog.error("game session dead handshake: \(detail, privacy: .public)")
+                    continuation.yield(.failed("The game server never answered the sign-in (\(detail))."))
+                    Self.tearDown(clients: clients)
+                    return
                 } catch {
                     coreLog.error("game session connection failed: \(String(describing: error), privacy: .public)")
+                    // A token the game no longer accepts is a refusal, not a
+                    // network fault — the gate must send the user to sign in
+                    // again, not to check their connection. The transport's
+                    // failure text lands on the lifecycle task's stream a
+                    // beat after the call fails, so give it a moment before
+                    // deciding this was a plain connection loss.
+                    var reason = transportFailure.reason
+                    if reason == nil {
+                        for _ in 0..<10 where transportFailure.reason == nil {
+                            try? await Task.sleep(for: .milliseconds(30))
+                        }
+                        reason = transportFailure.reason
+                    }
+                    if let reason, reason.contains("401") {
+                        continuation.yield(.rejected(
+                            "The game rejected the saved sign-in token — sign in with your BitCraft account again."
+                        ))
+                    } else {
+                        let detail = reason.map { " (\($0))" } ?? ""
+                        continuation.yield(.failed("The game connection failed\(detail)."))
+                    }
                     Self.tearDown(clients: clients)
                     return
                 }
@@ -162,6 +211,24 @@ struct GlobalSessionClient: Sendable {
     private static func tearDown(clients: [SpacetimeDBClient]) {
         for client in clients {
             Task { await client.disconnect() }
+        }
+    }
+
+    /// Lock-protected hand-off of a leg's last transport failure text from
+    /// its lifecycle task to the sign-in failure catch.
+    private final class FailureReason: @unchecked Sendable {
+        private let lock = NSLock()
+        private var _reason: String?
+
+        func record(_ reason: String?) {
+            guard let reason else { return }
+            lock.withLock {
+                if _reason == nil { _reason = reason }
+            }
+        }
+
+        var reason: String? {
+            lock.withLock { _reason }
         }
     }
 

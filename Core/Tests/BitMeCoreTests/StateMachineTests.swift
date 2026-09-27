@@ -252,7 +252,7 @@ struct StateMachineTests {
                  timeout: TimeInterval = 10) async -> RepCollector {
         let collector = RepCollector()
         await RepCollecting.collect(
-            machine, dispatch: dispatch,
+            machine.viewRep, dispatch: dispatch,
             onRep: { collector.append($0) },
             until: finished, timeout: timeout
         )

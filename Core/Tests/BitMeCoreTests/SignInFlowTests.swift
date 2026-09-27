@@ -119,7 +119,7 @@ struct SignInFlowTests {
     ) async -> RepCollector {
         let collector = RepCollector()
         await RepCollecting.collect(
-            machine, dispatch: dispatch,
+            machine.viewRep, dispatch: dispatch,
             onRep: { collector.append($0) },
             until: finished, timeout: timeout
         )
@@ -138,7 +138,7 @@ struct SignInFlowTests {
             await machine.ingest(Intent.ShowBitCraftSignIn())
             await machine.ingest(Intent.StartBitCraftSignIn(email: "  Ekscrypto@Gmail.com "))
         }, until: { rep in
-            guard case .bitCraftSignIn(let signIn) = rep,
+            guard case .signIn(let signIn) = rep,
                   case .awaitingCode(let email) = signIn.phase else { return false }
             return email == "ekscrypto@gmail.com" && signIn.error == nil
         })
@@ -167,10 +167,10 @@ struct SignInFlowTests {
             await machine.ingest(Intent.ShowBitCraftSignIn())
             await machine.ingest(Intent.StartBitCraftSignIn(email: "not-an-email"))
         }, until: { rep in
-            guard case .bitCraftSignIn(let signIn) = rep else { return false }
+            guard case .signIn(let signIn) = rep else { return false }
             return signIn.error != nil
         })
-        guard case .bitCraftSignIn(let signIn) = collector.lastRep else {
+        guard case .signIn(let signIn) = collector.lastRep else {
             Issue.record("expected sign-in rep")
             return
         }
@@ -188,7 +188,7 @@ struct SignInFlowTests {
             await machine.ingest(Intent.ShowBitCraftSignIn())
             await machine.ingest(Intent.StartBitCraftSignIn(email: "a@b.c"))
         }, until: { rep in
-            guard case .bitCraftSignIn(let signIn) = rep,
+            guard case .signIn(let signIn) = rep,
                   case .awaitingCode = signIn.phase else { return false }
             return true
         })
@@ -197,7 +197,7 @@ struct SignInFlowTests {
         await collect(machine, dispatch: {
             await machine.ingest(Intent.SubmitAccessCode(code: "WRONG1"))
         }, until: { rep in
-            guard case .bitCraftSignIn(let signIn) = rep,
+            guard case .signIn(let signIn) = rep,
                   case .awaitingCode = signIn.phase else { return false }
             return signIn.error == "invalid access code"
         })
@@ -222,7 +222,7 @@ struct SignInFlowTests {
             await machine.ingest(Intent.ShowBitCraftSignIn())
             await machine.ingest(Intent.StartBitCraftSignIn(email: "a@b.c"))
         }, until: { rep in
-            guard case .bitCraftSignIn(let signIn) = rep,
+            guard case .signIn(let signIn) = rep,
                   case .idle = signIn.phase else { return false }
             return signIn.error != nil
         })
@@ -232,7 +232,7 @@ struct SignInFlowTests {
         await collect(machine, dispatch: {
             await machine.ingest(Intent.StartBitCraftSignIn(email: "a@b.c"))
         }, until: { rep in
-            guard case .bitCraftSignIn(let signIn) = rep,
+            guard case .signIn(let signIn) = rep,
                   case .awaitingCode = signIn.phase else { return false }
             return true
         })
@@ -283,7 +283,7 @@ struct SignInFlowTests {
             await machine.ingest(Intent.ShowBitCraftSignIn())
             await machine.ingest(Intent.StartBitCraftSignIn(email: "first@b.c"))
         }, until: { rep in
-            guard case .bitCraftSignIn(let signIn) = rep,
+            guard case .signIn(let signIn) = rep,
                   case .awaitingCode = signIn.phase else { return false }
             return true
         })
@@ -297,11 +297,11 @@ struct SignInFlowTests {
             await machine.ingest(Intent.AccessCodeRequested(email: "first@b.c"))
             await machine.ingest(Intent.AccessCodeRequested(email: "second@b.c"))
         }, until: { rep in
-            guard case .bitCraftSignIn(let signIn) = rep,
+            guard case .signIn(let signIn) = rep,
                   case .awaitingCode(let email) = signIn.phase else { return false }
             return email == "second@b.c"
         })
-        guard case .bitCraftSignIn(let signIn) = await lastRep(of: machine) else {
+        guard case .signIn(let signIn) = await lastRep(of: machine) else {
             Issue.record("expected sign-in rep")
             return
         }
@@ -335,7 +335,7 @@ struct SignInFlowTests {
         )
         var ephemeral = EphemeralState()
         ephemeral.signInVisible = true
-        guard case .bitCraftSignIn = ViewRep.from(persistent: persistent, ephemeral: ephemeral) else {
+        guard case .signIn = ViewRep.from(persistent: persistent, ephemeral: ephemeral) else {
             Issue.record("expected sign-in rep over session")
             return
         }

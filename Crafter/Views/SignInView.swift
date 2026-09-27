@@ -1,13 +1,13 @@
 import SwiftUI
 import BitMeCore
 
-/// The app's launch screen: renders `ViewRep.BitCraftSignIn` and dispatches
+/// The app's launch screen: renders `BitCraftSignIn` and dispatches
 /// `Intent.StartBitCraftSignIn` / `Intent.SubmitAccessCode` /
 /// `Intent.RetryAccountLink`. All behavior lives in the core machine — the
 /// flow is email → access code → (the core links the account's own player
 /// over the game's global database) → the session takes over.
 struct SignInView: View {
-    let signIn: ViewRep.BitCraftSignIn
+    let signIn: BitCraftSignIn
     let ingest: @Sendable (Sendable) async -> Void
 
     @State private var email = ""
@@ -66,7 +66,7 @@ struct SignInView: View {
         }
     }
 
-    private func focus(phase: ViewRep.BitCraftSignIn.Phase) {
+    private func focus(phase: BitCraftSignIn.Phase) {
         switch phase {
         case .idle, .requestingCode: emailFocused = true
         case .awaitingCode, .authenticating: codeFocused = true

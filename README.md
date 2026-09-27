@@ -54,12 +54,22 @@ one-way state machine), shared by both iOS apps and a headless CLI:
   and `EphemeralState`; all mutation flows through serially-processed
   `Intent.*` values; async work happens in `Activity.*` structs that feed
   results back as intents. Internal state is not queryable — observers read
-  the published `ViewRep` only.
-- `ViewRep` — screen-shaped, Equatable/Codable projection with relay-clock
-  anchor timestamps; UIs interpolate countdowns locally.
+  the published rep channels only.
+- Screen projections — screen-shaped, Equatable/Codable enums with
+  relay-clock anchor timestamps; UIs interpolate countdowns locally. One per
+  sign-in flow, published on its own channel chosen by configuration:
+  `ViewRep` (name-driven — X-Ray and the CLI: onboarding, the harvest
+  dashboard, the resource map) and `CrafterRep` (account-driven — Pocket
+  Crafter: emailed-code sign-in, the pre-sign-in gate, the session with the
+  live game session). Payloads both apps render (`BitCraftSignIn`,
+  `RunningAction`, `SessionConnection`, the session shell projection) are
+  shared; each app's rep carries only the screens and fields it can show.
 - `MapRep` — the tile-data channel for the hex-grid map renderer: raw BMR1
   window words, the BME1 terrain plane, and the dictionary, published only
   when map state changes (never on every poll).
+- `WorkstationsRep` — the claim-buildings channel (Pocket Crafter): the
+  claim's buildings joined with catalogs, nicknames, and crafts, published
+  only when the buildings state moves (the `MapRep` precedent).
 - `StateMachine.Configuration` — optional subsystems an app host toggles at
   construction. Pocket Crafter disables the resource-map stack (no tile
   windows, no terrain, no change-stream websocket); X-Ray and the CLI use
@@ -96,14 +106,18 @@ open BitMe.xcodeproj       # pick the BitMeXRay or BitMeCrafter scheme, Cmd+R
 - **BitMe X-Ray** — bundle ID `life.encoded.bitme.ios` (display name
   "BitMe X-Ray"; inherits the original app's identity, so it upgrades in
   place). `XRay/` is presentation only: `XRayApp` owns the `StateMachine`
-  and mirrors the published `ViewRep`; `MapScreen` is the root screen and
-  presents `ActivityScreen` (the dashboard) as a full-screen cover.
+  and mirrors the published `ViewRep` (the name-driven projection);
+  `OnboardingView` (name-only entry) and `MapScreen` (the root screen,
+  presenting `ActivityScreen` — the dashboard — as a full-screen cover)
+  are the two screens.
 - **BitMe Pocket Crafter** — bundle ID `life.encoded.bitme.crafter`
-  (display name "BitMe Pocket Crafter"). `Crafter/` renders the emailed-code
-  `SignInView` (the app's root — account-driven sign-in), then the
-  pre-sign-in gate (`GameSessionPromptView`: character name, in-game N/E
-  coordinates, current claim, and the relay's live answer to whether the
-  account is signed in elsewhere), then the `CrafterHomeView` stub. The
+  (display name "BitMe Pocket Crafter"). `Crafter/` renders the
+  account-driven `CrafterRep`: the emailed-code `SignInView` (the app's
+  root), then the pre-sign-in gate (`GameSessionPromptView`: character
+  name, in-game N/E coordinates, current claim, and the relay's live answer
+  to whether the account is signed in elsewhere), then `CrafterHomeView`
+  (the claim header, the running-craft card, and the Crafting/Storage tabs
+  rendering the `WorkstationsRep` channel). The
   gate's action performs the game's `sign_in` (`CallReducer` on the global
   database, held open by `Activity.GameSessionLoop`) — "Take over session"
   when another device holds it, "Sign in" when not — which is what kicks
@@ -112,8 +126,7 @@ open BitMe.xcodeproj       # pick the BitMeXRay or BitMeCrafter scheme, Cmd+R
   traffic rides our [spacetimedb-swift-sdk](../spacetimedb-swift-sdk)
   (v2.bsatn; its transport speaks the byte-exact HTTP/1.1 websocket this
   server requires — see docs/protocol §3.1).
-- `Shared/` — presentation code compiled into both targets
-  (`OnboardingView`, `Format`).
+- `Shared/` — presentation code compiled into both targets (`Format`).
 - Each app has its own sandbox: identity persists at
   `<Application Support>/BitMe/identity.json` per app, and the BitCraft
   account lives in each app's own Keychain item — sign in separately in
@@ -129,7 +142,8 @@ stamina regen constants need gamedata + playtest confirmation.
   **Resource-map APIs live** (2026-09-24, first shipped on the X-Ray web
   client): BMR1 session/world windows, region dictionaries, BME1 terrain,
   and the BMD1 change-stream WebSocket.
-- Core + CLI: state machine, API, ViewRep extracted; 101 unit tests; CLI
+- Core + CLI: state machine, API, screen projections extracted (per-flow
+  `ViewRep`/`CrafterRep` since the two-app split); 109 unit tests; CLI
   verified against production (resolve, live watch, live resource map —
   window + dictionary + stream). The session/map loops also survive the
   CLI's start → SignOut → resolve race (late bootstraps can no longer

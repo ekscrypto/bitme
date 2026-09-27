@@ -421,6 +421,15 @@ extension Activity.GameSessionLoop: AsyncActivity, StampableActivity {
                 case .rejected(let message):
                     coreLog.error("game session sign_in rejected: \(message, privacy: .public)")
                     await ingestor.ingest(Intent.GameSessionStatusChanged(status: .rejected, message: message))
+                case .failed(let message):
+                    // No session ever existed — transport loss or a dead
+                    // handshake. Return to the gate carrying the reason
+                    // (and skip the loop-end ingest below: this path ends
+                    // the stream itself, and a second GameSessionEnded
+                    // would overwrite the notice with the generic text).
+                    coreLog.error("game session attempt failed: \(message, privacy: .public)")
+                    await ingestor.ingest(Intent.GameSessionEnded(notice: message))
+                    return
                 }
             }
         guard !Task.isCancelled else { return }

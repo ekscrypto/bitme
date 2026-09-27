@@ -221,6 +221,29 @@ public struct BuildingDescInfo: Equatable, Codable, Sendable {
     }
 }
 
+/// `crafting_recipe_desc` row → the fields the workstation join needs:
+/// id, name, and the profession signals — the first `level_requirements`
+/// skill id (the profession gate), else the first `tool_requirements` tool
+/// type (e.g. Foraging's Machete; resolved against `tool_type_desc` at
+/// load). Reads through `tool_requirements` (field 8) and stops; trailing
+/// fields stay unread in the row buffer.
+public struct RecipeInfo: Equatable, Codable, Sendable {
+    let id: Int32
+    let name: String
+    /// First `level_requirements` entry's `skill_id` (game profession enum:
+    /// 0 Forestry … 12 Foraging).
+    let skillID: Int32?
+    /// First `tool_requirements` entry's `tool_type` — nil for hand recipes.
+    let toolTypeID: Int32?
+}
+
+/// `tool_type_desc` row → the tool→skill join (e.g. Machete → Foraging).
+public struct ToolTypeInfo: Equatable, Codable, Sendable {
+    let id: Int32
+    let name: String
+    let skillID: Int32
+}
+
 /// Manual one-off decoders for the static catalog rows. `building_desc`
 /// carries `functions` (an array of 15-field products) before `name`, so
 /// the whole function list is walked field-by-field; everything after
@@ -263,12 +286,41 @@ enum RegionGamedataDecoder {
         return BuildingDescInfo(id: id, name: name, functions: functions)
     }
 
-    /// `crafting_recipe_desc` row → id + name (the first two fields).
-    static func recipe(_ data: Data) throws -> (id: Int32, name: String) {
+    /// `crafting_recipe_desc` row → id, name, and the profession signals.
+    /// Reads fields in schema order through `tool_requirements`: the
+    /// `building_requirement` option (some: building_type + tier) rides a
+    /// tag byte, exactly like the craft-row's optional slot.
+    static func recipe(_ data: Data) throws -> RecipeInfo {
         let reader = BSATNReader(data: data)
         let id = try reader.read() as Int32
         let name = try reader.readString()
-        return (id, name)
+        _ = try reader.read() as Float // time_requirement
+        _ = try reader.read() as Float // stamina_requirement
+        _ = try reader.read() as Int32 // tool_durability_lost
+        _ = try reader.readOptional { () throws -> (Int32, Int32) in
+            (try reader.read() as Int32, try reader.read() as Int32) // building_type, tier
+        }
+        let skillID = try reader.readTypedArray { () throws -> Int32 in
+            let skill = try reader.read() as Int32 // skill_id
+            _ = try reader.read() as Int32 // level
+            return skill
+        }.first
+        let toolTypeID = try reader.readTypedArray { () throws -> Int32 in
+            let tool = try reader.read() as Int32 // tool_type
+            _ = try reader.read() as Int32 // level
+            _ = try reader.read() as Int32 // power
+            return tool
+        }.first
+        return RecipeInfo(id: id, name: name, skillID: skillID, toolTypeID: toolTypeID)
+    }
+
+    /// `tool_type_desc` row → id, name, skill_id (the first three fields).
+    static func toolTypeDesc(_ data: Data) throws -> ToolTypeInfo {
+        let reader = BSATNReader(data: data)
+        let id = try reader.read() as Int32
+        let name = try reader.readString()
+        let skillID = try reader.read() as Int32
+        return ToolTypeInfo(id: id, name: name, skillID: skillID)
     }
 
     /// `claim_member_state` row → the player's own membership (the

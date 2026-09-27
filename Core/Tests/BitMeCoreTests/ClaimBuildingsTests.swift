@@ -23,6 +23,7 @@ struct ClaimBuildingsTests {
         mutating func u32(_ v: UInt32) { le(v) }
         mutating func i32(_ v: Int32) { le(v) }
         mutating func i64(_ v: Int64) { le(v) }
+        mutating func f32(_ v: Float) { le(v.bitPattern) }
         mutating func u8(_ v: UInt8) { data.append(v) }
         mutating func boolean(_ v: Bool) { data.append(v ? 1 : 0) }
         mutating func string(_ s: String) {
@@ -162,7 +163,7 @@ struct ClaimBuildingsTests {
         }
         session.buildings.crafts = crafts
 
-        let projected = ViewRep.workstations(from: session, cap: 3)
+        let projected = WorkstationsRep.from(session: session, cap: 3)
         // The completed craft is dropped everywhere; 11 queued survive the
         // filter, 3 fit the cap, 8 overflow.
         #expect(projected.buildings[0].craftCount == 11)
@@ -210,12 +211,135 @@ struct ClaimBuildingsTests {
         #expect(collected.all.last == .nicknameChanged(entityID: 3001, nickname: "Millie"))
     }
 
-    @Test func recipeRowStopsAfterName() throws {
+    /// A `crafting_recipe_desc` row body — id and name, then exactly the
+    /// field prefix the decoder walks: floats, durability, the
+    /// building_requirement option, level_requirements, tool_requirements.
+    private static func recipeRow(
+        id: Int32, name: String,
+        levelSkills: [Int32] = [], toolTypes: [Int32] = []
+    ) -> Data {
         var w = Wire()
-        w.i32(77); w.string("Oak Plank")
-        let decoded = try RegionGamedataDecoder.recipe(w.data)
-        #expect(decoded.id == 77)
-        #expect(decoded.name == "Oak Plank")
+        w.i32(id)
+        w.string(name)
+        w.f32(2) // time_requirement
+        w.f32(3.5) // stamina_requirement
+        w.i32(1) // tool_durability_lost
+        w.u8(1) // building_requirement: none
+        w.u32(UInt32(levelSkills.count))
+        for skill in levelSkills {
+            w.i32(skill); w.i32(10) // skill_id, level
+        }
+        w.u32(UInt32(toolTypes.count))
+        for tool in toolTypes {
+            w.i32(tool); w.i32(3); w.i32(20) // tool_type, level, power
+        }
+        return w.data
+    }
+
+    @Test func recipeRowDecodesProfessionSignals() throws {
+        // Level-requirement skill wins; the tool type rides along.
+        let gated = try RegionGamedataDecoder.recipe(
+            Self.recipeRow(id: 77, name: "Oak Plank", levelSkills: [1], toolTypes: [9])
+        )
+        #expect(gated.id == 77)
+        #expect(gated.name == "Oak Plank")
+        #expect(gated.skillID == 1)
+        #expect(gated.toolTypeID == 9)
+
+        // Hand recipes: no level gate, profession comes from the tool
+        // (e.g. Foraging's Machete) alone.
+        let tooled = try RegionGamedataDecoder.recipe(
+            Self.recipeRow(id: 78, name: "Plant Fiber", toolTypes: [14])
+        )
+        #expect(tooled.skillID == nil)
+        #expect(tooled.toolTypeID == 14)
+    }
+
+    @Test func toolTypeDescRowDecodes() throws {
+        var w = Wire()
+        w.i32(14); w.string("Machete"); w.i32(12) // id, name, skill_id (Foraging)
+        let tool = try RegionGamedataDecoder.toolTypeDesc(w.data)
+        #expect(tool.id == 14)
+        #expect(tool.name == "Machete")
+        #expect(tool.skillID == 12)
+    }
+
+    @Test func stationNamesResolveToProfessions() {
+        // One name per family, straight from the building_desc catalog —
+        // tiered stations, ancient variants, and the classical workstations.
+        let cases: [(String, Profession?)] = [
+            ("Simple Carpentry Station", .carpentry),
+            ("Ancient Forestry Station", .forestry),
+            ("Peerless Masonry Station", .masonry),
+            ("Ancient Kiln", .masonry),
+            ("Rough Grinder", .masonry),
+            ("Exquisite Mining Station", .mining),
+            ("Flawless Smelter", .smithing),
+            ("Smithing Station", .smithing),
+            ("Fine Scholar Station", .scholar),
+            ("Sturdy Tanning Tub", .leatherworking),
+            ("Leatherworking Station", .leatherworking),
+            ("Magnificent Hunting Station", .hunting),
+            ("Ornate Loom", .tailoring),
+            ("Tailoring Station", .tailoring),
+            ("Farming Station", .farming),
+            ("Large Farming Field", .farming),
+            ("Farmer's Garden", .farming),
+            ("Simple Fishing Station", .fishing),
+            ("Foraging Station", .foraging),
+            // No group of their own — the tab files these under Other.
+            ("Cooking Station", nil),
+            ("Ancient Oven", nil),
+            ("Crude Workbench", nil),
+            ("Taming Station", nil),
+            ("Sailing Station", nil),
+            ("Construction Station", nil),
+            ("Ancient Well", nil),
+        ]
+        for (name, expected) in cases {
+            #expect(Profession.from(stationName: name) == expected, "\(name) → \(String(describing: expected))")
+        }
+    }
+
+    @Test func projectionCarriesProfessions() {
+        var session = EphemeralState.Session(
+            entityID: "1000", loop: CancellableTask(), streamLoop: CancellableTask()
+        )
+        session.buildings.status = .live
+        session.buildings.playerEntityID = 1000
+        session.buildings.gamedata = BuildingGamedata(
+            buildings: [
+                1200: BuildingDescInfo(id: 1200, name: "Simple Masonry Station", functions: [
+                    BuildingFunctionInfo(
+                        functionType: 22, level: 1, craftingSlots: 2, storageSlots: 0,
+                        cargoSlots: 0, refiningSlots: 0, refiningCargoSlots: 0
+                    )
+                ])
+            ],
+            recipeNames: [77: "Rough Brick"],
+            recipeSkills: [77: 2] // Masonry
+        )
+        session.buildings.buildings = [
+            3001: RegionBuilding(entityID: 3001, claimEntityID: 2000, buildingDescriptionID: 1200)
+        ]
+        session.buildings.crafts = [
+            5001: RegionCraft(
+                entityID: 5001, ownerEntityID: 1000, buildingEntityID: 3001, recipeID: 77,
+                kind: .passive(status: .processing, startedAtMicros: 0)
+            ),
+            // A recipe the catalog never resolved — stays nil (→ Other).
+            5002: RegionCraft(
+                entityID: 5002, ownerEntityID: 1000, buildingEntityID: 3001, recipeID: 999,
+                kind: .passive(status: .queued, startedAtMicros: 0)
+            )
+        ]
+
+        let projected = WorkstationsRep.from(session: session)
+        #expect(projected.buildings[0].profession == .masonry)
+        let brick = projected.crafts.first { $0.entityID == "5001" }
+        #expect(brick?.profession == .masonry)
+        let unresolved = projected.crafts.first { $0.entityID == "5002" }
+        #expect(unresolved?.profession == nil)
     }
 
     // MARK: - Machine flow
@@ -290,7 +414,7 @@ struct ClaimBuildingsTests {
         // (the mutate no-ops otherwise, like the real screen's disabled form).
         await machine.ingest(Intent.StartBitCraftSignIn(email: "crafter@example.com"))
         _ = await collectUntil(machine) { rep in
-            if case .bitCraftSignIn(let signIn) = rep, case .awaitingCode = signIn.phase { return true }
+            if case .signIn(let signIn) = rep, case .awaitingCode = signIn.phase { return true }
             return false
         }
         await machine.ingest(Intent.SubmitAccessCode(code: "123456"))
@@ -300,19 +424,17 @@ struct ClaimBuildingsTests {
         }
 
         // Take the game session: the region leg arrives, the sync starts,
-        // and the joined workstations land in the session projection. Events
-        // arrive as individual intents (one rep each) — wait for the
-        // script's terminal state, not the first `.live`.
+        // and the joined workstations land on the workstations channel
+        // (`workstationsRep` — the session rep does not carry a copy).
+        // Events arrive as individual intents (one rep each) — wait for
+        // the script's terminal state, not the first `.live`.
         await machine.ingest(Intent.SignInGameSession())
-        let matched = await collectUntil(machine) { rep in
-            if case .session(let s) = rep, s.workstations.crafts.count == 2 { return true }
-            return false
-        }
-        guard case .session(let sessionRep)? = matched else {
-            Issue.record("expected a session rep with the projected workstations")
+        guard let stations = await RepCollecting.collect(
+            machine.workstationsRep, until: { $0.crafts.count == 2 }
+        ) else {
+            Issue.record("expected the projected workstations on the channel")
             return
         }
-        let stations = sessionRep.workstations
         #expect(stations.status == .live)
 
         // The sync was asked about the claim the character stands in
@@ -361,7 +483,7 @@ struct ClaimBuildingsTests {
         await machine.start()
         await machine.ingest(Intent.StartBitCraftSignIn(email: "crafter@example.com"))
         _ = await collectUntil(machine) { rep in
-            if case .bitCraftSignIn(let signIn) = rep, case .awaitingCode = signIn.phase { return true }
+            if case .signIn(let signIn) = rep, case .awaitingCode = signIn.phase { return true }
             return false
         }
         await machine.ingest(Intent.SubmitAccessCode(code: "123456"))
@@ -370,10 +492,7 @@ struct ClaimBuildingsTests {
             return false
         }
         await machine.ingest(Intent.SignInGameSession())
-        _ = await collectUntil(machine) { rep in
-            if case .session(let s) = rep, s.workstations.crafts.count == 2 { return true }
-            return false
-        }
+        _ = await RepCollecting.collect(machine.workstationsRep, until: { $0.crafts.count == 2 })
 
         // Another device takes the account's session: every held socket
         // closes, the app returns to the gate, and the buildings sync is
@@ -416,7 +535,7 @@ struct ClaimBuildingsTests {
         await machine.start()
         await machine.ingest(Intent.StartBitCraftSignIn(email: "crafter@example.com"))
         _ = await collectUntil(machine) { rep in
-            if case .bitCraftSignIn(let signIn) = rep, case .awaitingCode = signIn.phase { return true }
+            if case .signIn(let signIn) = rep, case .awaitingCode = signIn.phase { return true }
             return false
         }
         await machine.ingest(Intent.SubmitAccessCode(code: "123456"))
@@ -425,10 +544,7 @@ struct ClaimBuildingsTests {
             return false
         }
         await machine.ingest(Intent.SignInGameSession())
-        _ = await collectUntil(machine) { rep in
-            if case .session(let s) = rep, s.workstations.crafts.count == 2 { return true }
-            return false
-        }
+        _ = await RepCollecting.collect(machine.workstationsRep, until: { $0.crafts.count == 2 })
         await machine.ingest(Intent.SignOut()) // retire the loops
 
         let lines = traces.lines
@@ -659,7 +775,7 @@ struct ClaimBuildingsTests {
         await machine.start()
         await machine.ingest(Intent.StartBitCraftSignIn(email: "crafter@example.com"))
         _ = await collectUntil(machine) { rep in
-            if case .bitCraftSignIn(let signIn) = rep, case .awaitingCode = signIn.phase { return true }
+            if case .signIn(let signIn) = rep, case .awaitingCode = signIn.phase { return true }
             return false
         }
         await machine.ingest(Intent.SubmitAccessCode(code: "123456"))
@@ -700,17 +816,17 @@ struct ClaimBuildingsTests {
         }
     }
 
-    /// Collects ViewReps until `finished` matches (event-driven — see
+    /// Collects CrafterReps until `finished` matches (event-driven — see
     /// `RepCollecting.collect`; the timeout is a broken-flow backstop);
     /// returns the first matching rep.
     private func collectUntil(
         _ machine: StateMachine,
-        until finished: @Sendable @escaping (ViewRep) -> Bool,
+        until finished: @Sendable @escaping (CrafterRep) -> Bool,
         timeout: TimeInterval = 10
-    ) async -> ViewRep? {
+    ) async -> CrafterRep? {
         let collector = AccountDrivenSignInTests.RepCollector()
         await RepCollecting.collect(
-            machine,
+            machine.crafterRep,
             onRep: { collector.append($0) },
             until: finished, timeout: timeout
         )

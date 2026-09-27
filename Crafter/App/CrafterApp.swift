@@ -3,8 +3,9 @@ import BitMeCore
 
 /// BitMe Pocket Crafter: workstations and craft tasks for a claim, on the
 /// go. Thin SwiftUI host over the BitMeCore state machine: owns the actor,
-/// forwards intents, and renders whatever the published `ViewRep` says.
-/// All behavior lives in the core — this target is presentation only.
+/// forwards intents, and renders whatever the published `CrafterRep` (the
+/// account-driven projection) says. All behavior lives in the core — this
+/// target is presentation only.
 ///
 /// Sign-in is account-driven: the app opens on the emailed-code screen and
 /// the tracked character is always the signed-in account's own player (the
@@ -25,7 +26,7 @@ struct CrafterApp: App {
             resourceMapEnabled: false, accountDrivenSignIn: true
         )
     )
-    @State private var viewRep: ViewRep?
+    @State private var viewRep: CrafterRep?
     @State private var workstations: WorkstationsRep = .empty
 
     var body: some Scene {
@@ -37,7 +38,7 @@ struct CrafterApp: App {
                 ingest: { intent in await machine.ingest(intent) }
             )
             .task {
-                let stream = machine.viewRep.values
+                let stream = machine.crafterRep.values
                 for await rep in stream {
                     viewRep = rep
                 }
@@ -66,7 +67,7 @@ struct CrafterApp: App {
 
 struct RootView: View {
     let machine: StateMachine
-    let viewRep: ViewRep?
+    let viewRep: CrafterRep?
     let workstations: WorkstationsRep
     let ingest: @Sendable (Sendable) async -> Void
 
@@ -74,17 +75,12 @@ struct RootView: View {
         // The broadcaster replays the latest rep immediately, so this
         // placeholder renders for at most a frame.
         switch viewRep {
-        case .bitCraftSignIn(let signIn):
+        case .signIn(let signIn):
             SignInView(signIn: signIn, ingest: ingest)
         case .gameSessionPrompt(let prompt):
             GameSessionPromptView(prompt: prompt, ingest: ingest)
         case .session(let session):
             CrafterHomeView(session: session, workstations: workstations, ingest: ingest)
-        case .onboarding:
-            // Name onboarding is unreachable in the account-driven machine —
-            // it exists for X-Ray's flow. Render the launch background if a
-            // stray rep ever lands here.
-            Color(white: 0.05).ignoresSafeArea()
         case nil:
             Color(white: 0.05).ignoresSafeArea()
         }

@@ -1,12 +1,153 @@
 import Foundation
 
-/// The pure projection of machine state the UI (and CLI) subscribe to.
+// MARK: - Payloads shared by both projections
+
+/// The BitCraft account sign-in screen: emailed access code login
+/// (email → code → SpacetimeDB token), and — in account-driven apps —
+/// locating the account's player while the session starts. Both
+/// projections carry the screen (name-driven apps support it as an
+/// overlay; account-driven apps open on it).
+public struct BitCraftSignIn: Equatable, Sendable, Codable {
+    public enum Phase: Equatable, Sendable, Codable {
+        /// Email entry.
+        case idle
+        /// The code request is in flight.
+        case requestingCode
+        /// The code was emailed to `email`; the user is typing it.
+        case awaitingCode(email: String)
+        /// The code was submitted; authentication is in flight.
+        case authenticating(email: String)
+        /// The account is verified; its player is being located over the
+        /// game's global database.
+        case linking(email: String)
+    }
+
+    public var phase: Phase
+    public var error: String?
+    /// Whether leaving the screen is possible (a session or onboarding
+    /// sits behind it). False only in account-driven apps with no linked
+    /// character — there, the screen is the root.
+    public var canDismiss: Bool
+
+    public init(phase: Phase, error: String?, canDismiss: Bool) {
+        self.phase = phase
+        self.error = error
+        self.canDismiss = canDismiss
+    }
+
+    init(state: EphemeralState.SignInState, canDismiss: Bool) {
+        let phase: Phase
+        switch state.phase {
+        case .idle: phase = .idle
+        case .requestingCode: phase = .requestingCode
+        case .awaitingCode(let email): phase = .awaitingCode(email: email)
+        case .authenticating(let email, _): phase = .authenticating(email: email)
+        case .linking(let email): phase = .linking(email: email)
+        }
+        self.phase = phase
+        self.error = state.error
+        self.canDismiss = canDismiss
+    }
+}
+
+/// The relay-poll connection health — shared by both session payloads.
+public enum SessionConnection: String, Equatable, Sendable, Codable {
+    case ok
+    case degraded
+    case down
+}
+
+/// An action in progress (`server_time_ms < ends_at_ms`) — one per
+/// layer, Base first. Feeds X-Ray's dashboard/HUD and Crafter's
+/// running-craft card.
+public struct RunningAction: Equatable, Sendable, Codable {
+    public var actionType: String
+    /// "Base" or "UpperBody".
+    public var layer: String
+    /// Session target's name when it is this action's target.
+    public var targetName: String?
+    /// Relay-clock ms.
+    public var startsAtMs: Double
+    public var endsAtMs: Double
+    public var durationMs: Double
+}
+
+/// The fields both session payloads share: the relay's character snapshot
+/// as both apps render it (identity header, connection, clock anchor,
+/// running actions). The per-app projections map this into their own
+/// screen-shaped `Session` structs.
+struct SessionShell {
+    let username: String?
+    let entityID: String?
+    let region: Int?
+    let claimName: String?
+    let bitCraftAccountEmail: String?
+    let signedIn: Bool?
+    let connection: SessionConnection
+    let nowMs: Double?
+    let actions: [RunningAction]
+
+    static func project(persistent: PersistentState, ephemeral: EphemeralState) -> SessionShell {
+        let snapshot = ephemeral.session?.snapshot
+        let nowMs = snapshot.map { Double($0.serverTimeMs) }
+        let actions: [RunningAction]
+        if let snapshot {
+            let now = Double(snapshot.serverTimeMs)
+            actions = snapshot.actions
+                .filter { $0.durationMs > 0 && Double($0.endsAtMs) > now }
+                .sorted { lhs, rhs in
+                    if lhs.layer == rhs.layer { return lhs.layer < rhs.layer }
+                    return lhs.layer == "Base" // Base layer first
+                }
+                .map { action in
+                    RunningAction(
+                        actionType: action.actionType,
+                        layer: action.layer,
+                        targetName: action.targetEntityID.flatMap { targetID in
+                            snapshot.target?.entityID == targetID ? snapshot.target?.name : nil
+                        },
+                        startsAtMs: Double(action.startTimeMs),
+                        endsAtMs: Double(action.endsAtMs),
+                        durationMs: Double(action.durationMs)
+                    )
+                }
+        } else {
+            actions = []
+        }
+        return SessionShell(
+            username: persistent.identity?.username,
+            entityID: persistent.identity?.entityID,
+            region: snapshot?.region ?? persistent.identity?.regionID,
+            claimName: snapshot?.claim?.name,
+            bitCraftAccountEmail: persistent.bitCraftAccount?.email,
+            signedIn: snapshot?.signedIn,
+            connection: (ephemeral.session?.connection).map { rep in
+                switch rep {
+                case .ok: return .ok
+                case .degraded: return .degraded
+                case .down: return .down
+                }
+            } ?? .ok,
+            nowMs: nowMs,
+            actions: actions
+        )
+    }
+}
+
+// MARK: - Name-driven projection (X-Ray, CLI)
+
+/// The pure projection of machine state for **name-driven hosts**
+/// (X-Ray and the CLI — `StateMachine.Configuration.accountDrivenSignIn`
+/// off): resolve a character by name, then live on the session — the
+/// harvest dashboard (bush, citric, stamina, food) and the resource map.
 /// Screen-shaped, `Equatable` for change-detection, anchors in relay-clock
 /// milliseconds so renderers interpolate countdowns locally.
+///
+/// The account-driven flow (Pocket Crafter) has its own `CrafterRep`;
+/// the machine publishes exactly one of the two, chosen at construction.
 public enum ViewRep: Equatable, Sendable, Codable {
     case onboarding(Onboarding)
-    case bitCraftSignIn(BitCraftSignIn)
-    case gameSessionPrompt(GameSessionPrompt)
+    case signIn(BitCraftSignIn)
     case session(Session)
 
     public struct Onboarding: Equatable, Sendable, Codable {
@@ -19,67 +160,7 @@ public enum ViewRep: Equatable, Sendable, Codable {
         public var bitCraftAccountEmail: String?
     }
 
-    /// The BitCraft account sign-in screen: emailed access code login
-    /// (email → code → SpacetimeDB token), and — in account-driven apps —
-    /// locating the account's player while the session starts.
-    public struct BitCraftSignIn: Equatable, Sendable, Codable {
-        public enum Phase: Equatable, Sendable, Codable {
-            /// Email entry.
-            case idle
-            /// The code request is in flight.
-            case requestingCode
-            /// The code was emailed to `email`; the user is typing it.
-            case awaitingCode(email: String)
-            /// The code was submitted; authentication is in flight.
-            case authenticating(email: String)
-            /// The account is verified; its player is being located over the
-            /// game's global database.
-            case linking(email: String)
-        }
-
-        public var phase: Phase
-        public var error: String?
-        /// Whether leaving the screen is possible (a session or onboarding
-        /// sits behind it). False only in account-driven apps with no linked
-        /// character — there, the screen is the root.
-        public var canDismiss: Bool
-    }
-
-    /// The post-authentication, pre-sign-in gate (account-driven apps):
-    /// the signed-in account's character at a glance — name, in-game N/E
-    /// coordinates, the claim they stand in — plus the relay's live answer
-    /// to whether the account already holds a session (on another device),
-    /// and the action that signs the game session in.
-    public struct GameSessionPrompt: Equatable, Sendable, Codable {
-        public var username: String?
-        public var entityID: String?
-        public var region: Int?
-        public var bitCraftAccountEmail: String?
-        /// In-game map coordinates: super-hex N/E offsets of the
-        /// character's last known position (+z north, +x east — the same
-        /// display the game's map and X-Ray's tile inspect use). Nil while
-        /// no position is known.
-        public var north: Int?
-        public var east: Int?
-        /// The claim the character stands in, when relay data names one.
-        public var claimName: String?
-        /// The relay's presence answer: the account is signed in — on
-        /// another device, since this gate shows only while this app holds
-        /// no session. Nil while unknown. Drives the gate's action label:
-        /// "Take over session" vs "Sign in".
-        public var signedInElsewhere: Bool?
-        /// Why the previous game session ended, when there was one
-        /// (refused / kicked / lost).
-        public var notice: String?
-    }
-
     public struct Session: Equatable, Sendable, Codable {
-        public enum Connection: String, Equatable, Sendable, Codable {
-            case ok
-            case degraded
-            case down
-        }
-
         public struct Resource: Equatable, Sendable, Codable {
             public var name: String
             /// 0...1, nil while health is not yet tracked.
@@ -109,42 +190,12 @@ public enum ViewRep: Equatable, Sendable, Codable {
             public var fullAtMs: Double?
         }
 
-        /// The account's `sign_in` on the game's global database — the
-        /// session the actual game enforces one of per account. `live`
-        /// means this device owns it (other devices were kicked).
-        public struct GameSession: Equatable, Sendable, Codable {
-            public enum Status: String, Equatable, Sendable, Codable {
-                case connecting
-                case live
-                case reconnecting
-                case rejected
-            }
-
-            public var status: Status
-            /// The server's rejection message, when `status` is `rejected`.
-            public var error: String?
-        }
-
         public struct LiveBuff: Equatable, Sendable, Codable {
             public var id: Int
             public var expiresAtSec: Int64
             /// buff_desc display name; nil when gamedata lacks this id.
             public var name: String?
             public var stats: [BuffStat]
-        }
-
-        /// An action in progress (`server_time_ms < ends_at_ms`) — one per
-        /// layer, Base first. Feeds the Live Activity and the map HUD.
-        public struct RunningAction: Equatable, Sendable, Codable {
-            public var actionType: String
-            /// "Base" or "UpperBody".
-            public var layer: String
-            /// Session target's name when it is this action's target.
-            public var targetName: String?
-            /// Relay-clock ms.
-            public var startsAtMs: Double
-            public var endsAtMs: Double
-            public var durationMs: Double
         }
 
         public struct Food: Equatable, Sendable, Codable {
@@ -211,79 +262,13 @@ public enum ViewRep: Equatable, Sendable, Codable {
             )
         }
 
-        /// The pinned claim's workstations (Pocket Crafter): every building
-        /// in the claim joined with the catalogs, nicknames, and the crafts
-        /// running at them — the live state of the claim-buildings sync.
-        public struct Workstations: Equatable, Sendable, Codable {
-            public enum Status: String, Equatable, Sendable, Codable {
-                case idle
-                case syncing
-                case live
-                case failed
-            }
-
-            public enum CraftPhase: String, Equatable, Sendable, Codable {
-                case queued
-                case processing
-                case complete
-                case active
-                case preparing
-            }
-
-            public struct Building: Equatable, Sendable, Codable {
-                public let entityID: String
-                /// Nickname, else catalog name, else "Building <entity id>".
-                public let name: String
-                public let catalogName: String?
-                /// Any function entry advertises crafting/refining slots.
-                public let isCrafting: Bool
-                /// Any function entry advertises item/cargo pockets.
-                public let isStorage: Bool
-                /// Crafts at this station (active + queued, anyone's).
-                public let craftCount: Int
-            }
-
-            public struct Craft: Equatable, Sendable, Codable {
-                public let entityID: String
-                /// Catalog recipe name; nil until the catalog lands.
-                public let recipeName: String?
-                /// Joined station name; nil for crafts at unknown stations.
-                public let stationName: String?
-                public let mine: Bool
-                public let phase: CraftPhase
-                /// Active crafts: completed actions of `craftCount`.
-                public let progress: Int?
-                public let craftCount: Int?
-            }
-
-            public var status: Status
-            public var error: String?
-            /// Crafting stations first, then storage, then the rest —
-            /// name-sorted within each group.
-            public var buildings: [Building]
-            /// The player's own pending crafts first, then the claim's,
-            /// each station-then-name sorted. Completed passive crafts are
-            /// collected in game and stay out of the list; `craftsOverflow`
-            /// counts what the cap dropped.
-            public var crafts: [Craft]
-            public var craftsOverflow: Int
-
-            public static let empty = Workstations(status: .idle, error: nil, buildings: [], crafts: [], craftsOverflow: 0)
-        }
-
         public var username: String?
         public var entityID: String?
         public var region: Int?
-        /// Email of the signed-in BitCraft account, when there is one —
-        /// drives the session header's account entry.
+        /// Email of the signed-in BitCraft account, when there is one.
         public var bitCraftAccountEmail: String?
         public var signedIn: Bool?
-        public var connection: Connection
-        /// The account's live game session (account-driven apps): the
-        /// `sign_in` held on the game's global database, which owns the
-        /// game's one-live-session-per-account slot. Nil when the app
-        /// doesn't hold one.
-        public var gameSession: GameSession?
+        public var connection: SessionConnection
         public var claimName: String?
         /// Relay clock at snapshot time — the interpolation anchor.
         public var nowMs: Double?
@@ -293,40 +278,15 @@ public enum ViewRep: Equatable, Sendable, Codable {
         public var food: Food
         public var actions: [RunningAction]
         public var resourceMap: ResourceMap
-        public var workstations: Workstations = .empty
     }
 
     static func from(persistent: PersistentState, ephemeral: EphemeralState) -> ViewRep {
-        from(persistent: persistent, ephemeral: ephemeral, workstations: workstations(from: ephemeral.session))
-    }
-
-    /// The projection entry the machine uses: the workstations join is
-    /// expensive (a busy claim's buildings + capped crafts, sorted), so the
-    /// machine computes it once per buildings-state change (its own
-    /// `workstationsRep` channel) and hands it in — this path never re-runs
-    /// it per ingest.
-    static func from(
-        persistent: PersistentState,
-        ephemeral: EphemeralState,
-        workstations: Session.Workstations
-    ) -> ViewRep {
-        let signInOnTop = ephemeral.signInVisible
-            // Account-driven apps: with no linked character the screen is the
-            // root — there is no onboarding to fall back to.
-            || (ephemeral.accountDrivenSignIn && persistent.identity == nil)
-        if signInOnTop {
-            let phase: BitCraftSignIn.Phase
-            switch ephemeral.signIn.phase {
-            case .idle: phase = .idle
-            case .requestingCode: phase = .requestingCode
-            case .awaitingCode(let email): phase = .awaitingCode(email: email)
-            case .authenticating(let email, _): phase = .authenticating(email: email)
-            case .linking(let email): phase = .linking(email: email)
-            }
-            return .bitCraftSignIn(BitCraftSignIn(
-                phase: phase,
-                error: ephemeral.signIn.error,
-                canDismiss: !ephemeral.accountDrivenSignIn || persistent.identity != nil
+        // The sign-in screen overlays whatever is behind it whenever the
+        // user opened it (name-driven hosts only ever open it over
+        // onboarding or a live session, so it is always dismissible).
+        if ephemeral.signInVisible {
+            return .signIn(BitCraftSignIn(
+                state: ephemeral.signIn, canDismiss: true
             ))
         }
         guard persistent.identity != nil else {
@@ -343,44 +303,9 @@ public enum ViewRep: Equatable, Sendable, Codable {
             ))
         }
 
-        // Account-driven apps: between a completed link (or a restored
-        // launch) and a user-taken game session — and again whenever a
-        // held session ends — the pre-sign-in gate is the screen.
-        if ephemeral.accountDrivenSignIn, ephemeral.preSignInVisible {
-            let position = ephemeral.session?.snapshot?.position
-            let superOffset = position.map {
-                SuperHexMath.tileToSuperOffset(x: $0.tileX, z: $0.tileZ)
-            }
-            return .gameSessionPrompt(GameSessionPrompt(
-                username: persistent.identity?.username,
-                entityID: persistent.identity?.entityID,
-                region: ephemeral.session?.snapshot?.region ?? persistent.identity?.regionID,
-                bitCraftAccountEmail: persistent.bitCraftAccount?.email,
-                north: superOffset?.z,
-                east: superOffset?.x,
-                claimName: ephemeral.session?.snapshot?.claim?.name,
-                signedInElsewhere: ephemeral.session?.snapshot?.signedIn,
-                notice: ephemeral.gameSessionNotice
-            ))
-        }
-
         let config = GameConfig.shared
-        let nowMs = ephemeral.session?.snapshot.map { Double($0.serverTimeMs) }
-
-        // -- game session (account-driven apps) ------------------------------
-        var gameSession: Session.GameSession?
-        if ephemeral.accountDrivenSignIn, let session = ephemeral.session {
-            let status: Session.GameSession.Status
-            switch session.gameSession.status {
-            case .connecting: status = .connecting
-            case .live: status = .live
-            case .reconnecting: status = .reconnecting
-            case .rejected: status = .rejected
-            }
-            gameSession = Session.GameSession(
-                status: status, error: session.gameSession.lastError
-            )
-        }
+        let shell = SessionShell.project(persistent: persistent, ephemeral: ephemeral)
+        let nowMs = shell.nowMs
 
         // -- bush countdown ------------------------------------------------
         var bush: Session.Resource?
@@ -480,156 +405,22 @@ public enum ViewRep: Equatable, Sendable, Codable {
             food = Session.Food(configured: ephemeral.gamedata != nil, active: false, expiresAtSec: nil, liveBuffs: [])
         }
 
-        // -- running actions --------------------------------------------------
-        let actions: [Session.RunningAction]
-        if let snapshot = ephemeral.session?.snapshot {
-            let now = Double(snapshot.serverTimeMs)
-            actions = snapshot.actions
-                .filter { $0.durationMs > 0 && Double($0.endsAtMs) > now }
-                .sorted { lhs, rhs in
-                    if lhs.layer == rhs.layer { return lhs.layer < rhs.layer }
-                    return lhs.layer == "Base" // Base layer first
-                }
-                .map { action in
-                    Session.RunningAction(
-                        actionType: action.actionType,
-                        layer: action.layer,
-                        targetName: action.targetEntityID.flatMap { targetID in
-                            snapshot.target?.entityID == targetID ? snapshot.target?.name : nil
-                        },
-                        startsAtMs: Double(action.startTimeMs),
-                        endsAtMs: Double(action.endsAtMs),
-                        durationMs: Double(action.durationMs)
-                    )
-                }
-        } else {
-            actions = []
-        }
-
         return .session(Session(
-            username: persistent.identity?.username,
-            entityID: persistent.identity?.entityID,
-            region: ephemeral.session?.snapshot?.region ?? persistent.identity?.regionID,
-            bitCraftAccountEmail: persistent.bitCraftAccount?.email,
-            signedIn: ephemeral.session?.snapshot?.signedIn,
-            connection: (ephemeral.session?.connection).map { rep in
-                switch rep {
-                case .ok: return .ok
-                case .degraded: return .degraded
-                case .down: return .down
-                }
-            } ?? .ok,
-            gameSession: gameSession,
-            claimName: ephemeral.session?.snapshot?.claim?.name,
-            nowMs: nowMs,
+            username: shell.username,
+            entityID: shell.entityID,
+            region: shell.region,
+            bitCraftAccountEmail: shell.bitCraftAccountEmail,
+            signedIn: shell.signedIn,
+            connection: shell.connection,
+            claimName: shell.claimName,
+            nowMs: shell.nowMs,
             bush: bush,
             citric: citric,
             stamina: stamina,
             food: food,
-            actions: actions,
-            resourceMap: resourceMap(from: ephemeral.session),
-            workstations: workstations
+            actions: shell.actions,
+            resourceMap: resourceMap(from: ephemeral.session)
         ))
-    }
-
-    /// Projects the claim-buildings sync state: the claim's buildings joined
-    /// with the catalogs and nicknames, plus the pending crafts the
-    /// subscriptions delivered (the player's own anywhere, anyone's at claim
-    /// stations). Completed passive crafts are dropped — they are collected
-    /// in game and would otherwise dominate a busy claim's list — and the
-    /// list is capped (`craftsOverflow` carries what fell off).
-    static func workstations(from session: EphemeralState.Session?, cap: Int = 200) -> Session.Workstations {
-        guard let session else { return .empty }
-        let state = session.buildings
-        guard state.status != .idle, !state.isEmpty else { return .empty }
-
-        let status: Session.Workstations.Status
-        switch state.status {
-        case .idle: status = .idle
-        case .syncing: status = .syncing
-        case .live: status = .live
-        case .failed: status = .failed
-        }
-
-        let isPending: (RegionCraft) -> Bool = { craft in
-            if case .passive(.complete, _) = craft.kind { return false }
-            return true
-        }
-
-        var craftsByBuilding: [UInt64: Int] = [:]
-        for craft in state.crafts.values where isPending(craft) {
-            craftsByBuilding[craft.buildingEntityID, default: 0] += 1
-        }
-
-        let buildings: [Session.Workstations.Building] = state.buildings.values
-            .map { building in
-                let desc = state.gamedata.buildings[building.buildingDescriptionID]
-                let nickname = state.nicknames[building.entityID]
-                return Session.Workstations.Building(
-                    entityID: String(building.entityID),
-                    name: nickname ?? desc?.name ?? "Building \(building.entityID)",
-                    catalogName: desc?.name,
-                    isCrafting: desc?.isCrafting ?? false,
-                    isStorage: desc?.isStorage ?? false,
-                    craftCount: craftsByBuilding[building.entityID] ?? 0
-                )
-            }
-            .sorted { lhs, rhs in
-                let lRank = (lhs.isCrafting ? 0 : lhs.isStorage ? 1 : 2, lhs.name, lhs.entityID)
-                let rRank = (rhs.isCrafting ? 0 : rhs.isStorage ? 1 : 2, rhs.name, rhs.entityID)
-                return lRank < rRank
-            }
-
-        let playerID = state.playerEntityID
-        let nameByBuilding = Dictionary(uniqueKeysWithValues: buildings.map { (UInt64($0.entityID) ?? 0, $0.name) })
-        let pending = state.crafts.values
-            .filter { isPending($0) }
-            .filter { craft in
-                // Anything the subscriptions delivered is in scope by
-                // construction (personal set, per-building claim sets);
-                // the filter keeps stragglers from removed stations honest.
-                state.buildings[craft.buildingEntityID] != nil
-                    || craft.ownerEntityID == playerID
-            }
-            .sorted { lhs, rhs in
-                let lRank = (lhs.ownerEntityID == playerID ? 0 : 1, lhs.buildingEntityID, lhs.entityID)
-                let rRank = (rhs.ownerEntityID == playerID ? 0 : 1, rhs.buildingEntityID, rhs.entityID)
-                return lRank < rRank
-            }
-        var crafts: [Session.Workstations.Craft] = []
-        crafts.reserveCapacity(min(pending.count, cap))
-        for craft in pending.prefix(cap) {
-            let phase: Session.Workstations.CraftPhase
-            var progress: Int?
-            var craftCount: Int?
-            switch craft.kind {
-            case .passive(let status, _):
-                switch status {
-                case .queued: phase = .queued
-                case .processing: phase = .processing
-                case .complete: phase = .complete
-                }
-            case .active(let rawProgress, let count, let preparation, _):
-                phase = preparation ? .preparing : .active
-                progress = Int(rawProgress)
-                craftCount = Int(count)
-            }
-            crafts.append(Session.Workstations.Craft(
-                entityID: String(craft.entityID),
-                recipeName: state.gamedata.recipeNames[craft.recipeID],
-                stationName: nameByBuilding[craft.buildingEntityID],
-                mine: craft.ownerEntityID == playerID,
-                phase: phase,
-                progress: progress,
-                craftCount: craftCount
-            ))
-        }
-
-        return Session.Workstations(
-            status: status, error: state.lastError,
-            buildings: buildings, crafts: crafts,
-            craftsOverflow: max(0, pending.count - cap)
-        )
     }
 
     /// Projects the session's resource-map state: aggregates the tile tally

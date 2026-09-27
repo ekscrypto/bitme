@@ -26,8 +26,8 @@ struct PersistentState: Codable, Sendable {
 }
 
 /// Lives for the process lifetime: onboarding progress, gamedata, and the
-/// live session. Read only inside `Intent.mutate` and `ViewRep.from`
-/// (fenex-light ADR-014).
+/// live session. Read only inside `Intent.mutate` and the rep projections
+/// (`ViewRep.from`, `CrafterRep.from`) (fenex-light ADR-014).
 struct EphemeralState: Sendable {
     enum OnboardingPhase: Equatable, Sendable {
         case idle
@@ -66,6 +66,10 @@ struct EphemeralState: Sendable {
     /// session ends. The game session is never re-taken automatically:
     /// only the button takes it back.
     var preSignInVisible = false
+    /// The account email whose startup resume link is in flight — a
+    /// persisted JWT re-locates the character over the global database
+    /// while the gate already shows (in its resuming state). Nil otherwise.
+    var resumingAccount: String?
     /// Why the previous game session ended (refused, kicked, lost) — shown
     /// on the pre-sign-in gate; cleared by the next sign-in attempt.
     var gameSessionNotice: String?

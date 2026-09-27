@@ -11,7 +11,7 @@ import BitMeCore
 /// if the session is later kicked or dropped, the machine returns here —
 /// never re-taking it automatically.
 struct GameSessionPromptView: View {
-    let prompt: ViewRep.GameSessionPrompt
+    let prompt: CrafterRep.GameSessionPrompt
     let ingest: @Sendable (Sendable) async -> Void
 
     var body: some View {
@@ -19,8 +19,12 @@ struct GameSessionPromptView: View {
             Color(white: 0.05).ignoresSafeArea()
             VStack(spacing: 16) {
                 Spacer()
-                header
-                characterCard
+                if prompt.resuming {
+                    resumingCard
+                } else {
+                    header
+                    characterCard
+                }
                 if let notice = prompt.notice {
                     Text(notice)
                         .font(.footnote)
@@ -28,7 +32,9 @@ struct GameSessionPromptView: View {
                         .padding(10)
                         .background(.orange.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
                 }
-                presenceLine
+                if !prompt.resuming {
+                    presenceLine
+                }
                 Button {
                     Task { await ingest(Intent.SignInGameSession()) }
                 } label: {
@@ -38,7 +44,7 @@ struct GameSessionPromptView: View {
                         .padding(.vertical, 4)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(prompt.claimName == nil)
+                .disabled(prompt.resuming || prompt.claimName == nil)
                 Button {
                     Task { await ingest(Intent.SignOut()) }
                 } label: {
@@ -55,6 +61,28 @@ struct GameSessionPromptView: View {
     }
 
     // MARK: - Sections
+
+    /// The persisted JWT's startup state: the character is being relocated
+    /// over the global database — nothing to act on until it lands (a
+    /// failed resume falls back to the sign-in screen with the reason).
+    private var resumingCard: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "person.crop.circle.badge.clock")
+                .font(.system(size: 44))
+                .foregroundStyle(.secondary)
+            Text("Restoring your session…")
+                .font(.title3.bold())
+            if let email = prompt.bitCraftAccountEmail {
+                Text(email)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            ProgressView()
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity)
+        .background(Color(white: 0.1), in: RoundedRectangle(cornerRadius: 16))
+    }
 
     private var header: some View {
         VStack(spacing: 4) {
