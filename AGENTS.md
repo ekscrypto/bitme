@@ -71,16 +71,11 @@ when a question is "does the game have a table/field for X?".
 ## Working notes (hard-won, 2026-09 claim-buildings work)
 
 - **Claim-buildings sync**: reference is
-  [docs/protocol/region-claim-buildings.md](docs/protocol/region-claim-buildings.md).
-  All region-DB traffic rides the single region-leg websocket
-  (`GlobalSessionClient` yields it as `.regionLeg`) — the game allows one
-  live session per account per database; never open a second region
-  connection. Row events pool 0.5 s in `RegionBuildingsClient.EventBuffer`
-  (one intent per pool); new tables go through `consume()` + `recordDelta`.
-  Phone guardrails: never subscribe `building_state` (~74K rows/region) or
-  `location_state` (~13M) unfiltered; `inventory_state` per-owner only.
-  The projection drops completed passive crafts and caps at 200
-  (`craftsOverflow`).
+  [docs/protocol/region-claim-buildings.md](docs/protocol/region-claim-buildings.md);
+  sync design, row pipeline, and guardrails live in the
+  `claim-buildings-sync` skill. The one catastrophic rule: never subscribe
+  `building_state` (~74K rows/region) or `location_state` (~13M)
+  unfiltered; `inventory_state` per-owner only.
 - **spacetimedb-swift-sdk (our fork)**: `connect()` returns *before* the
   handshake — `.connected` means InitialConnection. Attach `tableEvents`
   streams *before* `subscribe`, or the initial snapshot is missed.
@@ -93,12 +88,11 @@ when a question is "does the game have a table/field for X?".
   "received N pooled event(s)" debug line). Activities read no state —
   use the carrier pattern (`ClaimCarrier`, `ResourceStreamCarrier`).
 - **Testing**: the full suite runs in <1 s — run it after every edit.
-  Waits are event-driven (`RepCollecting.collect`); never write
-  wall-clock "nothing happened within X ms" assertions — they go flaky
-  under load. Machine-flow tests drive the real machine over scripted
-  adapters (see the `AccountDrivenSignInTests` harness).
+  Test-writing patterns (event-driven `RepCollecting` waits, the
+  scripted-adapter machine-flow harness) live in the `event-driven-tests`
+  skill.
 - **Protocol facts**: the server answers `sign_in` with a ReducerResult
   in ~200 ms — anything slower is a dead handshake, not server slowness.
-  BSATN row decoders pin schema field order; after a game update,
-  re-verify against `bitjita-schema-region.json`. Tap captures
-  (gitignored, `tools/tap/captures/`) decode via `tools/tap/decode.js`.
+  BSATN row decoders pin schema field order; after a game update, follow
+  the `bsatn-schema-check` skill (schema re-verification + tap-capture
+  decoding).
