@@ -105,9 +105,14 @@ struct CrafterHomeView: View {
 /// Crafting stations and craft tasks, regrouped under collapsible
 /// profession headers (the workstation families of the catalog: Carpentry,
 /// …, Tailoring; everything else — Cooking, workbenches, taming — under
-/// "Other"). A profession's station list comes from the catalog name; its
-/// craft tasks from the recipe's profession, so a task follows its recipe
-/// even when the station itself is unknown.
+/// "Other"). A station's crafts nest under the station row itself (tap to
+/// expand): the player's own crafts, plus **shared** bench crafts other
+/// players opened to the claim (marked with a two-figure icon — anyone
+/// may contribute effort, exactly like at the station in game). Other
+/// players' private work — abandoned bench sessions included — renders
+/// nowhere; the game shows it to nobody.
+/// Own crafts at stations outside the claim (no station row to nest
+/// under) list at the bottom of their recipe's profession group.
 private struct CraftingTab: View {
     let session: CrafterRep.Session
     let workstations: WorkstationsRep
@@ -115,23 +120,38 @@ private struct CraftingTab: View {
     /// Collapsed by default — a busy claim carries many stations, and the
     /// running-craft card already surfaces the active work on top.
     @State private var expanded: Set<Profession> = []
+    /// Stations whose nested craft list is revealed (by building id).
+    @State private var expandedStations: Set<String> = []
 
     private struct ProfessionGroup {
         let profession: Profession
         let stations: [WorkstationsRep.Building]
-        let crafts: [WorkstationsRep.Craft]
+        /// Own crafts at claim stations, keyed by the station's building id
+        /// — what expanding a station row reveals.
+        let craftsByStation: [String: [WorkstationsRep.Craft]]
+        /// Own crafts at stations outside the claim — no station row to
+        /// nest under, so they list at the group's bottom.
+        let awayCrafts: [WorkstationsRep.Craft]
     }
 
     /// The professions that have something to show, in `Profession.allCases`
     /// order (the named twelve, then Other).
     private var groups: [ProfessionGroup] {
         let crafting = workstations.buildings.filter(\.isCrafting)
+        let craftsByStation = Dictionary(grouping: workstations.crafts, by: \.buildingEntityID)
+        let stationIDs = Set(crafting.map(\.entityID))
         return Profession.allCases.compactMap { profession in
             let stations = crafting.filter { ($0.profession ?? .other) == profession }
-            let crafts = workstations.crafts.filter { ($0.profession ?? .other) == profession }
-            return stations.isEmpty && crafts.isEmpty
+            let nested = stations.reduce(into: [WorkstationsRep.Craft]()) { $0 += craftsByStation[$1.entityID] ?? [] }
+            let away = workstations.crafts.filter {
+                !stationIDs.contains($0.buildingEntityID) && ($0.profession ?? .other) == profession
+            }
+            return stations.isEmpty && nested.isEmpty && away.isEmpty
                 ? nil
-                : ProfessionGroup(profession: profession, stations: stations, crafts: crafts)
+                : ProfessionGroup(
+                    profession: profession, stations: stations,
+                    craftsByStation: craftsByStation, awayCrafts: away
+                )
         }
     }
 
@@ -159,9 +179,20 @@ private struct CraftingTab: View {
                 ForEach(groups, id: \.profession) { group in
                     DisclosureGroup(isExpanded: isExpanded(group.profession)) {
                         ForEach(group.stations, id: \.entityID) { building in
-                            BuildingRow(building: building)
+                            StationRow(
+                                building: building,
+                                hasCrafts: !(group.craftsByStation[building.entityID] ?? []).isEmpty,
+                                expanded: expandedStations.contains(building.entityID),
+                                toggle: { toggleStation(building.entityID) }
+                            )
+                            if expandedStations.contains(building.entityID) {
+                                ForEach(group.craftsByStation[building.entityID] ?? [], id: \.entityID) { craft in
+                                    CraftRow(craft: craft)
+                                        .padding(.leading, 24)
+                                }
+                            }
                         }
-                        ForEach(group.crafts, id: \.entityID) { craft in
+                        ForEach(group.awayCrafts, id: \.entityID) { craft in
                             CraftRow(craft: craft)
                         }
                         if group.profession == .other && stations.craftsOverflow > 0 {
@@ -199,6 +230,14 @@ private struct CraftingTab: View {
         )
     }
 
+    private func toggleStation(_ entityID: String) {
+        if expandedStations.contains(entityID) {
+            expandedStations.remove(entityID)
+        } else {
+            expandedStations.insert(entityID)
+        }
+    }
+
     /// The collapsible header: profession icon, name, and what's inside.
     private func groupHeader(_ group: ProfessionGroup) -> some View {
         HStack {
@@ -215,12 +254,14 @@ private struct CraftingTab: View {
     }
 
     private func countLabel(_ group: ProfessionGroup) -> String {
+        let crafts = group.stations.reduce(0) { $0 + (group.craftsByStation[$1.entityID]?.count ?? 0) }
+            + group.awayCrafts.count
         var parts: [String] = []
         if !group.stations.isEmpty {
             parts.append("\(group.stations.count) station\(group.stations.count == 1 ? "" : "s")")
         }
-        if !group.crafts.isEmpty {
-            parts.append("\(group.crafts.count) craft\(group.crafts.count == 1 ? "" : "s")")
+        if crafts > 0 {
+            parts.append("\(crafts) craft\(crafts == 1 ? "" : "s")")
         }
         return parts.joined(separator: " · ")
     }
@@ -281,7 +322,7 @@ private struct StorageTab: View {
     ) -> some View {
         Section {
             ForEach(buildings, id: \.entityID) { building in
-                BuildingRow(building: building)
+                StorageBuildingRow(building: building)
             }
         } header: {
             Label(title, systemImage: icon)
@@ -354,9 +395,9 @@ private struct ProfessionIcon: View {
     }
 }
 
-/// One workstation: display name (nickname over catalog), catalog subtitle,
-/// and the pending-craft count badge.
-private struct BuildingRow: View {
+/// One storage building (Storage tab): display name over catalog subtitle.
+/// No craft pill — craft rows live in the Crafting tab.
+private struct StorageBuildingRow: View {
     let building: WorkstationsRep.Building
 
     var body: some View {
@@ -373,25 +414,66 @@ private struct BuildingRow: View {
                 }
             }
             Spacer()
-            if building.craftCount > 0 {
-                Text("\(building.craftCount)")
-                    .font(.caption.monospacedDigit().bold())
-                    .padding(.horizontal, 8).padding(.vertical, 2)
-                    .background(.orange.opacity(0.25), in: Capsule())
-                    .foregroundStyle(.orange)
-            }
         }
         .padding(.vertical, 2)
     }
 }
 
-/// One pending craft task: recipe, station, ownership icon, and phase chip.
+/// One workstation: display name (nickname over catalog), catalog
+/// subtitle, the player's own pending-craft count pill, and a chevron
+/// when there are rows to expand (own crafts plus shared crafts other
+/// players opened). Others' private work never surfaces — the game shows
+/// it to nobody, so neither do we.
+private struct StationRow: View {
+    let building: WorkstationsRep.Building
+    let hasCrafts: Bool
+    let expanded: Bool
+    let toggle: () -> Void
+
+    var body: some View {
+        Button(action: toggle) {
+            HStack {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(building.name)
+                        .font(.subheadline)
+                        .lineLimit(1)
+                    if building.name != building.catalogName, let catalog = building.catalogName {
+                        Text(catalog)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                Spacer()
+                if building.myCraftCount > 0 {
+                    Text("\(building.myCraftCount)")
+                        .font(.caption.monospacedDigit().bold())
+                        .padding(.horizontal, 8).padding(.vertical, 2)
+                        .background(.orange.opacity(0.25), in: Capsule())
+                        .foregroundStyle(.orange)
+                }
+                if hasCrafts {
+                    Image(systemName: expanded ? "chevron.down" : "chevron.right")
+                        .font(.caption2.bold())
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.vertical, 2)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// One rendered craft task: recipe, station, ownership mark, and phase
+/// chip. Own crafts lead with a filled figure; a shared craft another
+/// player opened (anyone may contribute effort) with an outlined one.
 private struct CraftRow: View {
     let craft: WorkstationsRep.Craft
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: craft.mine ? "person.fill" : "person")
+            Image(systemName: craft.mine ? "person.fill" : "person.2")
                 .font(.caption2)
                 .foregroundStyle(craft.mine ? .orange : .secondary)
             VStack(alignment: .leading, spacing: 1) {
@@ -567,8 +649,11 @@ private struct CraftPhaseBadge: View {
         case .complete: "Done"
         case .preparing: "Preparing"
         case .active:
-            if let progress = craft.progress, let count = craft.craftCount, count > 0 {
-                "\(min(progress, count))/\(count)"
+            // Bench-craft progress is cumulative effort over the effort
+            // goal (`itemCount × recipe.actions_required`) — the same
+            // fraction the game's bar shows.
+            if let progress = craft.progress, let total = craft.progressTotal, total > 0 {
+                "\(min(progress, total))/\(total)"
             } else {
                 "Active"
             }

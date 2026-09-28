@@ -140,7 +140,7 @@ struct ClaimBuildingsTests {
         #expect(!totem.isStorage)
     }
 
-    @Test func projectionDropsCompletedCraftsAndCapsTheList() {
+    @Test func projectionDropsCompletedCraftsAndCapsOwnList() {
         var session = EphemeralState.Session(
             entityID: "1000", loop: CancellableTask(), streamLoop: CancellableTask()
         )
@@ -150,12 +150,20 @@ struct ClaimBuildingsTests {
             3001: RegionBuilding(entityID: 3001, claimEntityID: 2000, buildingDescriptionID: 1200)
         ]
         var crafts: [UInt64: RegionCraft] = [
+            // Own completed passive craft — collected in game, never listed
+            // or counted.
             1: RegionCraft(
                 entityID: 1, ownerEntityID: 1000, buildingEntityID: 3001, recipeID: 77,
                 kind: .passive(status: .complete, startedAtMicros: 0)
             )
         ]
-        for id: UInt64 in 2...12 {
+        for id: UInt64 in 2...6 {
+            crafts[id] = RegionCraft(
+                entityID: id, ownerEntityID: 1000, buildingEntityID: 3001, recipeID: 77,
+                kind: .passive(status: .queued, startedAtMicros: 0)
+            )
+        }
+        for id: UInt64 in 7...14 {
             crafts[id] = RegionCraft(
                 entityID: id, ownerEntityID: 2002, buildingEntityID: 3001, recipeID: 77,
                 kind: .passive(status: .queued, startedAtMicros: 0)
@@ -164,12 +172,92 @@ struct ClaimBuildingsTests {
         session.buildings.crafts = crafts
 
         let projected = WorkstationsRep.from(session: session, cap: 3)
-        // The completed craft is dropped everywhere; 11 queued survive the
-        // filter, 3 fit the cap, 8 overflow.
-        #expect(projected.buildings[0].craftCount == 11)
+        // The completed craft is dropped everywhere; the station's pill
+        // counts the player's 5 pending, and only own crafts become rows:
+        // 3 fit the cap, 2 overflow. The neighbors' 8 queued passive
+        // crafts surface nowhere (private, like the game shows them).
+        #expect(projected.buildings[0].myCraftCount == 5)
         #expect(projected.crafts.count == 3)
         #expect(!projected.crafts.contains { $0.phase == .complete })
-        #expect(projected.craftsOverflow == 8)
+        #expect(projected.craftsOverflow == 2)
+    }
+
+    @Test func projectionRendersOwnAndSharedCraftsOnly() {
+        var session = EphemeralState.Session(
+            entityID: "1000", loop: CancellableTask(), streamLoop: CancellableTask()
+        )
+        session.buildings.status = .live
+        session.buildings.playerEntityID = 1000
+        session.buildings.buildings = [
+            3001: RegionBuilding(entityID: 3001, claimEntityID: 2000, buildingDescriptionID: 1200),
+            3002: RegionBuilding(entityID: 3002, claimEntityID: 2000, buildingDescriptionID: 1200)
+        ]
+        session.buildings.gamedata = BuildingGamedata(
+            // Live-verified shapes: "Saw Exquisite Stripped Wood" carries
+            // 145 effort per item — 890 items is a 129,050-effort goal.
+            recipeActionsRequired: [2079251095: 145]
+        )
+        session.buildings.crafts = [
+            // Neighbor's shared bench craft, still open — renders a row.
+            10: RegionCraft(
+                entityID: 10, ownerEntityID: 2002, buildingEntityID: 3001, recipeID: 2079251095,
+                kind: .active(progress: 89300, craftCount: 890, preparation: false, lockExpiresAtMicros: 0)
+            ),
+            // Neighbor's shared bench craft, effort goal reached — the
+            // game's station list drops it; so does the projection.
+            11: RegionCraft(
+                entityID: 11, ownerEntityID: 2002, buildingEntityID: 3001, recipeID: 2079251095,
+                kind: .active(progress: 129050, craftCount: 890, preparation: false, lockExpiresAtMicros: 0)
+            ),
+            // Neighbor's private bench craft — never a row, only "in use".
+            12: RegionCraft(
+                entityID: 12, ownerEntityID: 2002, buildingEntityID: 3002, recipeID: 2079251095,
+                kind: .active(progress: 100, craftCount: 890, preparation: true, lockExpiresAtMicros: 0)
+            ),
+            // Neighbor's passive queue — private by game design, "in use".
+            13: RegionCraft(
+                entityID: 13, ownerEntityID: 2002, buildingEntityID: 3002, recipeID: 77,
+                kind: .passive(status: .processing, startedAtMicros: 0)
+            ),
+            // Own craft at a station outside the claim — still a row.
+            14: RegionCraft(
+                entityID: 14, ownerEntityID: 1000, buildingEntityID: 9001, recipeID: 77,
+                kind: .passive(status: .queued, startedAtMicros: 0)
+            ),
+            // Own bench craft at a claim station — nests under the station.
+            15: RegionCraft(
+                entityID: 15, ownerEntityID: 1000, buildingEntityID: 3002, recipeID: 77,
+                kind: .active(progress: 20, craftCount: 4, preparation: false, lockExpiresAtMicros: 0)
+            ),
+        ]
+        session.buildings.sharedCraftIDs = [10, 11]
+
+        let projected = WorkstationsRep.from(session: session)
+        // Rows: the shared-open craft, the own passive away craft, and the
+        // own bench craft. Station-then-own-first order.
+        #expect(projected.crafts.map(\.entityID) == ["10", "15", "14"])
+        #expect(projected.crafts.map(\.mine) == [false, true, true])
+        // The effort math the game's bar shows: 89300 of 890 × 145.
+        let shared = projected.crafts[0]
+        #expect(shared.progress == 89300)
+        #expect(shared.progressTotal == 129050)
+        #expect(shared.itemCount == 890)
+        #expect(shared.phase == .active)
+        // Own bench craft without a resolved recipe — no effort goal.
+        let own = projected.crafts[1]
+        #expect(own.progress == 20)
+        #expect(own.progressTotal == nil)
+        #expect(own.buildingEntityID == "3002")
+
+        // Station counts: only the player's own crafts pill — others'
+        // work (shared-finished, private, abandoned) surfaces nowhere.
+        guard let s1 = projected.buildings.first(where: { $0.entityID == "3001" }),
+              let s2 = projected.buildings.first(where: { $0.entityID == "3002" }) else {
+            Issue.record("expected both stations in the projection")
+            return
+        }
+        #expect(s1.myCraftCount == 0)
+        #expect(s2.myCraftCount == 1)
     }
 
     @Test func projectionFormatsRecipeTemplateNames() {
@@ -282,26 +370,39 @@ struct ClaimBuildingsTests {
             w.u8(output.isCargo ? 1 : 0) // item_type tag: 0 Item, 1 Cargo
             w.u8(1) // durability: none
         }
+        w.i32(50) // actions_required
         return w.data
     }
 
     @Test func recipeRowDecodesProfessionSignals() throws {
         // Level-requirement skill wins; the tool type rides along.
         let gated = try RegionGamedataDecoder.recipe(
-            Self.recipeRow(id: 77, name: "Oak Plank", levelSkills: [1], toolTypes: [9])
+            Self.recipeRow(id: 77, name: "Oak Plank", levelSkills: [5], toolTypes: [9])
         )
         #expect(gated.id == 77)
         #expect(gated.name == "Oak Plank")
-        #expect(gated.skillID == 1)
+        #expect(gated.skillID == 5)
         #expect(gated.toolTypeID == 9)
+        #expect(gated.actionsRequired == 50)
 
         // Hand recipes: no level gate, profession comes from the tool
         // (e.g. Foraging's Machete) alone.
         let tooled = try RegionGamedataDecoder.recipe(
-            Self.recipeRow(id: 78, name: "Plant Fiber", toolTypes: [14])
+            Self.recipeRow(id: 78, name: "Plant Fiber", toolTypes: [12])
         )
         #expect(tooled.skillID == nil)
-        #expect(tooled.toolTypeID == 14)
+        #expect(tooled.toolTypeID == 12)
+    }
+
+    @Test func publicProgressiveActionRowDecodes() throws {
+        var w = Wire()
+        w.u64(5002); w.u64(3001); w.u64(2002) // entity, building, owner
+        let row = try PublicProgressiveActionRow(reader: BSATNReader(data: w.data))
+        #expect(row.entityID == 5002)
+        #expect(row.buildingEntityID == 3001)
+        #expect(row.ownerEntityID == 2002)
+        #expect(row.primaryKey == 5002)
+        #expect(PublicProgressiveActionRow.tableName == "public_progressive_action_state")
     }
 
     @Test func recipeRowDecodesTemplateStackRefs() throws {
@@ -390,11 +491,38 @@ struct ClaimBuildingsTests {
 
     @Test func toolTypeDescRowDecodes() throws {
         var w = Wire()
-        w.i32(14); w.string("Machete"); w.i32(12) // id, name, skill_id (Foraging)
+        w.i32(12); w.string("Machete"); w.i32(14) // id, name, skill_id (Foraging)
         let tool = try RegionGamedataDecoder.toolTypeDesc(w.data)
-        #expect(tool.id == 14)
+        #expect(tool.id == 12)
         #expect(tool.name == "Machete")
-        #expect(tool.skillID == 12)
+        #expect(tool.skillID == 14)
+    }
+
+    @Test func skillIDsResolveToProfessions() {
+        // The live `skill_desc` catalog (relay region mirror, 2026-09-27).
+        let cases: [(Int32, Profession?)] = [
+            (0, nil), // no-skill sentinel (Mallet)
+            (1, nil), // ANY
+            (2, .forestry),
+            (3, .carpentry),
+            (4, .masonry),
+            (5, .mining), // the Smash-stone recipes' skill
+            (6, .smithing),
+            (7, .scholar),
+            (8, .leatherworking),
+            (9, .hunting),
+            (10, .tailoring),
+            (11, .farming),
+            (12, .fishing),
+            (13, nil), // Cooking — no group of its own
+            (14, .foraging),
+            (15, nil), // Construction
+            (17, nil), // Taming
+            (22, nil), // Hexite Gathering
+        ]
+        for (skill, expected) in cases {
+            #expect(Profession.from(skillID: skill) == expected, "skill \(skill) → \(String(describing: expected))")
+        }
     }
 
     @Test func stationNamesResolveToProfessions() {
@@ -450,7 +578,7 @@ struct ClaimBuildingsTests {
                 ])
             ],
             recipeNames: [77: "Rough Brick"],
-            recipeSkills: [77: 2] // Masonry
+            recipeSkills: [77: 4] // Masonry (skill_desc id)
         )
         session.buildings.buildings = [
             3001: RegionBuilding(entityID: 3001, claimEntityID: 2000, buildingDescriptionID: 1200)
@@ -471,6 +599,7 @@ struct ClaimBuildingsTests {
         #expect(projected.buildings[0].profession == .masonry)
         let brick = projected.crafts.first { $0.entityID == "5001" }
         #expect(brick?.profession == .masonry)
+        #expect(brick?.buildingEntityID == "3001")
         let unresolved = projected.crafts.first { $0.entityID == "5002" }
         #expect(unresolved?.profession == nil)
     }
@@ -519,6 +648,9 @@ struct ClaimBuildingsTests {
                 entityID: 5002, ownerEntityID: 2002, buildingEntityID: 3001, recipeID: 77,
                 kind: .active(progress: 3, craftCount: 5, preparation: false, lockExpiresAtMicros: 0)
             )),
+            // The neighbor opens the same bench craft to the claim — it
+            // enters the game's shared projection and becomes a row.
+            .sharedCraftChanged(5002),
             // Completed passive crafts are collected in game — the
             // projection drops them instead of listing them.
             .craftChanged(RegionCraft(
@@ -559,11 +691,13 @@ struct ClaimBuildingsTests {
         // Take the game session: the region leg arrives, the sync starts,
         // and the joined workstations land on the workstations channel
         // (`workstationsRep` — the session rep does not carry a copy).
-        // Events arrive as individual intents (one rep each) — wait for
-        // the script's terminal state, not the first `.live`.
         await machine.ingest(Intent.SignInGameSession())
+        // Events arrive as individual intents (one rep each) — wait for the
+        // script's terminal state, not the first `.live`: the shared-craft
+        // event is the last one that moves the craft rows.
         guard let stations = await RepCollecting.collect(
-            machine.workstationsRep, until: { $0.crafts.count == 2 }
+            machine.workstationsRep,
+            until: { $0.crafts.count == 2 && $0.buildings.first?.myCraftCount == 1 }
         ) else {
             Issue.record("expected the projected workstations on the channel")
             return
@@ -583,21 +717,29 @@ struct ClaimBuildingsTests {
             Issue.record("expected all three buildings in the projection")
             return
         }
-        #expect(stations.buildings[0].craftCount == 2)
-        #expect(stations.buildings[1].craftCount == 0)
+        // Millie carries the player's own processing craft (the pill); the
+        // neighbor's bench craft entered the shared projection, so it
+        // renders as a row too. The completed craft is excluded from
+        // everything.
+        #expect(stations.buildings[0].myCraftCount == 1)
+        #expect(stations.buildings[1].myCraftCount == 0)
 
-        // Crafts: the player's own first, recipe and station joined; the
-        // completed craft is excluded.
+        // Craft rows: the player's own first, then the neighbor's shared
+        // bench craft (marked not-mine; no effort goal — the catalog
+        // script carries no `actions_required`).
         #expect(stations.crafts.count == 2)
-        #expect(!stations.crafts.contains { $0.phase == .complete })
-        #expect(stations.crafts[0].mine == true)
-        #expect(stations.crafts[0].recipeName == "Oak Plank")
-        #expect(stations.crafts[0].stationName == "Millie")
-        #expect(stations.crafts[0].phase == .processing)
-        #expect(stations.crafts[1].mine == false)
-        #expect(stations.crafts[1].phase == .active)
-        #expect(stations.crafts[1].progress == 3)
-        #expect(stations.crafts[1].craftCount == 5)
+        let own = stations.crafts[0]
+        #expect(own.mine == true)
+        #expect(own.recipeName == "Oak Plank")
+        #expect(own.stationName == "Millie")
+        #expect(own.buildingEntityID == "3001")
+        #expect(own.phase == .processing)
+        let shared = stations.crafts[1]
+        #expect(shared.mine == false)
+        #expect(shared.phase == .active)
+        #expect(shared.progress == 3)
+        #expect(shared.itemCount == 5)
+        #expect(shared.progressTotal == nil)
         await machine.ingest(Intent.SignOut()) // retire the loops
     }
 

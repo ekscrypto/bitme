@@ -140,6 +140,11 @@ struct PassiveCraftRow: BSATNTableWithPrimaryKey, Equatable {
 }
 
 /// `progressive_action_state` — the at-the-bench crafts with live progress.
+/// `progress` is cumulative *effort* (actions), not completed items: the
+/// in-game bar's denominator is `craftCount × recipe.actions_required`
+/// (live-verified 2026-09-28: 89300/129050 = 890 × 145 "Saw Exquisite
+/// Stripped Wood"), so "complete" means `progress ≥ craftCount ×
+/// actionsRequired` — never `progress ≥ craftCount`.
 struct ProgressiveActionRow: BSATNTableWithPrimaryKey, Equatable {
     static let tableName = "progressive_action_state"
 
@@ -186,6 +191,35 @@ struct ProgressiveActionRow: BSATNTableWithPrimaryKey, Equatable {
         self.ownerEntityID = ownerEntityID
         self.lockExpiresAtMicros = lockExpiresAtMicros
         self.preparation = preparation
+    }
+}
+
+/// `public_progressive_action_state` — the game's shared-craft projection:
+/// one row per effort-based craft its owner opened to other players
+/// (anyone may `craft_continue` it). A progressive craft is shared ⇔ its
+/// entity id appears here. Orphans outlive their craft (rows linger after
+/// collection), so membership alone never fabricates a row — the join is
+/// always through `progressive_action_state`, and only not-yet-complete
+/// crafts are actionable.
+struct PublicProgressiveActionRow: BSATNTableWithPrimaryKey, Equatable {
+    static let tableName = "public_progressive_action_state"
+
+    let entityID: UInt64
+    let buildingEntityID: UInt64
+    let ownerEntityID: UInt64
+
+    var primaryKey: UInt64 { entityID }
+
+    init(reader: BSATNReader) throws {
+        entityID = try reader.read() as UInt64
+        buildingEntityID = try reader.read() as UInt64
+        ownerEntityID = try reader.read() as UInt64
+    }
+
+    init(entityID: UInt64, buildingEntityID: UInt64, ownerEntityID: UInt64) {
+        self.entityID = entityID
+        self.buildingEntityID = buildingEntityID
+        self.ownerEntityID = ownerEntityID
     }
 }
 
@@ -237,15 +271,17 @@ public struct ItemStackRef: Equatable, Codable, Sendable {
 /// id, name, the profession signals — the first `level_requirements`
 /// skill id (the profession gate), else the first `tool_requirements` tool
 /// type (e.g. Foraging's Machete; resolved against `tool_type_desc` at
-/// load) — and the first consumed/crafted stack entries, the arguments
-/// the `name` template's {1}/{0} refer to. Reads through
-/// `crafted_item_stacks` (field 13) and stops; trailing fields stay
-/// unread in the row buffer.
+/// load) — the first consumed/crafted stack entries, the arguments
+/// the `name` template's {1}/{0} refer to, and `actions_required` (the
+/// per-item effort of bench crafts: the progress bar's denominator is
+/// `craftCount × actionsRequired`). Reads through `actions_required`
+/// (field 14) and stops; trailing fields stay unread in the row buffer.
 public struct RecipeInfo: Equatable, Codable, Sendable {
     let id: Int32
     let name: String
-    /// First `level_requirements` entry's `skill_id` (game profession enum:
-    /// 0 Forestry … 12 Foraging).
+    /// First `level_requirements` entry's `skill_id` — an id in the game's
+    /// `skill_desc` catalog (0/1 sentinels, 2 Forestry … 13 Cooking,
+    /// 14 Foraging; see `Profession.from(skillID:)`).
     let skillID: Int32?
     /// First `tool_requirements` entry's `tool_type` — nil for hand recipes.
     let toolTypeID: Int32?
@@ -253,6 +289,8 @@ public struct RecipeInfo: Equatable, Codable, Sendable {
     let input: ItemStackRef?
     /// First `crafted_item_stacks` entry — the name template's {0}.
     let output: ItemStackRef?
+    /// `actions_required` — effort per crafted item (progressive crafts).
+    let actionsRequired: Int32?
 }
 
 /// `tool_type_desc` row → the tool→skill join (e.g. Machete → Foraging).
@@ -353,9 +391,10 @@ enum RegionGamedataDecoder {
             _ = try reader.readOptional { () throws -> Int32 in try reader.read() as Int32 } // durability
             return ItemStackRef(id: itemID, isCargo: isCargo)
         }.first
+        let actionsRequired = try reader.read() as Int32 // actions_required
         return RecipeInfo(
             id: id, name: name, skillID: skillID, toolTypeID: toolTypeID,
-            input: input, output: output
+            input: input, output: output, actionsRequired: actionsRequired
         )
     }
 

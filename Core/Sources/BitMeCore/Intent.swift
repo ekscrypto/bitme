@@ -774,6 +774,10 @@ extension Intent.ClaimBuildingsChanged: StateMutator {
                 session.buildings.crafts[craft.entityID] = craft
             case .craftRemoved(let entityID):
                 session.buildings.crafts[entityID] = nil
+            case .sharedCraftChanged(let entityID):
+                session.buildings.sharedCraftIDs.insert(entityID)
+            case .sharedCraftRemoved(let entityID):
+                session.buildings.sharedCraftIDs.remove(entityID)
             case .failed(let message):
                 session.buildings.status = .failed
                 session.buildings.lastError = message

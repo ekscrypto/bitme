@@ -142,6 +142,12 @@ struct EphemeralState: Sendable {
             var buildings: [UInt64: RegionBuilding] = [:]
             var nicknames: [UInt64: String] = [:]
             var crafts: [UInt64: RegionCraft] = [:]
+            /// Entity ids in the game's shared-craft projection
+            /// (`public_progressive_action_state`): effort crafts their
+            /// owner opened to other players. Others' crafts render only
+            /// while shared and not yet complete — private crafts (all
+            /// passive ones, plus bench crafts absent here) stay counts.
+            var sharedCraftIDs: Set<UInt64> = []
             /// The tracked player's entity id — the `mine` marker for crafts.
             var playerEntityID: UInt64?
             /// Bumped on every mutation, and carried forward across resets,

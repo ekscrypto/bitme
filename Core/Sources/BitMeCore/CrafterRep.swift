@@ -158,11 +158,15 @@ public enum CrafterRep: Equatable, Sendable, Codable {
 }
 
 /// A crafting profession — the collapsible groups of the crafting tab.
-/// Skill ids are the game's profession enum (`CharacterStatType` 21+; see
-/// `FoodBuffGamedata.statNames`): 0 Forestry, 1 Carpentry, 2 Masonry,
-/// 3 Mining, 4 Smithing, 5 Scholar, 6 Leatherworking, 7 Hunting,
-/// 8 Tailoring, 9 Farming, 10 Fishing, 11 Cooking, 12 Foraging. Cooking
-/// has no group of its own — it lands in `.other` with the workbenches.
+/// Skill ids are the game's `skill_desc` catalog (live-verified 2026-09-27
+/// against the relay's region mirror): 0 is the no-skill sentinel
+/// (`tool_type_desc`'s Mallet), 1 ANY, then 2 Forestry, 3 Carpentry,
+/// 4 Masonry, 5 Mining, 6 Smithing, 7 Scholar, 8 Leatherworking,
+/// 9 Hunting, 10 Tailoring, 11 Farming, 12 Fishing, 13 Cooking,
+/// 14 Foraging, 15+ the non-station skills (Construction, Taming, …) —
+/// *not* the zero-based profession ordinals of
+/// `FoodBuffGamedata.statNames` (which start at stat 21). Cooking has no
+/// group of its own — it lands in `.other` with the workbenches.
 public enum Profession: String, CaseIterable, Identifiable, Equatable, Sendable, Codable {
     case carpentry, farming, fishing, foraging, forestry, hunting
     case leatherworking, masonry, mining, scholar, smithing, tailoring
@@ -176,19 +180,19 @@ public enum Profession: String, CaseIterable, Identifiable, Equatable, Sendable,
 
     static func from(skillID: Int32) -> Profession? {
         switch skillID {
-        case 0: .forestry
-        case 1: .carpentry
-        case 2: .masonry
-        case 3: .mining
-        case 4: .smithing
-        case 5: .scholar
-        case 6: .leatherworking
-        case 7: .hunting
-        case 8: .tailoring
-        case 9: .farming
-        case 10: .fishing
-        case 12: .foraging
-        default: nil // 11 Cooking and anything unknown → caller's "other"
+        case 2: .forestry
+        case 3: .carpentry
+        case 4: .masonry
+        case 5: .mining
+        case 6: .smithing
+        case 7: .scholar
+        case 8: .leatherworking
+        case 9: .hunting
+        case 10: .tailoring
+        case 11: .farming
+        case 12: .fishing
+        case 14: .foraging
+        default: nil // 0 no-skill, 1 ANY, 13 Cooking, 15+ non-station skills
         }
     }
 
@@ -228,7 +232,11 @@ public enum Profession: String, CaseIterable, Identifiable, Equatable, Sendable,
 
 /// The claim's workstations (Pocket Crafter): every building in the claim
 /// joined with the catalogs, nicknames, and the crafts running at them —
-/// the live state of the claim-buildings sync. This is the
+/// the live state of the claim-buildings sync. Craft rows are the player's
+/// own pending crafts plus other players' **shared** bench crafts (the
+/// game's `public_progressive_action_state` projection — anyone may
+/// contribute); everything else of others' renders nothing, like the
+/// game's own station UI. This is the
 /// `machine.workstationsRep` channel's payload: hosts whose whole screen
 /// is the workstation list subscribe the channel and re-render only when
 /// the buildings state moves, not on every session rep.
@@ -257,8 +265,12 @@ public struct WorkstationsRep: Equatable, Sendable, Codable {
         public let isCrafting: Bool
         /// Any function entry advertises item/cargo pockets.
         public let isStorage: Bool
-        /// Crafts at this station (active + queued, anyone's).
-        public let craftCount: Int
+        /// The player's own pending crafts at this station — the row's pill
+        /// and what expanding it lists first. Other players surface only
+        /// through their shared (not-yet-complete) bench crafts nested
+        /// under the station; their private work — abandoned bench
+        /// sessions included — renders nowhere, exactly like in game.
+        public let myCraftCount: Int
         /// From the catalog name (nil when the catalog hasn't landed or
         /// the station has no profession — those group under `.other`).
         public let profession: Profession?
@@ -266,20 +278,33 @@ public struct WorkstationsRep: Equatable, Sendable, Codable {
 
     public struct Craft: Equatable, Sendable, Codable {
         public let entityID: String
+        /// The station the craft runs at — nests the row under that
+        /// building's expandable list.
+        public let buildingEntityID: String
         /// Catalog recipe name with its template placeholders resolved
         /// ("Braid {0} from {1}" → "Braid Rough Rope from Rough Cloth
         /// Strip"); nil until the catalog lands.
         public let recipeName: String?
         /// Joined station name; nil for crafts at unknown stations.
         public let stationName: String?
+        /// The player's own craft (true) or a shared craft another player
+        /// opened to the claim (false — the game's
+        /// `public_progressive_action_state` lists it).
         public let mine: Bool
         public let phase: CraftPhase
-        /// Active crafts: completed actions of `craftCount`.
+        /// Active crafts: cumulative effort so far and the effort goal —
+        /// `itemCount × recipe.actions_required` (nil while the recipe is
+        /// unresolved). Effort, not items: 89300/129050 is 890 Exquisite
+        /// Stripped Wood at 145 effort each, one-third done.
         public let progress: Int?
-        public let craftCount: Int?
+        public let progressTotal: Int?
+        /// Active crafts: items queued (`craft_count`).
+        public let itemCount: Int?
         /// The recipe's profession (skill id from the catalog's
         /// level-requirement or its tool type) — nil when unresolved,
-        /// which the tab groups under `.other`.
+        /// which the tab groups under `.other`. Only consulted for the
+        /// player's own crafts at stations outside the claim (the rows
+        /// that have no station to nest under).
         public let profession: Profession?
     }
 
@@ -288,21 +313,29 @@ public struct WorkstationsRep: Equatable, Sendable, Codable {
     /// Crafting stations first, then storage, then the rest —
     /// name-sorted within each group.
     public var buildings: [Building]
-    /// The player's own pending crafts first, then the claim's,
-    /// each station-then-name sorted. Completed passive crafts are
-    /// collected in game and stay out of the list; `craftsOverflow`
-    /// counts what the cap dropped.
+    /// Rendered craft rows: the player's own pending crafts (anywhere,
+    /// nested under their station), plus other players' **shared** bench
+    /// crafts while not yet complete (the game's
+    /// `public_progressive_action_state` projection lists them — anyone
+    /// may contribute effort). Everything else of others' — private
+    /// queues, unshared or abandoned bench sessions, finished-but-
+    /// uncollected crafts — renders nothing, exactly like the game's
+    /// station UI. Completed passive crafts are collected in game and
+    /// stay out; `craftsOverflow` counts what the cap dropped.
     public var crafts: [Craft]
     public var craftsOverflow: Int
 
     public static let empty = WorkstationsRep(status: .idle, error: nil, buildings: [], crafts: [], craftsOverflow: 0)
 
     /// Projects the claim-buildings sync state: the claim's buildings joined
-    /// with the catalogs and nicknames, plus the pending crafts the
-    /// subscriptions delivered (the player's own anywhere, anyone's at claim
-    /// stations). Completed passive crafts are dropped — they are collected
-    /// in game and would otherwise dominate a busy claim's list — and the
-    /// list is capped (`craftsOverflow` carries what fell off).
+    /// with the catalogs and nicknames, plus the renderable craft rows —
+    /// the player's own pending crafts, and other players' shared bench
+    /// crafts while not yet complete. Everyone else's work (private
+    /// queues, unshared or abandoned bench sessions, finished-but-
+    /// uncollected crafts) renders nothing, like the game's own station
+    /// UI. Completed passive crafts are dropped — they are collected in
+    /// game — and the row list is capped (`craftsOverflow` carries what
+    /// fell off).
     static func from(session: EphemeralState.Session?, cap: Int = 200) -> WorkstationsRep {
         guard let session else { return .empty }
         let state = session.buildings
@@ -316,14 +349,34 @@ public struct WorkstationsRep: Equatable, Sendable, Codable {
         case .failed: status = .failed
         }
 
+        let playerID = state.playerEntityID
+
         let isPending: (RegionCraft) -> Bool = { craft in
             if case .passive(.complete, _) = craft.kind { return false }
             return true
         }
+        // A bench craft is finished when its effort goal is reached —
+        // `progress ≥ itemCount × recipe.actions_required` (effort, not
+        // items). Unknown recipes never read as finished: showing a live
+        // craft beats hiding it on a catalog gap.
+        let isFinished: (RegionCraft) -> Bool = { craft in
+            guard case .active(let progress, let count, _, _) = craft.kind,
+                  let perCraft = state.gamedata.recipeActionsRequired[craft.recipeID] else {
+                return false
+            }
+            return Int64(progress) >= Int64(perCraft) * Int64(count)
+        }
+        // A shared bench craft of someone else's, still open for effort.
+        let isSharedOpen: (RegionCraft) -> Bool = { craft in
+            guard case .active = craft.kind else { return false }
+            return state.sharedCraftIDs.contains(craft.entityID) && !isFinished(craft)
+        }
 
-        var craftsByBuilding: [UInt64: Int] = [:]
+        var mineByBuilding: [UInt64: Int] = [:]
         for craft in state.crafts.values where isPending(craft) {
-            craftsByBuilding[craft.buildingEntityID, default: 0] += 1
+            if craft.ownerEntityID == playerID {
+                mineByBuilding[craft.buildingEntityID, default: 0] += 1
+            }
         }
 
         let buildings: [Building] = state.buildings.values
@@ -336,7 +389,7 @@ public struct WorkstationsRep: Equatable, Sendable, Codable {
                     catalogName: desc?.name,
                     isCrafting: desc?.isCrafting ?? false,
                     isStorage: desc?.isStorage ?? false,
-                    craftCount: craftsByBuilding[building.entityID] ?? 0,
+                    myCraftCount: mineByBuilding[building.entityID] ?? 0,
                     profession: desc.flatMap { Profession.from(stationName: $0.name) }
                 )
             }
@@ -346,20 +399,16 @@ public struct WorkstationsRep: Equatable, Sendable, Codable {
                 return lRank < rRank
             }
 
-        let playerID = state.playerEntityID
         let nameByBuilding = Dictionary(uniqueKeysWithValues: buildings.map { (UInt64($0.entityID) ?? 0, $0.name) })
         let pending = state.crafts.values
-            .filter { isPending($0) }
             .filter { craft in
-                // Anything the subscriptions delivered is in scope by
-                // construction (personal set, per-building claim sets);
-                // the filter keeps stragglers from removed stations honest.
-                state.buildings[craft.buildingEntityID] != nil
-                    || craft.ownerEntityID == playerID
+                guard isPending(craft) else { return false }
+                if craft.ownerEntityID == playerID { return true }
+                return isSharedOpen(craft)
             }
             .sorted { lhs, rhs in
-                let lRank = (lhs.ownerEntityID == playerID ? 0 : 1, lhs.buildingEntityID, lhs.entityID)
-                let rRank = (rhs.ownerEntityID == playerID ? 0 : 1, rhs.buildingEntityID, rhs.entityID)
+                let lRank = (lhs.buildingEntityID, lhs.ownerEntityID == playerID ? 0 : 1, lhs.entityID)
+                let rRank = (rhs.buildingEntityID, rhs.ownerEntityID == playerID ? 0 : 1, rhs.entityID)
                 return lRank < rRank
             }
         var crafts: [Craft] = []
@@ -367,7 +416,8 @@ public struct WorkstationsRep: Equatable, Sendable, Codable {
         for craft in pending.prefix(cap) {
             let phase: CraftPhase
             var progress: Int?
-            var craftCount: Int?
+            var progressTotal: Int?
+            var itemCount: Int?
             switch craft.kind {
             case .passive(let status, _):
                 switch status {
@@ -378,16 +428,20 @@ public struct WorkstationsRep: Equatable, Sendable, Codable {
             case .active(let rawProgress, let count, let preparation, _):
                 phase = preparation ? .preparing : .active
                 progress = Int(rawProgress)
-                craftCount = Int(count)
+                itemCount = Int(count)
+                progressTotal = state.gamedata.recipeActionsRequired[craft.recipeID]
+                    .map { Int($0) * Int(count) }
             }
             crafts.append(Craft(
                 entityID: String(craft.entityID),
+                buildingEntityID: String(craft.buildingEntityID),
                 recipeName: state.gamedata.recipeDisplayName(craft.recipeID),
                 stationName: nameByBuilding[craft.buildingEntityID],
                 mine: craft.ownerEntityID == playerID,
                 phase: phase,
                 progress: progress,
-                craftCount: craftCount,
+                progressTotal: progressTotal,
+                itemCount: itemCount,
                 profession: state.gamedata.recipeSkills[craft.recipeID]
                     .flatMap(Profession.from(skillID:))
             ))

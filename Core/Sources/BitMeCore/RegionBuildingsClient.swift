@@ -60,6 +60,12 @@ public struct BuildingGamedata: Equatable, Sendable, Codable {
     /// Recipe id → first `crafted_item_stacks` entry — the name
     /// template's {0}.
     public let recipeOutputs: [Int32: ItemStackRef]
+    /// Recipe id → `actions_required`, the per-item effort of bench
+    /// crafts. A progressive craft's progress bar denominator is
+    /// `craftCount × actionsRequired` (live-verified 2026-09-28), and
+    /// "complete" is `progress ≥` that product — never `progress ≥
+    /// craftCount`.
+    public let recipeActionsRequired: [Int32: Int32]
     /// `item_desc` id → name — resolves Item-typed stack refs.
     public let itemNames: [Int32: String]
     /// `cargo_desc` id → name — resolves Cargo-typed stack refs.
@@ -72,6 +78,7 @@ public struct BuildingGamedata: Equatable, Sendable, Codable {
         recipeSkills: [Int32: Int32] = [:],
         recipeInputs: [Int32: ItemStackRef] = [:],
         recipeOutputs: [Int32: ItemStackRef] = [:],
+        recipeActionsRequired: [Int32: Int32] = [:],
         itemNames: [Int32: String] = [:],
         cargoNames: [Int32: String] = [:],
         fetchedAt: Date = .now
@@ -81,6 +88,7 @@ public struct BuildingGamedata: Equatable, Sendable, Codable {
         self.recipeSkills = recipeSkills
         self.recipeInputs = recipeInputs
         self.recipeOutputs = recipeOutputs
+        self.recipeActionsRequired = recipeActionsRequired
         self.itemNames = itemNames
         self.cargoNames = cargoNames
         self.fetchedAt = fetchedAt
@@ -178,6 +186,14 @@ public enum ClaimBuildingsEvent: Equatable, Sendable {
     case nicknameRemoved(UInt64)
     case craftChanged(RegionCraft)
     case craftRemoved(UInt64)
+    /// A progressive craft entered the game's shared projection
+    /// (`public_progressive_action_state`) — other players may contribute
+    /// effort to it. Carries the craft's entity id; the craft's own row
+    /// arrives (or already sits) in `.craftChanged`.
+    case sharedCraftChanged(UInt64)
+    /// The shared projection dropped a craft (unshared or collected).
+    /// Orphaned ids that never had a craft row are harmless.
+    case sharedCraftRemoved(UInt64)
     case failed(String)
 }
 
@@ -374,6 +390,7 @@ enum RegionBuildingsClient {
             await client.registerTableRowDecoder(BuildingNicknameRow.self)
             await client.registerTableRowDecoder(PassiveCraftRow.self)
             await client.registerTableRowDecoder(ProgressiveActionRow.self)
+            await client.registerTableRowDecoder(PublicProgressiveActionRow.self)
 
             // 2. Attach the batched row streams before subscribing: the
             // initial snapshot fans out when SubscribeApplied lands, so a
@@ -383,6 +400,7 @@ enum RegionBuildingsClient {
             let nicknameEvents = await client.tableEvents(named: BuildingNicknameRow.tableName)
             let passiveCraftEvents = await client.tableEvents(named: PassiveCraftRow.tableName)
             let progressiveEvents = await client.tableEvents(named: ProgressiveActionRow.tableName)
+            let sharedEvents = await client.tableEvents(named: PublicProgressiveActionRow.tableName)
             let connectionEvents = await client.connectionEvents
 
             emit(.syncing)
@@ -474,6 +492,15 @@ enum RegionBuildingsClient {
                     }
                 }
                 group.addTask {
+                    await Self.consume(sharedEvents, of: PublicProgressiveActionRow.self) { row in
+                        emit(.sharedCraftChanged(row.entityID))
+                    } onRemove: { entityID in
+                        emit(.sharedCraftRemoved(entityID))
+                    } onBatch: { inserted, deleted in
+                        buffer.recordDelta(table: PublicProgressiveActionRow.tableName, inserts: inserted.count, deletes: deleted.count)
+                    }
+                }
+                group.addTask {
                     for await event in connectionEvents {
                         switch event {
                         case .connected, .reconnecting:
@@ -515,7 +542,9 @@ enum RegionBuildingsClient {
 
     /// Additive craft subscription for freshly-arrived claim buildings —
     /// the mirror's hexite pattern (a second query set after entity ids
-    /// are known), debounced into one Subscribe per arrival burst.
+    /// are known), debounced into one Subscribe per arrival burst. Covers
+    /// both craft tables plus the game's shared-craft projection (whose
+    /// membership decides whether other players' bench crafts render).
     /// Errors are logged, not fatal: the rows simply stop arriving, and
     /// the next building change re-attempts the delta.
     private static func subscribeCrafts(client: SpacetimeDBClient, buildings: Set<UInt64>) {
@@ -525,6 +554,7 @@ enum RegionBuildingsClient {
                 for id in buildings.sorted() {
                     queries.append("SELECT * FROM passive_craft_state WHERE building_entity_id = \(id);")
                     queries.append("SELECT * FROM progressive_action_state WHERE building_entity_id = \(id);")
+                    queries.append("SELECT * FROM public_progressive_action_state WHERE building_entity_id = \(id);")
                 }
                 coreLog.info("claim buildings: additive craft subscription for \(buildings.count) building(s)")
                 _ = try await client.subscribe(queries)
@@ -590,6 +620,7 @@ enum RegionBuildingsClient {
             var recipeSkills: [Int32: Int32] = [:]
             var recipeInputs: [Int32: ItemStackRef] = [:]
             var recipeOutputs: [Int32: ItemStackRef] = [:]
+            var recipeActionsRequired: [Int32: Int32] = [:]
             for table in try await recipeTables where table.tableName == "crafting_recipe_desc" {
                 for row in table.rows.rows {
                     if let recipe = try? RegionGamedataDecoder.recipe(row) {
@@ -598,6 +629,9 @@ enum RegionBuildingsClient {
                             ?? recipe.toolTypeID.flatMap { toolSkillByType[$0] }
                         if let input = recipe.input { recipeInputs[recipe.id] = input }
                         if let output = recipe.output { recipeOutputs[recipe.id] = output }
+                        if let actions = recipe.actionsRequired {
+                            recipeActionsRequired[recipe.id] = actions
+                        }
                     }
                 }
             }
@@ -627,6 +661,7 @@ enum RegionBuildingsClient {
             let fresh = BuildingGamedata(
                 buildings: buildings, recipeNames: recipes, recipeSkills: recipeSkills,
                 recipeInputs: recipeInputs, recipeOutputs: recipeOutputs,
+                recipeActionsRequired: recipeActionsRequired,
                 itemNames: itemNames, cargoNames: cargoNames, fetchedAt: .now
             )
             if !buildings.isEmpty || !recipes.isEmpty {
