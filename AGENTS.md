@@ -80,19 +80,7 @@ when a question is "does the game have a table/field for X?".
   Phone guardrails: never subscribe `building_state` (~74K rows/region) or
   `location_state` (~13M) unfiltered; `inventory_state` per-owner only.
   The projection drops completed passive crafts and caps at 200
-  (`craftsOverflow`). Craft privacy is a game concept: passive (time-based)
-  crafts are always private; progressive (effort-based) crafts are private
-  or shared — shared ⇔ listed in `public_progressive_action_state`
-  (subscribed per building like the craft tables). Rows = the player's own
-  pending crafts + others' shared bench crafts while
-  `progress < craft_count × recipe.actions_required` (progress is
-  cumulative *effort*, not items — the bar denominator is that product);
-  everyone else's work (private, abandoned, finished-uncollected) renders
-  nowhere — no occupancy chips; abandoned private prep crafts linger in
-  the tables for months and must never surface.
-  Recipe skill ids come from `skill_desc` (2 Forestry … 13 Cooking,
-  14 Foraging; 0/1 sentinels), NOT the stat-list ordinals — an off-by-two
-  there once rendered Mining crafts under Scholar.
+  (`craftsOverflow`).
 - **spacetimedb-swift-sdk (our fork)**: `connect()` returns *before* the
   handshake — `.connected` means InitialConnection. Attach `tableEvents`
   streams *before* `subscribe`, or the initial snapshot is missed.
