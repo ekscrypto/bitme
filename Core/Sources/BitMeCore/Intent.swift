@@ -672,6 +672,7 @@ extension Intent.SignInGameSession: StateMutator {
                 token: account.token,
                 entityID: identity.entityID,
                 regionID: identity.regionID,
+                identityHex: account.identityHex,
                 cancellable: gameSessionLoop
             )
         ])

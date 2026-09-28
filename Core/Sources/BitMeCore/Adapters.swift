@@ -18,6 +18,11 @@ public struct Adapters: Sendable {
         /// One change-stream connection. The returned stream ends when the
         /// socket closes; reconnection is the caller's policy.
         public let openResourceStream: @Sendable (_ entityID: String) -> AsyncStream<ResourceStreamEvent>
+        /// Login/session timestamps (roads-side `/player/:id`). Consumed by
+        /// the game-session pre-flight to decide whether the global leg is
+        /// still worth attempting. Defaults to "no answer" so hosts and
+        /// tests that never exercise the path stay silent.
+        public let playerStatus: @Sendable (_ entityID: String) async throws -> PlayerStatus
 
         public init(
             resolve: @escaping @Sendable (String) async throws -> ResolveResponse,
@@ -25,7 +30,8 @@ public struct Adapters: Sendable {
             sessionResources: @escaping @Sendable (String) async throws -> ResourceWindow,
             resourceDictionary: @escaping @Sendable (Int) async throws -> ResourceDictionary,
             worldElevation: @escaping @Sendable (Int, Int) async throws -> TerrainPlane,
-            openResourceStream: @escaping @Sendable (String) -> AsyncStream<ResourceStreamEvent>
+            openResourceStream: @escaping @Sendable (String) -> AsyncStream<ResourceStreamEvent>,
+            playerStatus: (@Sendable (String) async throws -> PlayerStatus)? = nil
         ) {
             self.resolve = resolve
             self.session = session
@@ -33,6 +39,9 @@ public struct Adapters: Sendable {
             self.resourceDictionary = resourceDictionary
             self.worldElevation = worldElevation
             self.openResourceStream = openResourceStream
+            // The "no answer" default is built in the body — a public
+            // default argument may only reference public declarations.
+            self.playerStatus = playerStatus ?? { _ in throw RelayError.notFound }
         }
     }
 
@@ -48,12 +57,19 @@ public struct Adapters: Sendable {
         /// the game's global database.
         public let resolveAccountPlayer: @Sendable (_ token: String, _ identityHex: String) async throws -> AccountPlayer
         /// One game-session connection set: signs the account in
-        /// (`CallReducer sign_in`) on the global database and the account's
-        /// region shard, and holds both sockets open — the wire action that
-        /// owns the game's one-live-session slot. The returned stream ends
-        /// when any leg ends; reconnection is the caller's policy
-        /// (`Activity.GameSessionLoop`).
-        public let openGlobalSession: @Sendable (_ token: String, _ entityID: String, _ regionID: Int?) -> AsyncStream<GlobalSessionEvent>
+        /// (`CallReducer sign_in`) on the account's region shard — the
+        /// load-bearing leg the claim-buildings sync rides — and then, best
+        /// effort, on the global database. The region leg is the session:
+        /// its failure fails the attempt, while the global leg (presence,
+        /// 1 h admission window) failing or dropping only degrades it.
+        /// `skipGlobal` (set by the pre-flight when the last login is
+        /// older than the window) never opens the global leg at all.
+        /// `identityHex` (the token's `hex_identity` claim) arms the
+        /// region leg's queue join (`player_queue_join` → own-row
+        /// `user_state.can_sign_in` → `sign_in`). The returned stream ends
+        /// when a load-bearing leg ends; reconnection is the caller's
+        /// policy (`Activity.GameSessionLoop`).
+        public let openGlobalSession: @Sendable (_ token: String, _ entityID: String, _ regionID: Int?, _ skipGlobal: Bool, _ identityHex: String?) -> AsyncStream<GlobalSessionEvent>
         /// Live claim-buildings sync over the game session's region leg
         /// (docs/protocol/region-claim-buildings.md): static catalogs via
         /// one-off queries, then subscriptions for the claim's buildings,
@@ -74,7 +90,7 @@ public struct Adapters: Sendable {
             requestAccessCode: @escaping @Sendable (String) async throws -> Void,
             authenticate: @escaping @Sendable (String, String) async throws -> String,
             resolveAccountPlayer: @escaping @Sendable (String, String) async throws -> AccountPlayer,
-            openGlobalSession: @escaping @Sendable (String, String, Int?) -> AsyncStream<GlobalSessionEvent>,
+            openGlobalSession: @escaping @Sendable (String, String, Int?, Bool, String?) -> AsyncStream<GlobalSessionEvent>,
             syncClaimBuildings: @escaping @Sendable (RegionLeg, UInt64, UInt64) -> AsyncStream<[ClaimBuildingsEvent]>,
             resolveOwnClaimMembership: @escaping @Sendable (RegionLeg, UInt64) async -> UInt64? = { _, _ in nil }
         ) {
@@ -137,6 +153,9 @@ public struct Adapters: Sendable {
                 },
                 openResourceStream: { entityID in
                     ResourceStreamClient.production.events(entityID: entityID)
+                },
+                playerStatus: { entityID in
+                    try await relay.playerStatus(entityID: entityID)
                 }
             ),
             bitCraft: BitCraft(
@@ -145,12 +164,15 @@ public struct Adapters: Sendable {
                 resolveAccountPlayer: { token, identityHex in
                     try await GlobalPlayerResolver.resolve(token: token, identityHex: identityHex)
                 },
-                openGlobalSession: { token, entityID, regionID in
+                openGlobalSession: { token, entityID, regionID, skipGlobal, identityHex in
                     guard let entity = UInt64(entityID) else {
                         coreLog.error("game session: malformed entity id \(entityID, privacy: .public)")
                         return AsyncStream { $0.finish() }
                     }
-                    return GlobalSessionClient.events(token: token, entityID: entity, regionID: regionID)
+                    return GlobalSessionClient.events(
+                        token: token, entityID: entity, regionID: regionID,
+                        skipGlobal: skipGlobal, identityHex: identityHex
+                    )
                 },
                 syncClaimBuildings: { leg, claim, player in
                     RegionBuildingsClient.events(leg: leg, claim: claim, player: player)

@@ -162,6 +162,13 @@ request/query-set ids in `conn-03/decoded.jsonl`.)
 
 ## 6. What's still uncaptured
 
+> **Resolved 2026-09-28** via option 1 below: the tap now rewrites the URI
+> inside `region_connection_info` rows in-frame (same-length replacement —
+> see `docs/protocol/region-sign-in-queue.md` §4), and capture
+> `2026-09-28_00-24-16` holds a full region leg (`bitcraft-live-14`),
+> including the queue-join sign-in sequence.
+
+
 The **world-shard leg** (`bitcraft-live-<N>`) went direct: the client reads the
 shard URI from `region_connection_info` *rows* (SpacetimeDB data, not API
 responses), so the tap's API-side rewrite can't redirect it. Options for a

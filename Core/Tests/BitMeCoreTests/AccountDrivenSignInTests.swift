@@ -123,6 +123,12 @@ struct AccountDrivenSignInTests {
             let token: String
             let entityID: String
             let regionID: Int?
+            /// Whether the pre-flight told the client to skip the global
+            /// leg (last game login older than the admission window).
+            let skipGlobal: Bool
+            /// The token's `hex_identity` claim — arms the region leg's
+            /// queue join.
+            let identityHex: String?
         }
 
         struct Script: Sendable {
@@ -160,9 +166,9 @@ struct AccountDrivenSignInTests {
             held.forEach { $0.finish() }
         }
 
-        func open(token: String, entityID: String, regionID: Int?) -> AsyncStream<GlobalSessionEvent> {
+        func open(token: String, entityID: String, regionID: Int?, skipGlobal: Bool, identityHex: String?) -> AsyncStream<GlobalSessionEvent> {
             let script = lock.withLock {
-                _connections.append(Connection(token: token, entityID: entityID, regionID: regionID))
+                _connections.append(Connection(token: token, entityID: entityID, regionID: regionID, skipGlobal: skipGlobal, identityHex: identityHex))
                 return _scripts.isEmpty ? Script.established : _scripts.removeFirst()
             }
             return AsyncStream { continuation in
@@ -194,6 +200,12 @@ struct AccountDrivenSignInTests {
         // that has not landed an answer yet.
         sessionSnapshot: @escaping @Sendable () throws -> SessionSnapshot = {
             AccountDrivenSignInTests.snapshot
+        },
+        // What the pre-flight's player-status poll answers (the relay's
+        // `/player/:id`); throwing models an unmirrored region / relay
+        // outage — the pre-flight then attempts both legs.
+        playerStatus: @escaping @Sendable () throws -> PlayerStatus = {
+            throw RelayError.notFound
         }
     ) -> StateMachine {
         StateMachine(adapters: Adapters(
@@ -203,7 +215,8 @@ struct AccountDrivenSignInTests {
                 sessionResources: { _ in throw RelayError.notFound },
                 resourceDictionary: { _ in throw RelayError.notFound },
                 worldElevation: { _, _ in throw RelayError.notFound },
-                openResourceStream: { _ in AsyncStream { _ in } } // parked
+                openResourceStream: { _ in AsyncStream { _ in } }, // parked
+                playerStatus: { _ in try playerStatus() }
             ),
             bitCraft: Adapters.BitCraft(
                 requestAccessCode: { _ in },
@@ -211,8 +224,8 @@ struct AccountDrivenSignInTests {
                 resolveAccountPlayer: { token, identityHex in
                     try await link.resolve(token: token, identityHex: identityHex)
                 },
-                openGlobalSession: { token, entityID, regionID in
-                    globalSession.open(token: token, entityID: entityID, regionID: regionID)
+                openGlobalSession: { token, entityID, regionID, skipGlobal, identityHex in
+                    globalSession.open(token: token, entityID: entityID, regionID: regionID, skipGlobal: skipGlobal, identityHex: identityHex)
                 },
                 syncClaimBuildings: { leg, claim, player in
                     claimBuildings.open(leg: leg, claim: claim, player: player)
@@ -239,6 +252,12 @@ struct AccountDrivenSignInTests {
 
         func append(_ rep: CrafterRep) {
             lock.withLock { reps.append(rep) }
+        }
+
+        /// The collected window in arrival order (opens with the
+        /// subscribe-time replay of the current rep).
+        var all: [CrafterRep] {
+            lock.withLock { reps }
         }
 
         func contains(_ predicate: (CrafterRep) -> Bool) -> Bool {
@@ -598,7 +617,7 @@ struct AccountDrivenSignInTests {
 
         let reps = await signInUntilGameSession(machine, status: .live)
         #expect(gameSession.connections == [
-            SimulatedGlobalSession.Connection(token: Self.token(), entityID: "1000", regionID: 14)
+            SimulatedGlobalSession.Connection(token: Self.token(), entityID: "1000", regionID: 14, skipGlobal: false, identityHex: Self.identityHex)
         ])
         guard case .session(let session)? = reps.last(where: { rep in
             guard case .session = rep else { return false }
@@ -609,6 +628,146 @@ struct AccountDrivenSignInTests {
         }
         #expect(session.gameSession?.status == .live)
         #expect(session.gameSession?.error == nil)
+        await machine.ingest(Intent.SignOut()) // retire the loops
+    }
+
+    // MARK: Pre-flight (relay `/player/:id`) and the global-leg gate
+
+    /// A `/player/:id` answer whose last login is `ageSeconds` old (the
+    /// relay is only seconds behind live, so the fixture moves with the
+    /// test's clock).
+    nonisolated static func playerStatus(lastLoginAgeSeconds seconds: Double) -> PlayerStatus {
+        let lastLogin = Int64(Date().timeIntervalSince1970 - seconds)
+        return PlayerStatus(
+            entityID: "1000", username: "Maplesugar", region: 14, signedIn: true,
+            lastLoginTimestamp: lastLogin, lastActiveTimestamp: lastLogin
+        )
+    }
+
+    /// The pre-flight consults the relay before any leg opens: the
+    /// connection carries the credentials, the entity id it asked about,
+    /// and the token's identity claim (the region leg's queue-join key).
+    @Test func preFlightAsksTheRelayForThePlayerStatus() async {
+        let gameSession = SimulatedGlobalSession(scripts: [.established])
+        let machine = makeMachine(
+            link: SimulatedLink(outcome: .player(Self.player)),
+            globalSession: gameSession,
+            playerStatus: { Self.playerStatus(lastLoginAgeSeconds: 300) }
+        )
+        await machine.start()
+        await driveToGate(machine)
+        _ = await signInUntilGameSession(machine, status: .live)
+        #expect(gameSession.connections == [
+            SimulatedGlobalSession.Connection(token: Self.token(), entityID: "1000", regionID: 14, skipGlobal: false, identityHex: Self.identityHex)
+        ])
+        await machine.ingest(Intent.SignOut()) // retire the loops
+    }
+
+    /// A last game login older than the game's global admission window
+    /// (1 h — `GameConfig.globalAuthWindowSecs`) skips the global leg:
+    /// "Take over session" connects region-only instead of burning the
+    /// attempt on a leg the global database will refuse.
+    @Test func staleLastLoginSkipsTheGlobalLeg() async {
+        let gameSession = SimulatedGlobalSession(scripts: [.established])
+        let machine = makeMachine(
+            link: SimulatedLink(outcome: .player(Self.player)),
+            globalSession: gameSession,
+            playerStatus: { Self.playerStatus(lastLoginAgeSeconds: 2 * 3600) }
+        )
+        await machine.start()
+        await driveToGate(machine)
+        _ = await signInUntilGameSession(machine, status: .live)
+        #expect(gameSession.connections.count == 1)
+        #expect(gameSession.connections.first?.skipGlobal == true)
+        await machine.ingest(Intent.SignOut()) // retire the loops
+    }
+
+    /// A recent last login (inside the window) attempts the global leg
+    /// alongside the region.
+    @Test func freshLastLoginAttemptsTheGlobalLeg() async {
+        let gameSession = SimulatedGlobalSession(scripts: [.established])
+        let machine = makeMachine(
+            link: SimulatedLink(outcome: .player(Self.player)),
+            globalSession: gameSession,
+            playerStatus: { Self.playerStatus(lastLoginAgeSeconds: 300) }
+        )
+        await machine.start()
+        await driveToGate(machine)
+        _ = await signInUntilGameSession(machine, status: .live)
+        #expect(gameSession.connections.first?.skipGlobal == false)
+        await machine.ingest(Intent.SignOut()) // retire the loops
+    }
+
+    /// No pre-flight answer (unmirrored region, relay outage) attempts
+    /// both legs — the handshake itself is the ground truth, and the
+    /// relay being unreachable must not lock the user out of the global
+    /// leg.
+    @Test func unansweredPreFlightAttemptsTheGlobalLeg() async {
+        let gameSession = SimulatedGlobalSession(scripts: [.established])
+        let machine = makeMachine(
+            link: SimulatedLink(outcome: .player(Self.player)),
+            globalSession: gameSession,
+            playerStatus: { throw RelayError.notFound }
+        )
+        await machine.start()
+        await driveToGate(machine)
+        _ = await signInUntilGameSession(machine, status: .live)
+        #expect(gameSession.connections.first?.skipGlobal == false)
+        await machine.ingest(Intent.SignOut()) // retire the loops
+    }
+
+    /// A global leg that fails after the region leg committed degrades
+    /// the session instead of failing it: the status stays `.live` with a
+    /// note, and the app never returns to the pre-sign-in gate. (The
+    /// global database refuses connections past its 1 h admission
+    /// window even though the region shard — 24 h — accepts the same
+    /// token.)
+    @Test func globalLegFailureKeepsTheRegionSessionLive() async {
+        let gameSession = SimulatedGlobalSession(scripts: [
+            SimulatedGlobalSession.Script(
+                events: [.established, .globalLegFailed("the login is past the global admission window")],
+                hold: true
+            )
+        ])
+        let machine = makeMachine(
+            link: SimulatedLink(outcome: .player(Self.player)),
+            globalSession: gameSession
+        )
+        await machine.start()
+        await driveToGate(machine)
+
+        let reps = await collect(machine, dispatch: {
+            await machine.ingest(Intent.SignInGameSession())
+        }, until: { rep in
+            guard case .session(let session) = rep else { return false }
+            return session.gameSession?.status == .live && session.gameSession?.error != nil
+        })
+        guard case .session(let session)? = reps.last(where: { rep in
+            guard case .session = rep else { return false }
+            return true
+        }) else {
+            Issue.record("expected a session rep with the degraded note")
+            return
+        }
+        #expect(session.gameSession?.status == .live)
+        #expect(session.gameSession?.error?.contains("global") == true)
+        // The session was not failed back to the gate — no prompt rep
+        // after the session went live. (The collected window opens with
+        // the replayed pre-tap gate rep, so only the tail is asserted.)
+        let firstSession = reps.all.firstIndex { rep in
+            if case .session = rep { return true }
+            return false
+        }
+        let promptAfterLive: Bool
+        if let firstSession {
+            promptAfterLive = reps.all[(firstSession + 1)...].contains { rep in
+                if case .gameSessionPrompt = rep { return true }
+                return false
+            }
+        } else {
+            promptAfterLive = false // no session rep at all — the guard above failed
+        }
+        #expect(!promptAfterLive)
         await machine.ingest(Intent.SignOut()) // retire the loops
     }
 
@@ -832,7 +991,7 @@ struct AccountDrivenSignInTests {
         // The restored token still works when the user acts.
         _ = await signInUntilGameSession(machine, status: .live)
         #expect(gameSession.connections == [
-            SimulatedGlobalSession.Connection(token: Self.token(), entityID: "1000", regionID: 14)
+            SimulatedGlobalSession.Connection(token: Self.token(), entityID: "1000", regionID: 14, skipGlobal: false, identityHex: Self.identityHex)
         ])
         await machine.ingest(Intent.SignOut()) // retire the loops
     }

@@ -57,7 +57,9 @@ public enum CrafterRep: Equatable, Sendable, Codable {
             }
 
             public var status: Status
-            /// The server's rejection message, when `status` is `rejected`.
+            /// The server's rejection message when `status` is
+            /// `rejected`; on a `live` session, the degraded-global note
+            /// (region session standing, global presence offline).
             public var error: String?
         }
 

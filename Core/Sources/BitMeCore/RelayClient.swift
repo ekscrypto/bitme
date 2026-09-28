@@ -59,6 +59,20 @@ struct RelayClient: Sendable {
         return try decode(SessionSnapshot.self, from: payload)
     }
 
+    // MARK: - GET /player/:entity_id
+
+    /// Login/session timestamps from the region shard's public
+    /// `player_state` (roads-side endpoint, not under `/bitme/`). The
+    /// pre-sign-in gate's global-leg check reads `lastLoginTimestamp` as
+    /// the proxy for the game's module-private authentication stamp.
+    /// Throws `RelayError.notFound` when the player's region is not
+    /// mirrored (or during a deploy reseed).
+    func playerStatus(entityID: String) async throws -> PlayerStatus {
+        let url = baseURL.appendingPathComponent("player/\(entityID)")
+        let payload = try await data(for: url)
+        return try decode(PlayerStatus.self, from: payload)
+    }
+
     // MARK: - GET /cache-health
 
     /// `false` (or a thrown error) ⇒ mirror is reseeding/degraded; treat all

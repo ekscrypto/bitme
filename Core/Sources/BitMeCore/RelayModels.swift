@@ -37,6 +37,37 @@ public struct ResolveResponse: Codable, Equatable, Sendable {
     }
 }
 
+// MARK: - GET /player/:entity_id
+
+/// The roads-side player row: login/session timestamps straight from the
+/// region shard's public `player_state`. The game's global database only
+/// admits connections within an hour of the account's last launcher login
+/// (module-private `user_authentication_state`), and
+/// `lastLoginTimestamp` is the closest readable proxy for that stamp —
+/// the launcher's login always precedes the session's first `sign_in`.
+/// Unix *seconds*, not ms.
+public struct PlayerStatus: Codable, Equatable, Sendable {
+    public let entityID: String
+    public let username: String?
+    public let region: Int?
+    public let signedIn: Bool?
+    /// `player_state.sign_in_timestamp` — when the current (or last)
+    /// session signed in. Not refreshed on reconnects, only fresh
+    /// sign-ins. Nil when the player's region is not mirrored.
+    public let lastLoginTimestamp: Int64?
+    /// `mobile_entity_state` last-move timestamp (unix seconds).
+    public let lastActiveTimestamp: Int64?
+
+    enum CodingKeys: String, CodingKey {
+        case entityID = "entity_id"
+        case username
+        case region
+        case signedIn = "signed_in"
+        case lastLoginTimestamp = "last_login_timestamp"
+        case lastActiveTimestamp = "last_active_timestamp"
+    }
+}
+
 // MARK: - GET /bitme/session/:entity_id
 
 public struct SessionSnapshot: Codable, Equatable, Sendable {

@@ -30,6 +30,15 @@ struct GameConfig: Sendable {
     /// "Eat food" escalates when a food buff expires inside this window.
     let eatFoodWarnWindowMs: Double = 120_000
 
+    /// The game's global database only admits a connection within 1 h of
+    /// the account's last launcher login — the module-private
+    /// `user_authentication_state` timestamp (BitCraftPublic
+    /// `global_module/handlers/authentication.rs`, 3600 s; the region
+    /// shards use 24 h). The relay's `last_login_timestamp`
+    /// (`player_state.sign_in_timestamp`, public) is the readable proxy:
+    /// older than this window ⇒ skip the global leg, region only.
+    let globalAuthWindowSecs: Double = 3600
+
     /// Citric window fallback when the spawn entry has `expires_at_ms: null`.
     let citricFallbackWindowMs: Double = 30_000
 

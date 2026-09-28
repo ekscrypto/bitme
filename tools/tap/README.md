@@ -41,11 +41,22 @@ StreamingAssets/Config/production.json` (`apiServerUrl`) — keep a backup and
 ad-hoc re-sign the bundle afterwards (`codesign --force --deep -s - BitCraft.app`)
 since modifying bundle contents invalidates the signature.
 
-The WebSocket rewrite happens automatically: any `wss://bitcraft-early-access.
-spacetimedb.com` URI the API returns is rewritten to the local forwarder before
-the client sees it. Everything else passes through byte-exact. If the server
-URI never transits the API, `server.log` will note bare occurrences of the
-hostname so a new rewrite rule can be added.
+The WebSocket rewrite happens automatically in two places:
+
+1. **API responses**: any `wss://bitcraft-early-access.spacetimedb.com` URI
+   the API returns is rewritten to the local forwarder before the client
+   sees it (covers `/global-module/get-connection-info`, hence the global
+   leg). `server.log` notes bare occurrences of the hostname so a new
+   rewrite rule can be added.
+2. **Server→client WS frames**: the region-shard database URIs reach the
+   client as `region_connection_info` TABLE ROWS (BSATN: u32LE length +
+   utf8), not via API responses — without this rule the region leg
+   connects direct to production and the tap never sees it (every capture
+   before 2026-09-27 has global legs only). Each s2c frame is decompressed
+   when needed, every length-prefixed `https://<upstream>` string is
+   replaced with the local forwarder URI (length prefix fixed up, frame
+   forwarded raw), and the capture still records the ORIGINAL server
+   bytes. `server.log` logs `REWRITE frame: …` counts.
 
 ## Decode captures
 

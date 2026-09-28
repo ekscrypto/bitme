@@ -20,6 +20,7 @@ import https from 'node:https';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
 
@@ -131,6 +132,60 @@ function rewriteBody(body, contentType) {
   if (!notes.length) return { body, changed: false };
   log(`REWRITE ${notes.join('; ')}`);
   return { body: Buffer.from(text, 'utf8'), changed: true };
+}
+
+// Rule 3: server→client websocket frames. The region-shard database URIs
+// reach the client as `region_connection_info` TABLE ROWS (BSATN:
+// u32LE length + utf8 bytes) — not via API responses — so the body
+// rewrites above never see them and the region leg connects direct to
+// production, bypassing the tap. The replacement MUST be the SAME BYTE
+// LENGTH as the original: BSATN row blocks carry explicit per-row
+// lengths/offsets, so shrinking a string desyncs the client's parser
+// (verified live: the client closed the socket 4 ms after receiving a
+// shortened-rows frame). Same length ⇒ all offsets stay valid. The local
+// URI is therefore http://<34-char host>:9443 (7+34+5 = 46 bytes, same
+// as https://bitcraft-early-access.spacetimedb.com), with the host
+// resolving to 127.0.0.1 via /etc/hosts. Frames are decompressed,
+// patched, and recompressed with their ORIGINAL algorithm; the capture
+// still records the ORIGINAL server bytes (ground truth).
+const FRAME_REMOTE_URI = Buffer.from(`https://${CFG.upstreamWsHost}`);
+const FRAME_LOCAL_HOST = process.env.TAP_FRAME_LOCAL_HOST || 'taprewrite.bitcraft-tap.localhost';
+const FRAME_LOCAL_URI = Buffer.from(`http://${FRAME_LOCAL_HOST}:${CFG.wsPort}`);
+if (FRAME_LOCAL_URI.length !== FRAME_REMOTE_URI.length) {
+  throw new Error(
+    `frame rewrite disabled: local URI must be ${FRAME_REMOTE_URI.length} bytes ` +
+    `(got ${FRAME_LOCAL_URI.length} for ${FRAME_LOCAL_URI.toString()}); ` +
+    `adjust TAP_FRAME_LOCAL_HOST to a ${(FRAME_REMOTE_URI.length - 7 - String(CFG.wsPort).length - 1)}-char hostname resolving to 127.0.0.1`);
+}
+
+function rewriteS2CFrame(data) {
+  if (!Buffer.isBuffer(data) || data.length < 1 + FRAME_REMOTE_URI.length) return data;
+  const comp = data[0];
+  if (comp !== 0 && comp !== 1 && comp !== 2) return data;
+  let payload = data.subarray(1);
+  try {
+    if (comp === 1) payload = zlib.brotliDecompressSync(payload);
+    else if (comp === 2) payload = zlib.inflateSync(payload);
+  } catch (e) {
+    return data; // undecodable: forward verbatim
+  }
+  if (!payload.includes(FRAME_REMOTE_URI)) return data;
+  const patched = Buffer.from(payload); // same length — copy and overwrite in place
+  let count = 0;
+  for (let at = payload.indexOf(FRAME_REMOTE_URI); at >= 0; at = payload.indexOf(FRAME_REMOTE_URI, at + 1)) {
+    FRAME_LOCAL_URI.copy(patched, at);
+    count++;
+  }
+  try {
+    const body = comp === 1 ? zlib.brotliCompressSync(patched)
+      : comp === 2 ? zlib.gzipSync(patched)
+      : patched;
+    log(`REWRITE frame: ${count} same-length URI(s) -> ${FRAME_LOCAL_URI.toString()} (${comp === 0 ? 'raw' : comp === 1 ? 'brotli' : 'gzip'} re-encoded)`);
+    return Buffer.concat([Buffer.from([comp]), body]);
+  } catch (e) {
+    log(`REWRITE frame: re-encode failed (${e.message}) — forwarding original`);
+    return data;
+  }
 }
 
 // ---------- API reverse proxy ----------
@@ -332,7 +387,10 @@ function handleUpgrade(req, socket, head) {
       });
       upstream.on('message', (data, isBinary) => {
         recordFrame('s2c', data, isBinary);
-        if (client.readyState === WebSocket.OPEN) client.send(data, { binary: isBinary });
+        if (client.readyState === WebSocket.OPEN) {
+          const out = isBinary ? rewriteS2CFrame(data) : data;
+          client.send(out, { binary: isBinary });
+        }
       });
       const linkClose = (who) => (code, reason) => {
         const other = who === 'client' ? upstream : client;

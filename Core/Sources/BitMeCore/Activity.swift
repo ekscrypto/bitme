@@ -385,17 +385,21 @@ extension Activity.ResourceStreamLoop: AsyncActivity, StampableActivity {
 extension Activity {
     /// The account's game session on the game's databases: holds the
     /// `sign_in`s that own the game's one-live-session-per-account slot
-    /// (`GlobalSessionClient` — the global DB plus the region shard, the
-    /// two legs the desktop client holds). One connection set per user
-    /// action (`Intent.SignInGameSession`). There is deliberately no
-    /// reconnect — when a leg is kicked (the desktop client signing in),
-    /// dropped, or refused, the machine returns to the pre-sign-in gate
-    /// and only the user takes the session back.
+    /// (`GlobalSessionClient` — the region shard, load-bearing, plus the
+    /// best-effort global leg the pre-flight may skip past the game's 1 h
+    /// admission window). One connection set per user action
+    /// (`Intent.SignInGameSession`). There is deliberately no reconnect —
+    /// when a leg is kicked (the desktop client signing in), dropped, or
+    /// refused, the machine returns to the pre-sign-in gate and only the
+    /// user takes the session back.
     struct GameSessionLoop: Sendable {
         let token: String
         let entityID: String
         /// The account's region — selects the shard leg.
         let regionID: Int?
+        /// The token's `hex_identity` claim — arms the region leg's queue
+        /// join (`player_queue_join` before `sign_in`).
+        let identityHex: String?
         /// Machine-stamped with the spawned task; stored in session state by
         /// the starting intent so `Intent.SignOut` can cancel it.
         let cancellable: CancellableTask
@@ -408,7 +412,25 @@ extension Activity.GameSessionLoop: AsyncActivity, StampableActivity {
     func start(ingestor: IntentIngestor, adapters: Adapters) async {
         coreLog.info("game session connecting for \(self.entityID, privacy: .public)")
         await ingestor.ingest(Intent.GameSessionStatusChanged(status: .connecting, message: nil))
-        for await event in adapters.bitCraft.openGlobalSession(token, entityID, regionID) {
+        // Pre-flight over the public relay (anonymous; only seconds behind
+        // live). The game's global database refuses connections once more
+        // than an hour has passed since the account's last launcher login
+        // (module-private `user_authentication_state`), and the relay's
+        // `last_login_timestamp` — the public `player_state` field the
+        // session's first `sign_in` stamps — is the readable proxy: older
+        // than the window ⇒ don't bother with the global leg, region only.
+        // No answer (unmirrored region, relay down) ⇒ attempt both legs —
+        // the handshake itself is the ground truth.
+        var skipGlobal = false
+        if let status = try? await adapters.relay.playerStatus(entityID),
+           let lastLogin = status.lastLoginTimestamp {
+            let elapsed = Date().timeIntervalSince1970 - Double(lastLogin)
+            skipGlobal = elapsed > GameConfig.shared.globalAuthWindowSecs
+            if skipGlobal {
+                coreLog.info("game session: last game login \(Int(elapsed), privacy: .public) s ago — past the global admission window, skipping the global leg")
+            }
+        }
+        for await event in adapters.bitCraft.openGlobalSession(token, entityID, regionID, skipGlobal, identityHex) {
                 if Task.isCancelled { return }
                 switch event {
                 case .regionLeg(let leg):
@@ -418,6 +440,15 @@ extension Activity.GameSessionLoop: AsyncActivity, StampableActivity {
                 case .established:
                     coreLog.info("game session holding for \(self.entityID, privacy: .public)")
                     await ingestor.ingest(Intent.GameSessionStatusChanged(status: .live, message: nil))
+                case .globalLegFailed(let message):
+                    // The best-effort global leg is offline while the region
+                    // session stands — surface it as a note on the live
+                    // session, never as a failure.
+                    coreLog.error("game session global leg offline: \(message, privacy: .public)")
+                    await ingestor.ingest(Intent.GameSessionStatusChanged(
+                        status: .live,
+                        message: "Connected to your region; the game's global server is offline for this session (\(message))."
+                    ))
                 case .rejected(let message):
                     coreLog.error("game session sign_in rejected: \(message, privacy: .public)")
                     await ingestor.ingest(Intent.GameSessionStatusChanged(status: .rejected, message: message))

@@ -764,7 +764,7 @@ struct ClaimBuildingsTests {
                     requestAccessCode: { _ in },
                     authenticate: { _, _ in "test-token" },
                     resolveAccountPlayer: { _, _ in throw URLError(.badServerResponse) },
-                    openGlobalSession: { _, _, _ in AsyncStream { _ in } },
+                    openGlobalSession: { _, _, _, _, _ in AsyncStream { _ in } },
                     syncClaimBuildings: { leg, claim, player in
                         claimBuildings.open(leg: leg, claim: claim, player: player)
                     },
