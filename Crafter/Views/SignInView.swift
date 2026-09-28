@@ -1,11 +1,13 @@
 import SwiftUI
 import BitMeCore
 
-/// The app's launch screen: renders `BitCraftSignIn` and dispatches
+/// The authentication screen: renders `BitCraftSignIn` and dispatches
 /// `Intent.StartBitCraftSignIn` / `Intent.SubmitAccessCode` /
 /// `Intent.RetryAccountLink`. All behavior lives in the core machine — the
 /// flow is email → access code → (the core links the account's own player
-/// over the game's global database) → the session takes over.
+/// over the game's global database) → the session takes over. Shown when
+/// no account is linked (after the startup screen resolves that) or when
+/// the user signs out — never as the app's first screen.
 struct SignInView: View {
     let signIn: BitCraftSignIn
     let ingest: @Sendable (Sendable) async -> Void

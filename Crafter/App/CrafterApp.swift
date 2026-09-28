@@ -7,14 +7,16 @@ import BitMeCore
 /// account-driven projection) says. All behavior lives in the core — this
 /// target is presentation only.
 ///
-/// Sign-in is account-driven: the app opens on the emailed-code screen and
-/// the tracked character is always the signed-in account's own player (the
+/// Sign-in is account-driven: the app opens on a neutral startup screen
+/// until bootstrap restores persisted state, then shows the emailed-code
+/// screen or (for a persisted account) the pre-sign-in gate — and the
+/// tracked character is always the signed-in account's own player (the
 /// core resolves it over the game's global database — no character-name
 /// step). The resource-map stack is disabled at construction: this app
 /// never renders the hex map, so it never fetches tile windows or opens the
 /// change stream.
 ///
-/// Flow: email/code → account link → the pre-sign-in gate (character card,
+/// Flow: startup → email/code → account link → the pre-sign-in gate (character card,
 /// presence, Sign in / Take over session) → home while the game session is
 /// held. A kicked or dropped game session returns to the gate — never
 /// re-taken automatically.
@@ -72,9 +74,13 @@ struct RootView: View {
     let ingest: @Sendable (Sendable) async -> Void
 
     var body: some View {
-        // The broadcaster replays the latest rep immediately, so this
-        // placeholder renders for at most a frame.
+        // The broadcaster replays the latest rep immediately, so `nil`
+        // renders for at most a frame — the rep itself opens on the
+        // neutral `.startup` screen and stays there until bootstrap
+        // decides whether the user needs to authenticate.
         switch viewRep {
+        case .startup:
+            StartupView()
         case .signIn(let signIn):
             SignInView(signIn: signIn, ingest: ingest)
         case .gameSessionPrompt(let prompt):

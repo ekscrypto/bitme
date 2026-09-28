@@ -8,6 +8,11 @@ import Foundation
 /// has its own `ViewRep`; the machine publishes exactly one of the two,
 /// chosen at construction.
 public enum CrafterRep: Equatable, Sendable, Codable {
+    /// The pre-bootstrap screen: persisted state is still being restored, so
+    /// whether the user needs to authenticate is not yet known. Never
+    /// projected — it exists only as the channel's bootstrap value; the
+    /// first ingest (bootstrap completed) replaces it with a real screen.
+    case startup
     case signIn(BitCraftSignIn)
     case gameSessionPrompt(GameSessionPrompt)
     case session(Session)

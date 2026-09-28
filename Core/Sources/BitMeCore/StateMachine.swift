@@ -69,16 +69,17 @@ public final actor StateMachine: IntentIngestor {
         self.ephemeralState.resourceMapEnabled = configuration.resourceMapEnabled
         self.ephemeralState.accountDrivenSignIn = configuration.accountDrivenSignIn
         // Bootstrap reps: the first frame an app renders. Name-driven
-        // hosts open on name entry; account-driven hosts on email entry
-        // (a restored account/character takes over on bootstrap — or the
-        // link resumes — within a frame or two). The channel the other
-        // flow would use keeps its bootstrap rep; it is never published.
+        // hosts open on name entry (their genuine root). Account-driven
+        // hosts open on the neutral startup screen: whether the flow goes
+        // to email entry or a restored account takes it to the gate (or a
+        // resume link) is known only after bootstrap restores persisted
+        // state — opening on email entry flashed the sign-in screen over
+        // the gate on every restored launch. The channel the other flow
+        // would use keeps its bootstrap rep; it is never published.
         self.viewRep = ViewRepBroadcaster(initial: .onboarding(ViewRep.Onboarding(
             isResolving: false, lookingUpName: nil, error: nil, resolvedOfflineHint: false
         )))
-        self.crafterRep = CrafterRepBroadcaster(initial: .signIn(BitCraftSignIn(
-            phase: .idle, error: nil, canDismiss: false
-        )))
+        self.crafterRep = CrafterRepBroadcaster(initial: .startup)
         self.mapRep = RepBroadcaster<MapRep>(initial: .empty)
         self.workstationsRep = RepBroadcaster<WorkstationsRep>(initial: .empty)
     }

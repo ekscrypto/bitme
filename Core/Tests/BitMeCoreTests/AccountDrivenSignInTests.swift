@@ -296,14 +296,28 @@ struct AccountDrivenSignInTests {
 
     // MARK: - Tests
 
-    /// The machine's very first rep is email entry. (That the name-driven
-    /// onboarding screen can never appear in this mode is now a property
-    /// of the type — `CrafterRep` has no onboarding case.)
-    @Test func initialRepIsEmailEntry() async {
+    /// Bootstrap opens on the neutral startup rep — never email entry,
+    /// which flashed the authentication screen over the gate on every
+    /// restored launch — and the first projected rep after bootstrap (no
+    /// persisted account here) is email entry, which never regresses to
+    /// startup afterwards. (That the name-driven onboarding screen can
+    /// never appear in this mode is a property of the type — `CrafterRep`
+    /// has no onboarding case.)
+    @Test func bootstrapOpensOnStartupThenEmailEntry() async {
         let machine = makeMachine(link: SimulatedLink(outcome: .player(Self.player)))
-        let reps = await collect(machine, until: { rep in
+        let reps = await collect(machine, dispatch: {
+            await machine.start()
+        }, until: { rep in
             guard case .signIn(let signIn) = rep else { return false }
             return signIn.phase == .idle
+        })
+        guard case .startup = reps.all.first else {
+            Issue.record("expected the startup bootstrap rep first")
+            return
+        }
+        #expect(reps.all.dropFirst().allSatisfy { rep in
+            if case .startup = rep { return false }
+            return true
         })
         guard case .signIn(let signIn)? = reps.lastRep else {
             Issue.record("expected the email sign-in rep")
