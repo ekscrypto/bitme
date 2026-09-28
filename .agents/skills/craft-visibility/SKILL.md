@@ -44,7 +44,13 @@ never trusts client timing:
 
 - cooldown is server-computed: `recipe.time_requirement ×
   1/(CraftingSpeed + skill_speed − 1)` (extraction uses GatheringSpeed —
-  the buffed ~1.06 s forage swing);
+  the buffed ~1.06 s forage swing). To reproduce it client-side, don't
+  re-derive buffs — the server materializes all bonuses into public
+  `character_stats_state` (subscribe `WHERE entity_id = <own>`;
+  `values` indexed by `CharacterStatType` declaration order). Buff
+  application rules (type/priority replacement, flat+pct+clamp, food →
+  `food_desc.buffs`, expiry) and the movement-speed chain:
+  region-move-and-craft-continue.md, "Computing speeds client-side";
 - completion earlier than **95 %** of that delay: **80–95 %** = strike,
   **< 80 %** = `"Tried to … too quickly"` fail (action cleared, must
   re-arm via the `_start` call); `was_consumed` also blocks double

@@ -175,6 +175,65 @@ same `_start`/complete pairs, but must honor the server-side cadence —
 fire-to-completion no earlier than ~95 % of the recipe delay (or accept
 strikes), and never reuse a consumed action.
 
+### Computing speeds client-side (stats, buffs, movement)
+
+Verified against BitCraftPublic `master`. **The practical answer for
+craft/extract: don't re-derive anything — read the materialized row.**
+The server folds every bonus source into `character_stats_state.values`
+(positional by `CharacterStatType` discriminant) on every change
+(`PlayerState::collect_stats_with_uncommited_buffs`), and the table is
+**public** — the desktop client subscribes its own row with exact
+equality (`WHERE entity_id = <own>`, proven grammar in the capture).
+`event_delay` divides exactly those values, so the app gets
+server-identical cooldowns by subscribing the same row. Decoder pin
+needed: the `values` index = `CharacterStatType` declaration order
+(schema typespace / `components.rs`).
+
+**Buff/debuff application** (for predicting changes, e.g. buff-expiry
+countdowns) — all inputs public:
+
+- Food → buffs: `food_desc.buffs[] = {buff_id, duration}` per item eaten
+  (`food.rs::consume`; also hp/stamina/satiation/teleport energy).
+- Activation (`ActiveBuffState::add_active_buff_with_data`): **one
+  active buff per `buff_type_id`** — a new buff with lower `priority`
+  than the live one of that type is rejected, ≥ replaces it. Values
+  default to `buff_desc.stats[].value`, duration to `buff_desc.duration`;
+  overrides possible per-activation.
+- Stat aggregation on recollect:
+  `clamp((base + Σ flat) × (1 + Σ pct), min_value, max_value)` per stat —
+  base/min/max from public `character_stat_desc`; bonuses from
+  equipment (active preset), active buffs, mounted deployable
+  (Cart/Mount/BoatSpeed), and acquired knowledges
+  (`knowledge_stat_modifier_desc` ← `knowledge_secondary_state`);
+  paving-tile bonuses present but disabled.
+- Each `buff_desc.stats[]` entry is `{id: stat_type, value: f32,
+  is_pct: bool}`. Expiry: a scheduled recollect at duration + 0.5 s;
+  remaining time is computable from public `active_buff_state`
+  (`{buff_id, start, duration, values[]}`). Debuffs (environment, rez
+  sickness) are the same pipeline — `buff_type_desc.category`
+  distinguishes them.
+- Crit per completed action: RNG ≤ crit_chance → effort ×
+  (1 + crit_multiplier stat) — see the effort math in
+  craft-visibility's "Progress math".
+
+**Movement speed** — formula fully known, numbers partly private:
+
+```
+speed = default_speed[surface_type]              // parameters_player_move_desc (PRIVATE table)
+        × character_stats_state[MovementMultiplier]   // public, buffable
+        × 2.0 if move_type > 2                       // transitions "above the law"
+        × paving multiplier                          // paving_tile_desc, public
+```
+
+`default_speed` is a per-surface-type list; water depth below the swim
+minimum is treated as ground (`get_speed_on_water_type`). The server
+checks moves at `duration ≥ travel_time × 0.9 − 0.05 s` plus hard caps
+(speed 100, hop ≤ 7 tiles — `validate_move_basic`). **Gap:** the actual
+`default_speed` values (and the `MovementSpeed.surface_type` enum) live
+in the private parameters table — not subscribable; measure from
+`player_move` args (duration × distance) in captures or extract from the
+client's bundled static data.
+
 ## 4. Event tables (v2-only — a constraint that shapes who can see them)
 
 The region streams ephemeral `*_event` tables alongside persistent ones.

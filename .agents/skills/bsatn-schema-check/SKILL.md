@@ -39,9 +39,11 @@ tags; timestamps are microseconds since the Unix epoch.
    declared Sums that merely look like `Option`: `player_move`'s
    `destination`/`origin` declare variants **`[some, none]` → some = 0x00,
    none = 0x01** — the reverse of std `Option` habit; assuming none=0
-   misaligns every later field. And reducer-request `timestamp` fields
-   (`player_move`, `craft_continue*`, `extract*`) are **milliseconds**
-   while row/server timestamps stay microseconds.
+   misaligns every later field. `character_stats_state.values` is another
+   positional trap: element i = `CharacterStatType` discriminant i
+   (declaration order in the schema typespace). And reducer-request
+   `timestamp` fields (`player_move`, `craft_continue*`, `extract*`) are
+   **milliseconds** while row/server timestamps stay microseconds.
 5. Run `cd Core && swift test` (full suite, <1 s).
 6. Confirm end-to-end against a fresh tap capture (below): snapshot rows
    must decode with no trailing bytes.
