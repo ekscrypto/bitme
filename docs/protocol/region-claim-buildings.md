@@ -6,9 +6,18 @@ subscribe to them live. Researched 2026-09-26 against the game module
 schema (`bitcraft-mats/bitjita-schema-region.json`, schema version pinned
 there) and the relay mirror's live subscriptions
 (`relay-bitcraftsync-app/spacetimedb-bitcraft-mirror`, `shard.rs` +
-`USED-TABLES.md`). The official client's region leg has never been
-captured (tap analysis §6), so the query set below is derived from schema
-+ relay practice — both verified against the same server build.
+`USED-TABLES.md`). The official client's region leg has since been
+captured (2026-09-28 — see
+[region-move-and-craft-continue.md](region-move-and-craft-continue.md)):
+it confirms these tables but subscribes the craft set **chunk-scoped** —
+`SELECT progressive_action_state.* FROM progressive_action_state JOIN
+location_state ON progressive_action_state.building_entity_id =
+location_state.entity_id WHERE location_state.chunk_index = <one of 9
+chunks around the player>`, same shape for `public_progressive_action_state`
+and `passive_craft_state` — proximity scope for a world client, not claim
+scope. The per-building equality below remains the right shape for a
+claim-scoped app, and the JOIN on `location_state` (without subscribing
+it) is more proven grammar.
 
 ## 1. Where buildings live
 
@@ -87,7 +96,7 @@ subscriptions — the list stays live with no re-querying.
 | `item_desc` | `id: i32, name: string, description: string, volume: i32, …` | id |
 | `cargo_desc` | `id: i32, name: string, description: string, volume: i32, …` | id |
 | `progressive_action_state` | `entity_id: u64, building_entity_id: u64, function_type: i32, progress: i32, recipe_id: i32, craft_count: i32, last_crit_outcome: i32, owner_entity_id: u64, lock_expiration: micros, preparation: bool` | building_entity_id, entity_id, owner_entity_id |
-| `public_progressive_action_state` | `entity_id: u64, building_entity_id: u64, owner_entity_id: u64` | (entity_id pk) — the game's shared-craft projection: a progressive craft is shared ⇔ its entity id appears here (anyone may `craft_continue`). Orphaned rows outlive collection — membership never fabricates a craft; join through `progressive_action_state` and show others' shared crafts only while `progress < craft_count × crafting_recipe_desc.actions_required` | |
+| `public_progressive_action_state` | `entity_id: u64, building_entity_id: u64, owner_entity_id: u64` | (entity_id pk) — the game's shared-craft projection: a progressive craft is shared ⇔ its entity id appears here (anyone may `craft_continue`). Orphaned rows outlive collection — membership never fabricates a craft; join through `progressive_action_state` and show others' shared crafts only while `progress < craft_count × crafting_recipe_desc.actions_required`. Wire layouts of the `craft_continue`/`craft_continue_start` pair: [region-move-and-craft-continue.md](region-move-and-craft-continue.md) | |
 | `inventory_state` | `entity_id: u64, pockets: [ { volume: i32, contents: Option<{item_id, quantity, item_type, durability}>, locked: bool } ], inventory_index: i32, cargo_index: i32, owner_entity_id: u64, player_owner_entity_id: u64` | entity_id, **owner_entity_id**, player_owner_entity_id |
 
 (`passive_craft_state`/`progressive_action_state` timestamps are

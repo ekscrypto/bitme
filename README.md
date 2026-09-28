@@ -31,6 +31,7 @@ reference scenario for X-Ray's dashboard.
 | [docs/relay-data-requirements.md](docs/relay-data-requirements.md) | Design history — the original data-requirements spec sent to the relay team (superseded; static-gamedata list §6 still applies). |
 | [docs/protocol/session-2026-09-25-tap-analysis.md](docs/protocol/session-2026-09-25-tap-analysis.md) | **Protocol: global-DB tap** — auth flow, connection topology, v2.bsatn wire facts, the desktop client's subscription/reducer catalog. |
 | [docs/protocol/region-claim-buildings.md](docs/protocol/region-claim-buildings.md) | **Protocol: claim-buildings sync** — the region tables behind a claim's workstations (shapes, indexes, guardrails) and the subscription set Pocket Crafter rides on the game session's region leg. |
+| [docs/protocol/region-move-and-craft-continue.md](docs/protocol/region-move-and-craft-continue.md) | **Protocol: movement & shared-craft resume** — captured `player_move` / `craft_continue` reducer wire layouts (incl. the `[some, none]` tag trap and ms-vs-µs timestamps), the no-repeat `_start`/complete idiom with server-side cadence validation (95%/80% band, strikes), and the v2-only `*_event` tables. |
 
 ## External sources of truth
 

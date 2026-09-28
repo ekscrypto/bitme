@@ -35,7 +35,13 @@ tags; timestamps are microseconds since the Unix epoch.
    field shift everything downstream — re-pin the reads. Columns appended
    after it are safe (decoders stop early by design).
 4. Re-check enum variant order (u8 tags — e.g. `PassiveCraftStatus`
-   Queued/Processing/Complete = 0/1/2) and `Option` wrappers.
+   Queued/Processing/Complete = 0/1/2) and `Option` wrappers. Beware
+   declared Sums that merely look like `Option`: `player_move`'s
+   `destination`/`origin` declare variants **`[some, none]` → some = 0x00,
+   none = 0x01** — the reverse of std `Option` habit; assuming none=0
+   misaligns every later field. And reducer-request `timestamp` fields
+   (`player_move`, `craft_continue*`, `extract*`) are **milliseconds**
+   while row/server timestamps stay microseconds.
 5. Run `cd Core && swift test` (full suite, <1 s).
 6. Confirm end-to-end against a fresh tap capture (below): snapshot rows
    must decode with no trailing bytes.
