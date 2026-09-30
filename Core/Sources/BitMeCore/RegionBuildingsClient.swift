@@ -66,6 +66,12 @@ public struct BuildingGamedata: Equatable, Sendable, Codable {
     /// "complete" is `progress ≥` that product — never `progress ≥
     /// craftCount`.
     public let recipeActionsRequired: [Int32: Int32]
+    /// Recipe id → `time_requirement` seconds — the craft driver's
+    /// cooldown base: server pace is `time / (CraftingSpeed +
+    /// skill_speed − 1)` per completed action.
+    public let recipeTimeRequirement: [Int32: Float]
+    /// Recipe id → `stamina_requirement` — charged per completed action.
+    public let recipeStaminaRequirement: [Int32: Float]
     /// `item_desc` id → name — resolves Item-typed stack refs.
     public let itemNames: [Int32: String]
     /// `cargo_desc` id → name — resolves Cargo-typed stack refs.
@@ -79,6 +85,8 @@ public struct BuildingGamedata: Equatable, Sendable, Codable {
         recipeInputs: [Int32: ItemStackRef] = [:],
         recipeOutputs: [Int32: ItemStackRef] = [:],
         recipeActionsRequired: [Int32: Int32] = [:],
+        recipeTimeRequirement: [Int32: Float] = [:],
+        recipeStaminaRequirement: [Int32: Float] = [:],
         itemNames: [Int32: String] = [:],
         cargoNames: [Int32: String] = [:],
         fetchedAt: Date = .now
@@ -89,6 +97,8 @@ public struct BuildingGamedata: Equatable, Sendable, Codable {
         self.recipeInputs = recipeInputs
         self.recipeOutputs = recipeOutputs
         self.recipeActionsRequired = recipeActionsRequired
+        self.recipeTimeRequirement = recipeTimeRequirement
+        self.recipeStaminaRequirement = recipeStaminaRequirement
         self.itemNames = itemNames
         self.cargoNames = cargoNames
         self.fetchedAt = fetchedAt
@@ -621,6 +631,8 @@ enum RegionBuildingsClient {
             var recipeInputs: [Int32: ItemStackRef] = [:]
             var recipeOutputs: [Int32: ItemStackRef] = [:]
             var recipeActionsRequired: [Int32: Int32] = [:]
+            var recipeTimeRequirement: [Int32: Float] = [:]
+            var recipeStaminaRequirement: [Int32: Float] = [:]
             for table in try await recipeTables where table.tableName == "crafting_recipe_desc" {
                 for row in table.rows.rows {
                     if let recipe = try? RegionGamedataDecoder.recipe(row) {
@@ -631,6 +643,12 @@ enum RegionBuildingsClient {
                         if let output = recipe.output { recipeOutputs[recipe.id] = output }
                         if let actions = recipe.actionsRequired {
                             recipeActionsRequired[recipe.id] = actions
+                        }
+                        if let time = recipe.timeRequirement {
+                            recipeTimeRequirement[recipe.id] = time
+                        }
+                        if let stamina = recipe.staminaRequirement {
+                            recipeStaminaRequirement[recipe.id] = stamina
                         }
                     }
                 }
@@ -662,6 +680,8 @@ enum RegionBuildingsClient {
                 buildings: buildings, recipeNames: recipes, recipeSkills: recipeSkills,
                 recipeInputs: recipeInputs, recipeOutputs: recipeOutputs,
                 recipeActionsRequired: recipeActionsRequired,
+                recipeTimeRequirement: recipeTimeRequirement,
+                recipeStaminaRequirement: recipeStaminaRequirement,
                 itemNames: itemNames, cargoNames: cargoNames, fetchedAt: .now
             )
             if !buildings.isEmpty || !recipes.isEmpty {

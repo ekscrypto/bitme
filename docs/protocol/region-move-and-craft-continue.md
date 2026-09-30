@@ -170,6 +170,36 @@ dimension/interior-bounds checks, ≤ 3 chunks per hop — with the stricter
 terrain/elevation/raycast code present but disabled ("triggered by HTM +
 glancing").
 
+### Strike observability — tolerated strikes are silent
+
+- **Tolerated strikes (the 80–95 % band): invisible.** The counter table
+  `move_validation_strike_counter_state` (`entity_id`,
+  `validation_failure_timestamps`) is **private**, the action itself
+  *succeeds*, no event fires, and no error returns. Only server logs
+  record them ("failed … validation, but is allowed to proceed (strike
+  N/M)"). Neither the desktop client (zero strike subscriptions in the
+  capture) nor BitMe can observe a tolerated strike.
+- **Hard rejections (< 80 %, strike cap exceeded, bad timestamp) leave
+  three signals:** (1) `ReducerResult Err` — "Tried to … too quickly" /
+  "~Invalid timestamp" (failures do produce receipts — the stamina Err in
+  this capture came back on a `flags: 0` call); (2) the public
+  `player_action_state` own row (`WHERE entity_id = <own>`, proven
+  grammar) flips `last_action_result` to `TimingFail`
+  (Success/TimingFail/Fail/Cancel, declaration order) via the scheduled
+  `player_clear_action_state` — a passive tripwire subscription; the
+  cleared action also means the next call must be the `_start` one.
+  (3) Movement only: the server schedules `reset_mobile_entity_timer` —
+  the position snaps back, visible as an unsolicited position update.
+- **Thresholds are unknown from public sources:** max strikes and the
+  rolling window live in `private_parameters_desc.move_validation`
+  (private; values imported from static data not in the public repo —
+  possibly in the local `BitCraft_GameData` checkout).
+
+If BitMe ever drives actions: pace ≥ 95 % locally (computable from
+`character_stats_state` + recipe — see below), treat any Err receipt as
+a stop signal, and optionally subscribe the own `player_action_state`
+row as the TimingFail tripwire.
+
 Implication for BitMe: an account-driven client could legally drive the
 same `_start`/complete pairs, but must honor the server-side cadence —
 fire-to-completion no earlier than ~95 % of the recipe delay (or accept
@@ -304,3 +334,39 @@ updates; subscribe `progressive_action_state` /
 rows like `passive_craft_state.timestamp`) are **microseconds**, as
 everywhere else in the protocol. When replaying captured args, don't mix
 the two — a ms value reinterpreted as µs lands ~1970-01-21.
+
+## 6. Driver implementation (Pocket Crafter, 2026-09-28)
+
+The app drives these reducers over its own game-session region leg
+(account-driven sign-in holds the account's one live session). Files:
+`RegionDriverClient.swift` (calls + refusal classification),
+`Activity.CraftDriverLoop` (walk stage + paced loop), the driver intents
+in `Intent.swift`, `ScriptedCraftDriver` in the tests.
+
+- **Feedback channel**: every `callReducer` receipt — the SDK awaits them
+  by default (no `lightMode`) — carries this client's own row effects
+  (`ReducerSuccess.transactionUpdate`, decoded by `DriverReceipt`).
+  Effort (`progressive_action_state.progress`), stamina, and position
+  confirmation all arrive there; the own-row subscriptions never echo
+  own-action writes.
+- **Pacing**: the plan computes the server's own delay
+  (`time_requirement / (CraftingSpeed + skill_speed − 1)`, stats from the
+  materialized `character_stats_state` row) × `craftDelayMargin` (1.02 —
+  never inside the 80–95 % strike band); the loop sleeps it between
+  `craft_continue_start` and `craft_continue`, plus a 70 ms inter-gap.
+  A "Tried to … too quickly" refusal widens the delay ×1.25 (cap ×2) and
+  re-arms; "Not enough stamina." parks the drive in a resumable pause;
+  transport errors retry ×3 then end the drive.
+- **Walk stage**: stand-point = station center shifted toward the player
+  by `footprintRadius + 2` tiles (rotation-invariant metric — §"Computing
+  speeds client-side" inputs); hops of ≤1 tile at the measured 5100
+  raw-units/s × `MovementMultiplier`, durations ×1.15 safety, origins
+  chained, a final zero-duration stop call anchors position server-side.
+  A refused hop halves once, then fails. Interior (dimension ≠ 1)
+  stations are refused up front — the app holds the session, so nobody
+  can walk inside on the user's behalf.
+- **Lifecycle**: pause cancels the loop (the craft suspends server-side
+  when its lock lapses; resume = a fresh `craft_continue_start`); stop
+  calls `craft_cancel` + `player_action_cancel` best-effort;
+  backgrounding pauses, foregrounding auto-resumes
+  (`Intent.AppBackgrounded/AppForegrounded`).

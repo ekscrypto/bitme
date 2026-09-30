@@ -202,11 +202,18 @@ struct AccountDrivenSignInTests {
             AccountDrivenSignInTests.snapshot
         },
         // What the pre-flight's player-status poll answers (the relay's
-        // `/player/:id`); throwing models an unmirrored region / relay
-        // outage — the pre-flight then attempts both legs.
+        /// `/player/:id`); throwing models an unmirrored region / relay
+        /// outage — the pre-flight then attempts both legs.
         playerStatus: @escaping @Sendable () throws -> PlayerStatus = {
             throw RelayError.notFound
-        }
+        },
+        // What the player-vitals sync answers per leg (own-row events).
+        playerVitals: @escaping @Sendable (RegionLeg, UInt64) -> AsyncStream<PlayerVitalsEvent> = { _, _ in
+            AsyncStream { $0.finish() }
+        },
+        // What the craft driver's reducer calls answer. The default
+        // refuses everything — suites that never drive stay silent.
+        driver: ScriptedCraftDriver = ScriptedCraftDriver()
     ) -> StateMachine {
         StateMachine(adapters: Adapters(
             relay: Adapters.Relay(
@@ -229,7 +236,28 @@ struct AccountDrivenSignInTests {
                 },
                 syncClaimBuildings: { leg, claim, player in
                     claimBuildings.open(leg: leg, claim: claim, player: player)
-                }
+                },
+                syncPlayerVitals: playerVitals,
+                craftContinueStart: { _, entity, timestampMs in
+                    try driver.start(entity, timestampMs)
+                },
+                craftContinue: { _, entity, timestampMs in
+                    try driver.complete(entity, timestampMs)
+                },
+                craftCancel: { _, pocketID in
+                    driver.cancel(pocketID)
+                },
+                playerActionCancel: { _ in
+                    driver.actionCancel()
+                },
+                movePlayer: { _, timestampMs, destinationX, destinationZ, dimension, originX, originZ, durationSeconds, moveType in
+                    try driver.move(
+                        timestampMs, destinationX, destinationZ, dimension,
+                        originX, originZ, durationSeconds, moveType
+                    )
+                },
+                stationLocation: { _, _ in driver.stationLocation },
+                ownPosition: { _, _ in driver.ownPosition }
             ),
             loadFoodBuffGamedata: { nil },
             restoreIdentity: { restoredIdentity },

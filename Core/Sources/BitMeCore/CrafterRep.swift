@@ -84,6 +84,47 @@ public enum CrafterRep: Equatable, Sendable, Codable {
         /// Relay clock at snapshot time — the interpolation anchor.
         public var nowMs: Double?
         public var actions: [RunningAction]
+        /// The status banner's vitals — the player's own pools from the
+        /// region leg, nil until the game session is held. Values inside
+        /// may be nil while the own-row snapshot is still landing.
+        public var vitals: Vitals?
+        /// The active-craft banner (under the vitals strip): the tapped
+        /// craft the driver is walking to / driving / has finished. Nil
+        /// while no drive has been tapped (or after Stop/Dismiss).
+        public var craftBanner: CraftBanner?
+
+        public struct CraftBanner: Equatable, Sendable, Codable {
+            public enum State: Equatable, Sendable, Codable {
+                case walking(stationName: String?)
+                case crafting
+                /// Paused by the user, or out of stamina.
+                case paused(outOfStamina: Bool)
+                case completed
+                case failed(String)
+            }
+
+            public var state: State
+            public var recipeName: String?
+            /// Server-confirmed effort over the effort goal.
+            public var effortDone: Int?
+            public var effortTotal: Int?
+        }
+
+        /// The two-line status banner's data: what the player is doing
+        /// and the four pools. `activity` is the driver's phase when a
+        /// drive is running (Walking / Crafting / …), else the server's
+        /// own action record (`PlayerActionKind.displayName`).
+        public struct Vitals: Equatable, Sendable, Codable {
+            public var activity: String
+            public var stamina: Float?
+            public var maxStamina: Float?
+            public var health: Float?
+            public var maxHealth: Float?
+            public var teleportEnergy: Float?
+            public var maxTeleportEnergy: Float?
+            public var satiation: Float?
+            public var maxSatiation: Float?
+        }
     }
 
     /// The projection entry the machine uses for this configuration. The
@@ -130,17 +171,57 @@ public enum CrafterRep: Equatable, Sendable, Codable {
 
         let shell = SessionShell.project(persistent: persistent, ephemeral: ephemeral)
         var gameSession: Session.GameSession?
-        if let session = ephemeral.session {
+        var vitals: Session.Vitals?
+        var craftBanner: Session.CraftBanner?
+        if let liveSession = ephemeral.session {
             let status: Session.GameSession.Status
-            switch session.gameSession.status {
+            switch liveSession.gameSession.status {
             case .connecting: status = .connecting
             case .live: status = .live
             case .reconnecting: status = .reconnecting
             case .rejected: status = .rejected
             }
             gameSession = Session.GameSession(
-                status: status, error: session.gameSession.lastError
+                status: status, error: liveSession.gameSession.lastError
             )
+            // The banner exists only while this app holds the game session
+            // (the vitals sync rides its region leg).
+            if liveSession.gameSessionLoop != nil {
+                vitals = Session.Vitals(
+                    activity: liveSession.driver.bannerActivity
+                        ?? liveSession.vitals.action.displayName,
+                    stamina: liveSession.vitals.stamina,
+                    maxStamina: liveSession.vitals.maxStamina,
+                    health: liveSession.vitals.health,
+                    maxHealth: liveSession.vitals.maxHealth,
+                    teleportEnergy: liveSession.vitals.teleportEnergy,
+                    maxTeleportEnergy: liveSession.vitals.maxTeleportEnergy,
+                    satiation: liveSession.vitals.satiation,
+                    maxSatiation: liveSession.vitals.maxSatiation
+                )
+            }
+
+            // The craft banner renders whatever the driver holds — the
+            // plan stays until dismissed (or stopped), so completed and
+            // failed drives keep their banner.
+            if liveSession.driver.phase != .idle, let plan = liveSession.driver.plan {
+                let state: Session.CraftBanner.State
+                switch liveSession.driver.phase {
+                case .idle: state = .crafting // unreachable — guarded above
+                case .walking(let station): state = .walking(stationName: station)
+                case .crafting: state = .crafting
+                case .paused(.outOfStamina): state = .paused(outOfStamina: true)
+                case .paused: state = .paused(outOfStamina: false)
+                case .completed: state = .completed
+                case .failed(let message): state = .failed(message)
+                }
+                craftBanner = Session.CraftBanner(
+                    state: state,
+                    recipeName: plan.recipeName,
+                    effortDone: plan.effortDone,
+                    effortTotal: plan.effortTotal
+                )
+            }
         }
         return .session(Session(
             username: shell.username,
@@ -152,7 +233,9 @@ public enum CrafterRep: Equatable, Sendable, Codable {
             gameSession: gameSession,
             claimName: shell.claimName,
             nowMs: shell.nowMs,
-            actions: shell.actions
+            actions: shell.actions,
+            vitals: vitals,
+            craftBanner: craftBanner
         ))
     }
 }

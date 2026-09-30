@@ -66,4 +66,37 @@ struct GameConfig: Sendable {
     let mapStreamReconnectMaxSecs: Double = 30
     /// How long the pause loop sleeps between wanted-checks.
     let mapStreamPausePollSecs: Double = 1
+
+    /// Prospection overlay (docs/protocol/prospecting.md): crumb acceptance
+    /// radius in world units for the target circle — the desc ranges are
+    /// 10–12 for most activities, 25 for hunts/hidden spots; the common
+    /// case is drawn and the wedge carries the rest of the uncertainty.
+    let prospectCrumbRadius: Double = 12
+
+    // Craft driver (docs/protocol/region-move-and-craft-continue.md).
+    /// Safety margin over the server-computed action delay: the cadence
+    /// gate rejects completions under 95 % of the delay (80–95 % records
+    /// a strike), so the driver fires at 102 % — never in the strike band.
+    let craftDelayMargin: Double = 1.02
+    /// Multiplier applied to the delay after a "Tried to … too quickly"
+    /// rejection (server under-validation or clock skew) before re-arming.
+    let craftTooFastBackoff: Double = 1.25
+    /// Cap on that backoff, relative to the base delay.
+    let craftTooFastBackoffCap: Double = 2.0
+    /// The inter-iteration gap after `craft_continue` before the next
+    /// `craft_continue_start` — the captured loop's 50–90 ms cadence.
+    let craftInterIterationGapSecs: Double = 0.07
+    /// How many reducer-level failures (unknown errors) end a drive.
+    let craftMaxConsecutiveErrors = 3
+    /// Measured overworld walk speed in raw milli-tile units per second
+    /// (capture 2026-09-28: mean 5217, min 4852 across the captured
+    /// player's segments). Hops are paced under it.
+    let walkSpeedRawPerSec: Double = 5_100
+    /// Duration safety multiplier per hop — the server rejects moves
+    /// faster than its own speed math (`duration ≥ travel × 0.9 − 0.05`).
+    let walkDurationMargin: Double = 1.15
+    /// Longest acceptable one-hop distance, raw units (≈1 tile).
+    let walkHopRawDistance: Double = 1_000
+    /// Autowalk gives up after this many seconds.
+    let walkTimeoutSecs: Double = 60
 }

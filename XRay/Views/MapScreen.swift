@@ -142,6 +142,7 @@ struct MapScreen: View {
             blit(bitmap, in: &context, size: size)
         }
         drawTarget(in: &context, size: size)
+        drawProspect(in: &context, size: size)
         drawSelectedTile(in: &context, size: size)
         drawPlayer(in: &context, size: size, pulse: pulse)
     }
@@ -214,6 +215,97 @@ struct MapScreen: View {
             lineWidth: 2.5
         )
     }
+
+    // MARK: - Prospection overlay
+
+    /// The pending prospection: a filled bearing cone out to the measured
+    /// range, the crumb-radius circle at the cone's midline (the
+    /// dead-reckoned target point), and — on the final step — a precise
+    /// dashed needle to the prize. Everything anchors at the **fix origin**
+    /// — where the player stood when they prospected — and stays put until
+    /// the next prospection, even as the player walks on. Geometry is
+    /// sampled in world tile space and projected per point, so the odd-r
+    /// shear stays honest (docs/protocol/prospecting.md).
+    private func drawProspect(in context: inout GraphicsContext, size: CGSize) {
+        guard let prospect = rep.prospect,
+              let origin = screenPixel(x: prospect.fixX, z: prospect.fixZ, size: size) else { return }
+
+        let px = prospect.fixX
+        let pz = prospect.fixZ
+        let tint = Self.prospectColor
+
+        // The fix origin itself: a small ring, so the detached cone reads
+        // as anchored to a spot rather than to the moving player marker.
+        var originRing = Path()
+        let ringR = 4.0
+        originRing.addEllipse(in: CGRect(x: origin.x - ringR, y: origin.y - ringR, width: ringR * 2, height: ringR * 2))
+        context.stroke(originRing, with: .color(tint.opacity(0.7)), lineWidth: 1.5)
+
+        // World-space point along a bearing at a distance.
+        func point(bearing: Double, at d: Double) -> CGPoint? {
+            screenPixel(x: px + d * cos(bearing), z: pz + d * sin(bearing), size: size)
+        }
+
+        // Normalize the cone: shortest sweep, possibly wrapping ±π.
+        var lo = prospect.bearingLo
+        var hi = prospect.bearingHi
+        while hi < lo { hi += 2 * .pi }
+        var sweep = hi - lo
+        if sweep > .pi { sweep -= 2 * .pi }
+
+        if sweep > 0.02 {
+            // The bearing wedge: origin → lo ray → arc at the range → hi
+            // ray → closed. Rays are straight (short enough); the arc is
+            // sampled so the shear never bends it wrong.
+            var wedge = Path()
+            wedge.move(to: origin)
+            let steps = max(8, Int(prospect.distance / 2))
+            for i in 0...steps {
+                let d = prospect.distance * Double(i) / Double(steps)
+                if let p = point(bearing: lo, at: d) { wedge.addLine(to: p) }
+            }
+            let arcSteps = max(6, Int(abs(sweep) / 0.06))
+            for i in 1...arcSteps {
+                let a = lo + sweep * Double(i) / Double(arcSteps)
+                if let p = point(bearing: a, at: prospect.distance) { wedge.addLine(to: p) }
+            }
+            for i in stride(from: steps, through: 0, by: -1) {
+                let d = prospect.distance * Double(i) / Double(steps)
+                if let p = point(bearing: hi, at: d) { wedge.addLine(to: p) }
+            }
+            wedge.closeSubpath()
+            context.fill(wedge, with: .color(tint.opacity(0.14)))
+            context.stroke(wedge, with: .color(tint.opacity(0.55)), lineWidth: 1.2)
+        } else {
+            // Final step: one precise needle to the prize.
+            if let tip = point(bearing: lo, at: prospect.distance) {
+                var needle = Path()
+                needle.move(to: origin)
+                needle.addLine(to: tip)
+                context.stroke(
+                    needle,
+                    with: .color(tint.opacity(0.8)),
+                    style: StrokeStyle(lineWidth: 2, dash: [6, 5])
+                )
+            }
+        }
+
+        // Target circle at the cone midline (the best point estimate).
+        let mid = lo + sweep / 2
+        if let center = point(bearing: mid, at: prospect.distance) {
+            let r = max(4, prospect.crumbRadius * camera.pxPerHex)
+            var circle = Path()
+            circle.addEllipse(in: CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2))
+            context.fill(circle, with: .color(tint.opacity(0.18)))
+            context.stroke(
+                circle,
+                with: .color(tint.opacity(0.9)),
+                style: StrokeStyle(lineWidth: 2, dash: [4, 4])
+            )
+        }
+    }
+
+    static let prospectColor = Color(red: 0.72, green: 0.45, blue: 0.98)
 
     private func drawSelectedTile(in context: inout GraphicsContext, size: CGSize) {
         guard let tile = selectedTile,
@@ -385,6 +477,9 @@ struct MapScreen: View {
                 }
             }
             .padding(.horizontal, 12)
+            if let prospect = rep.prospect {
+                prospectPill(prospect)
+            }
             Spacer()
             if !hasWindow {
                 Text("Waiting for the map — the player must be live in the overworld.")
@@ -523,6 +618,29 @@ struct MapScreen: View {
         case .reconnecting: return "reconnecting…"
         case .off: return "map paused"
         }
+    }
+
+    /// The pending prospection's one-line status (the wedge on the canvas
+    /// carries the geometry).
+    private func prospectPill(_ prospect: MapRep.Prospect) -> some View {
+        let label = prospect.isFinalStep
+            ? "Prospecting · treasure · \(Int(prospect.distance.rounded()))m"
+            : "Prospecting · step \(prospect.step)/\(prospect.totalSteps) · \(Int(prospect.distance.rounded()))m"
+        return HStack(spacing: 6) {
+            Image(systemName: "location.north.line.fill")
+                .font(.caption2)
+                .foregroundStyle(Self.prospectColor)
+            Text(label)
+                .font(.caption)
+                .bold()
+                .monospacedDigit()
+                .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(.black.opacity(0.55), in: Capsule())
+        .overlay(Capsule().strokeBorder(Self.prospectColor.opacity(0.5), lineWidth: 1))
+        .padding(.top, 6)
     }
 
     private func tileInfoCard(_ tile: TileCoordinate) -> some View {

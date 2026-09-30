@@ -237,14 +237,65 @@ public struct BuildingFunctionInfo: Equatable, Codable, Sendable {
     let refiningCargoSlots: Int32
 }
 
+/// One `building_desc.footprint` entry — a tile offset from the building's
+/// center. `kind` is the `FootprintType` u8 tag (0 hitbox, 1 walkable,
+/// 2 perimeter, 3 walkable-resource).
+public struct FootprintTileInfo: Equatable, Codable, Sendable {
+    let x: Int32
+    let z: Int32
+    let kind: UInt8
+
+    init(x: Int32, z: Int32, kind: UInt8) {
+        self.x = x
+        self.z = z
+        self.kind = kind
+    }
+}
+
+/// Axial hex distance between two tile offsets — the game's own metric
+/// (`HexCoordinates::distance_to`: `(|dx| + |dy| + |dz|) / 2` with
+/// `y = -x - z`). Footprint offsets rotate around the center when a
+/// building is placed, but rotation preserves each tile's distance from
+/// the center — so the max over the raw deltas is direction-invariant.
+func hexTileDistance(dx: Int32, dz: Int32) -> Int32 {
+    (abs(dx) + abs(dx + dz) + abs(dz)) / 2
+}
+
 /// `building_desc` — the building catalog: display name plus the function
 /// entries that decide what a building is. Classification follows the
 /// relay's rule (`relay-cache/src/decode.rs::functions_is_storage`):
 /// crafting ⇔ crafting/refining slots, storage ⇔ item/cargo pockets.
+/// `unenterable` and the footprint tiles drive the craft driver: an
+/// unenterable station crafts from ≤2 tiles of its footprint, and the
+/// footprint's max radius picks the stand-point.
 public struct BuildingDescInfo: Equatable, Codable, Sendable {
     let id: Int32
     let name: String
     let functions: [BuildingFunctionInfo]
+    /// True when crafting happens from outside (≤2 tiles of footprint);
+    /// false means the crafter must stand inside an interior — out of the
+    /// driver's v1 scope.
+    let unenterable: Bool
+    /// Footprint tile offsets from the building's center (unrotated).
+    let footprint: [FootprintTileInfo]
+
+    /// The footprint's largest tile-distance from the center — invariant
+    /// under the placement rotation. Standing this +2 tiles from the
+    /// center is ≤2 tiles from every footprint tile (and never on one).
+    var footprintRadiusTiles: Int32 {
+        footprint.isEmpty ? 0 : footprint.map { hexTileDistance(dx: $0.x, dz: $0.z) }.max() ?? 0
+    }
+
+    init(
+        id: Int32, name: String, functions: [BuildingFunctionInfo],
+        unenterable: Bool = true, footprint: [FootprintTileInfo] = []
+    ) {
+        self.id = id
+        self.name = name
+        self.functions = functions
+        self.unenterable = unenterable
+        self.footprint = footprint
+    }
 
     var isCrafting: Bool {
         functions.contains { $0.craftingSlots > 0 || $0.refiningSlots > 0 }
@@ -279,6 +330,12 @@ public struct ItemStackRef: Equatable, Codable, Sendable {
 public struct RecipeInfo: Equatable, Codable, Sendable {
     let id: Int32
     let name: String
+    /// `time_requirement` — the per-action cooldown base: the server paces
+    /// actions at `time_requirement / (CraftingSpeed + skill_speed − 1)`
+    /// seconds (craft.rs::event_delay).
+    let timeRequirement: Float?
+    /// `stamina_requirement` — charged per completed craft action.
+    let staminaRequirement: Float?
     /// First `level_requirements` entry's `skill_id` — an id in the game's
     /// `skill_desc` catalog (0/1 sentinels, 2 Forestry … 13 Cooking,
     /// 14 Foraging; see `Profession.from(skillID:)`).
@@ -305,8 +362,10 @@ public struct ToolTypeInfo: Equatable, Codable, Sendable {
 /// the whole function list is walked field-by-field; everything after
 /// `name` is not needed and left unread.
 enum RegionGamedataDecoder {
-    /// `building_desc` row → catalog info. Reads `id`, `functions`, `name`
-    /// and stops — trailing fields stay unread in the row buffer.
+    /// `building_desc` row → catalog info. Reads `id`, `functions`, `name`,
+    /// then walks the fixed catalog fields to `footprint` (description,
+    /// rested-buff duration, light radius, model/icon asset names,
+    /// unenterable, wilderness) and stops — trailing fields stay unread.
     static func buildingDesc(_ data: Data) throws -> BuildingDescInfo {
         let reader = BSATNReader(data: data)
         let id = try reader.read() as Int32
@@ -339,7 +398,23 @@ enum RegionGamedataDecoder {
             )
         }
         let name = try reader.readString()
-        return BuildingDescInfo(id: id, name: name, functions: functions)
+        _ = try reader.readString() // description
+        _ = try reader.read() as Int32 // rested_buff_duration
+        _ = try reader.read() as Int32 // light_radius
+        _ = try reader.readString() // model_asset_name
+        _ = try reader.readString() // icon_asset_name
+        let unenterable = try reader.readBool()
+        _ = try reader.readBool() // wilderness
+        let footprint = try reader.readTypedArray { () -> FootprintTileInfo in
+            let x = try reader.read() as Int32
+            let z = try reader.read() as Int32
+            let kind = try reader.read() as UInt8 // FootprintType tag
+            return FootprintTileInfo(x: x, z: z, kind: kind)
+        }
+        return BuildingDescInfo(
+            id: id, name: name, functions: functions,
+            unenterable: unenterable, footprint: footprint
+        )
     }
 
     /// `crafting_recipe_desc` row → id, name, the profession signals, and
@@ -352,8 +427,8 @@ enum RegionGamedataDecoder {
         let reader = BSATNReader(data: data)
         let id = try reader.read() as Int32
         let name = try reader.readString()
-        _ = try reader.read() as Float // time_requirement
-        _ = try reader.read() as Float // stamina_requirement
+        let timeRequirement = try reader.read() as Float
+        let staminaRequirement = try reader.read() as Float
         _ = try reader.read() as Int32 // tool_durability_lost
         _ = try reader.readOptional { () throws -> (Int32, Int32) in
             (try reader.read() as Int32, try reader.read() as Int32) // building_type, tier
@@ -393,7 +468,10 @@ enum RegionGamedataDecoder {
         }.first
         let actionsRequired = try reader.read() as Int32 // actions_required
         return RecipeInfo(
-            id: id, name: name, skillID: skillID, toolTypeID: toolTypeID,
+            id: id, name: name,
+            timeRequirement: timeRequirement,
+            staminaRequirement: staminaRequirement,
+            skillID: skillID, toolTypeID: toolTypeID,
             input: input, output: output, actionsRequired: actionsRequired
         )
     }

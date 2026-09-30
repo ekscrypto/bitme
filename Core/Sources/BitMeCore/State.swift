@@ -121,6 +121,24 @@ struct EphemeralState: Sendable {
         let claimCarrier = ClaimCarrier()
         /// Machine-stamped with the spawned claim-buildings sync task.
         var buildingsLoop: CancellableTask?
+        /// Machine-stamped with the spawned player-vitals sync task.
+        var vitalsLoop: CancellableTask?
+        /// The player's own rows on the region leg — vitals pools, stats,
+        /// action record, position (Pocket Crafter's status banner and the
+        /// craft driver's inputs).
+        var vitals = VitalsState()
+        /// The pending prospection's compass row, watched anonymously on
+        /// the region mirror (X-Ray's map overlay). `prospectionRegion`
+        /// pins the watched region — a region transfer restarts the watch.
+        var prospectionLoop: CancellableTask?
+        var prospectionRegion: Int?
+        var prospection = ProspectionState()
+        /// The craft driver (Pocket Crafter): the walk-then-craft state
+        /// machine for a tapped craft. `driverLoop` holds the running
+        /// drive; a paused drive has no loop (resume re-arms with
+        /// `craft_continue_start`).
+        var driver = DriverState()
+        var driverLoop: CancellableTask?
         /// The pinned claim's buildings, catalogs, and crafts (Pocket
         /// Crafter's workstation domain). Pinned once at sync start — the
         /// product scope is one claim per session.
@@ -159,6 +177,143 @@ struct EphemeralState: Sendable {
             var isEmpty: Bool {
                 claim == nil && buildings.isEmpty && crafts.isEmpty && nicknames.isEmpty
             }
+        }
+
+        /// The craft driver's state: what a tapped craft is doing right
+        /// now. The banner's second line renders `plan` while a craft is
+        /// walking/crafting/paused/completed.
+        struct DriverState: Sendable, Equatable {
+            enum PauseReason: Equatable, Sendable {
+                case byUser
+                case outOfStamina
+                case backgrounded
+            }
+
+            enum Phase: Equatable, Sendable {
+                case idle
+                case walking(stationName: String?)
+                case crafting
+                case paused(PauseReason)
+                case completed(recipeName: String?)
+                case failed(message: String)
+            }
+
+            var phase: Phase = .idle
+            var plan: CraftPlan?
+
+            /// The banner's activity label while a drive runs — nil hands
+            /// the label back to the server's action record (paused and
+            /// finished drives tell their story in the craft banner).
+            var bannerActivity: String? {
+                switch phase {
+                case .walking: "Walking"
+                case .crafting: "Crafting"
+                case .idle, .paused, .completed, .failed: nil
+                }
+            }
+        }
+
+        /// One tapped craft the driver is walking to and driving — the
+        /// plan the loop paces against and the banner renders.
+        struct CraftPlan: Equatable, Sendable {
+            /// The `progressive_action_state` entity — the
+            /// `craft_continue*` argument ("pocket id").
+            let progressiveActionEntityID: UInt64
+            let buildingEntityID: UInt64
+            let recipeID: Int32
+            let recipeName: String?
+            let stationName: String?
+            /// Effort goal: `craftCount × recipe.actions_required`.
+            let effortTotal: Int
+            /// Latest server-confirmed effort (from the receipts' craft
+            /// row; tracks the in-game progress bar).
+            var effortDone: Int
+            /// `recipe.stamina_requirement` — charged per completed action.
+            let staminaPerAction: Float
+            /// The paced delay between `craft_continue_start` and
+            /// `craft_continue`, milliseconds: the server's own formula
+            /// (`time_requirement / (CraftingSpeed + skill_speed − 1)`)
+            /// with the ≥95 % safety margin applied.
+            let delayMs: Double
+            /// How close to the station's center tile to stand: footprint
+            /// radius + 2 (≤2 tiles from every footprint tile, never on
+            /// one — the craft range check's own metric).
+            let standDistanceTiles: Int32
+            /// Walk speed in raw milli-tile units/s — the measured base
+            /// × the player's `MovementMultiplier` (buffs change it).
+            let walkSpeedRawPerSec: Double
+        }
+
+        /// The player's own vitals from the region leg: pools, the
+        /// materialized stat vector (maxes live at `CharacterStatIndex`
+        /// offsets), the server's action record, and the position truth.
+        struct VitalsState: Sendable, Equatable {
+            var stamina: Float?
+            var health: Float?
+            var satiation: Float?
+            var teleportEnergy: Float?
+            /// The raw stat vector — the driver's speed/cooldown math
+            /// reads it (`stat(_:)` bounds-checks the index).
+            var stats: [Float] = []
+            /// The Base-layer action row's kind — server truth for what
+            /// the player is doing.
+            var action = PlayerActionKind.none
+            var actionRecipeID: Int32?
+            /// Position in fixed-point milli-tiles; nil until the own-row
+            /// snapshot lands.
+            var positionX: Int32?
+            var positionZ: Int32?
+            var dimension: UInt32?
+
+            var maxStamina: Float? { stat(CharacterStatIndex.maxStamina) }
+            var maxHealth: Float? { stat(CharacterStatIndex.maxHealth) }
+            var maxSatiation: Float? { stat(CharacterStatIndex.maxSatiation) }
+            var maxTeleportEnergy: Float? { stat(CharacterStatIndex.maxTeleportationEnergy) }
+            var movementMultiplier: Float? { stat(CharacterStatIndex.movementMultiplier) }
+            var craftingSpeed: Float? { stat(CharacterStatIndex.craftingSpeed) }
+            var gatheringSpeed: Float? { stat(CharacterStatIndex.gatheringSpeed) }
+            func skillSpeed(skillID: Int32) -> Float? {
+                CharacterStatIndex.skillSpeed(skillID: skillID).flatMap { stat($0) }
+            }
+
+            private func stat(_ index: Int) -> Float? {
+                guard index >= 0, index < stats.count else { return nil }
+                return stats[index]
+            }
+
+            var hasAnyValue: Bool {
+                stamina != nil || health != nil || satiation != nil
+                    || teleportEnergy != nil || !stats.isEmpty
+                    || positionX != nil
+            }
+        }
+
+        /// The pending prospection's compass projection
+        /// (`prospecting_state`, docs/protocol/prospecting.md): a bearing
+        /// cone + range from where the player stood when they prospected,
+        /// cleared when the trail completes, is abandoned, or the watch
+        /// dies.
+        struct ProspectionState: Sendable, Equatable {
+            var prospectingID: Int32?
+            var trailEntityID: UInt64?
+            var completedSteps: Int = 0
+            var ongoingStep: Int = 0
+            var totalSteps: Int = 0
+            /// Compass bearings (radians, `atan2(Δz, Δx)`, world axes):
+            /// two = the `[lo, hi]` cone, one = the final step's precise
+            /// bearing to the prize.
+            var nextCrumbAngles: [Float] = []
+            /// Player→target distance, world units.
+            var toNextNode: Float?
+            var lastProspectionMs: Double?
+            /// Where the player stood when this fix was taken (world
+            /// units) — the server measured the bearing from here. The
+            /// cone is anchored at this point and stays put until the next
+            /// prospection, even as the player walks on.
+            var fixX: Double?
+            var fixZ: Double?
+
+            var isActive: Bool { trailEntityID != nil && toNextNode != nil }
         }
 
         /// Projection-facing state of the game-session loop.

@@ -60,11 +60,14 @@ struct ClaimBuildingsTests {
         w.u32(0) // housing_income
     }
 
-    /// A `building_desc` row body — id, functions, name; the trailing
-    /// catalog fields stay absent, exactly where the decoder stops.
+    /// A `building_desc` row body — id, functions, name, then the fixed
+    /// catalog fields through `footprint`; everything past the footprint
+    /// stays absent, exactly where the decoder stops.
     private static func buildingDescRow(
         id: Int32, name: String,
-        slots: [(crafting: Int32, storage: Int32, cargo: Int32, refining: Int32, refiningCargo: Int32)] = []
+        slots: [(crafting: Int32, storage: Int32, cargo: Int32, refining: Int32, refiningCargo: Int32)] = [],
+        unenterable: Bool = true,
+        footprint: [(x: Int32, z: Int32, kind: UInt8)] = []
     ) -> Data {
         var w = Wire()
         w.i32(id)
@@ -78,6 +81,19 @@ struct ClaimBuildingsTests {
             )
         }
         w.string(name)
+        w.string("") // description
+        w.i32(0) // rested_buff_duration
+        w.i32(0) // light_radius
+        w.string("") // model_asset_name
+        w.string("") // icon_asset_name
+        w.u8(unenterable ? 1 : 0)
+        w.u8(0) // wilderness
+        w.u32(UInt32(footprint.count))
+        for tile in footprint {
+            w.i32(tile.x)
+            w.i32(tile.z)
+            w.u8(tile.kind)
+        }
         return w.data
     }
 
@@ -608,7 +624,10 @@ struct ClaimBuildingsTests {
 
     /// A fabricated region leg — a not-connected SDK client is enough; the
     /// identity is all the machine flow needs.
-    private static func makeLeg() -> RegionLeg {
+    /// A fabricated region leg shared by the machine-flow suites — a
+    /// not-connected SDK client is enough; the identity is all the flows
+    /// need.
+    static func makeLeg() -> RegionLeg {
         let client = try! SpacetimeDBClient(host: "wss://region.test.invalid", db: "bitcraft-live-14")
         return RegionLeg(client: client)
     }
@@ -1094,7 +1113,8 @@ struct ClaimBuildingsTests {
     /// Collects CrafterReps until `finished` matches (event-driven — see
     /// `RepCollecting.collect`; the timeout is a broken-flow backstop);
     /// returns the first matching rep.
-    private func collectUntil(
+    /// Event-driven CrafterRep wait shared by the machine-flow suites.
+    func collectUntil(
         _ machine: StateMachine,
         until finished: @Sendable @escaping (CrafterRep) -> Bool,
         timeout: TimeInterval = 10

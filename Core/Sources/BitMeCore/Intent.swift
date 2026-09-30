@@ -74,6 +74,58 @@ public enum Intent {
     public struct ForgetBitCraftAccount: Sendable {
         public init() {}
     }
+
+    // MARK: - Craft driver (Pocket Crafter)
+
+    /// User tapped a craft's action button — drive it: walk the player to
+    /// the station (v1: outdoor stations) and run the
+    /// `craft_continue_start`/`craft_continue` loop until completion,
+    /// pause, or refusal. The craft must be one the workstations list
+    /// renders (own pending or another player's shared, not complete).
+    public struct TapCraft: Sendable {
+        public let craftEntityID: UInt64
+
+        public init(craftEntityID: UInt64) {
+            self.craftEntityID = craftEntityID
+        }
+    }
+
+    /// User tapped Pause on the active craft — stops the loop; the craft
+    /// suspends server-side (its station lock lapses) and resumes later
+    /// via a fresh `craft_continue_start`.
+    public struct PauseCraftDriver: Sendable {
+        public init() {}
+    }
+
+    /// User tapped Resume on a paused craft — re-arms with
+    /// `craft_continue_start` and continues the loop.
+    public struct ResumeCraftDriver: Sendable {
+        public init() {}
+    }
+
+    /// User tapped Stop on the active craft — cancels the loop and calls
+    /// `craft_cancel` (best effort) to clear the bench craft.
+    public struct StopCraftDriver: Sendable {
+        public init() {}
+    }
+
+    /// User dismissed the completed/failed craft banner.
+    public struct DismissCraftBanner: Sendable {
+        public init() {}
+    }
+
+    /// The app left the foreground — a running drive pauses (iOS
+    /// suspends the process; the client-paced loop cannot run), and a
+    /// paused-on-background drive resumes when the app returns.
+    public struct AppBackgrounded: Sendable {
+        public init() {}
+    }
+
+    /// The app returned to the foreground — a drive paused by
+    /// backgrounding resumes on its own.
+    public struct AppForegrounded: Sendable {
+        public init() {}
+    }
 }
 
 // MARK: - Internal feedback intents (activities → machine)
@@ -227,6 +279,49 @@ extension Intent {
     struct ClaimBuildingsChanged: Sendable {
         let events: [ClaimBuildingsEvent]
     }
+
+    /// Player-vitals sync events (own-row diffs from the region leg)
+    /// applied to the session's vitals state in one mutation.
+    struct PlayerVitalsChanged: Sendable {
+        let events: [PlayerVitalsEvent]
+    }
+
+    /// Prospection watch events (the own `prospecting_state` row off the
+    /// region mirror) applied to the session's prospection state in one
+    /// mutation.
+    struct ProspectionChanged: Sendable {
+        let events: [ProspectionEvent]
+    }
+
+    /// Craft-driver feedback: the loop's per-iteration outcome (effort
+    /// from the receipt's craft row, stamina from its stamina row) and
+    /// terminal states. Guarded on the craft entity id — a late event
+    /// from a superseded drive must not move the new one's state.
+    struct DriverEvent: Sendable {
+        enum Outcome: Equatable, Sendable {
+            /// A `craft_continue` completed: server-confirmed effort.
+            case crafting(effortDone: Int, stamina: Float?)
+            case paused(EphemeralState.Session.DriverState.PauseReason)
+            /// The effort goal was reached — carries the final effort.
+            case completed(effortDone: Int)
+            case failed(String)
+        }
+
+        let craftEntityID: UInt64
+        let outcome: Outcome
+    }
+
+    /// The walk stage's outcome from `Activity.WalkToStation` — the drive
+    /// then either proceeds to the craft loop or ends.
+    struct WalkOutcome: Sendable {
+        enum Outcome: Equatable, Sendable {
+            case arrived(positionX: Int32, positionZ: Int32)
+            case failed(String)
+        }
+
+        let craftEntityID: UInt64
+        let outcome: Outcome
+    }
 }
 
 /// Reference carrier the session loop and the intents share (ADR-014: the
@@ -263,6 +358,8 @@ private func startSession(
     ephemeral.session?.streamLoop?.cancel()
     ephemeral.session?.gameSessionLoop?.cancel()
     ephemeral.session?.buildingsLoop?.cancel()
+    ephemeral.session?.vitalsLoop?.cancel()
+    ephemeral.session?.prospectionLoop?.cancel()
     let loop = CancellableTask()
     let streamLoop = CancellableTask()
     let session = EphemeralState.Session(entityID: entityID, loop: loop, streamLoop: streamLoop)
@@ -422,6 +519,32 @@ extension Intent.SessionPolled: StateMutator {
                polledAtMs > session.resourceMap.refetchNotBeforeMs {
                 session.resourceMap.fetchInFlight = true
                 activities.append(Activity.FetchResourceWindow(entityID: session.entityID))
+            }
+
+            // Prospection watch (X-Ray): the pending-prospection compass
+            // row rides the region mirror anonymously, so it needs only the
+            // region id — start it once the region is known, restart it if
+            // the player region-transfers. Cheap single-row socket; the
+            // row's presence *is* the pending state, and a lost connection
+            // clears the overlay (a later poll re-arms a fresh watch).
+            let region = snapshot.region > 0
+                ? snapshot.region
+                : (session.resourceMap.window?.region ?? persistent.identity?.regionID)
+            if let region,
+               let playerEntityID = UInt64(session.entityID),
+               session.prospectionRegion != region {
+                session.prospectionLoop?.cancel()
+                let prospectionLoop = CancellableTask()
+                session.prospectionLoop = prospectionLoop
+                session.prospectionRegion = region
+                // A transferred player's trail belongs to the old region —
+                // never show a stale cone across a region boundary.
+                session.prospection = EphemeralState.Session.ProspectionState()
+                activities.append(Activity.ProspectionWatch(
+                    playerEntityID: playerEntityID,
+                    region: region,
+                    cancellable: prospectionLoop
+                ))
             }
         }
         ephemeral.session = session
@@ -699,9 +822,16 @@ extension Intent.GameSessionEnded: StateMutator {
         session.gameSessionLoop?.cancel()
         session.gameSessionLoop = nil
         session.gameSession = EphemeralState.Session.GameSessionState()
-        // The region leg (and its buildings sync) died with the session.
+        // The region leg (and its buildings/vitals syncs) died with the
+        // session — the craft driver's reducer calls die with it too.
         session.buildingsLoop?.cancel()
         session.buildingsLoop = nil
+        session.vitalsLoop?.cancel()
+        session.vitalsLoop = nil
+        session.vitals = EphemeralState.Session.VitalsState()
+        session.driverLoop?.cancel()
+        session.driverLoop = nil
+        session.driver = EphemeralState.Session.DriverState()
         session.regionLeg = nil
         var cleared = EphemeralState.Session.BuildingsState()
         cleared.version = session.buildings.version + 1 // monotonic across resets
@@ -733,8 +863,11 @@ extension Intent.GameSessionRegionLegReady: StateMutator {
         buildings.status = .syncing
         buildings.version = session.buildings.version + 1 // monotonic across resets
         session.buildings = buildings
+        session.vitals = EphemeralState.Session.VitalsState()
         let buildingsLoop = CancellableTask()
         session.buildingsLoop = buildingsLoop
+        let vitalsLoop = CancellableTask()
+        session.vitalsLoop = vitalsLoop
         ephemeral.session = session
         return StateChange(ephemeral: ephemeral, activities: [
             Activity.ClaimBuildingsLoop(
@@ -742,7 +875,12 @@ extension Intent.GameSessionRegionLegReady: StateMutator {
                 playerEntityID: playerEntityID,
                 claimCarrier: session.claimCarrier,
                 cancellable: buildingsLoop
-            )
+            ),
+            Activity.PlayerVitalsLoop(
+                leg: leg,
+                playerEntityID: playerEntityID,
+                cancellable: vitalsLoop
+            ),
         ])
     }
 }
@@ -789,6 +927,89 @@ extension Intent.ClaimBuildingsChanged: StateMutator {
     }
 }
 
+// MARK: - Player-vitals mutations (account-driven apps)
+
+extension Intent.PlayerVitalsChanged: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        guard var session = ephemeral.session else { return .noChange }
+        for event in events {
+            switch event {
+            case .stamina(let value):
+                session.vitals.stamina = value
+            case .health(let value):
+                session.vitals.health = value
+            case .satiation(let value):
+                session.vitals.satiation = value
+            case .teleportEnergy(let value):
+                session.vitals.teleportEnergy = value
+            case .stats(let values):
+                session.vitals.stats = values
+            case .action(let row):
+                session.vitals.action = row.actionType
+                session.vitals.actionRecipeID = row.recipeID
+            case .position(let row):
+                session.vitals.positionX = row.locationX
+                session.vitals.positionZ = row.locationZ
+                session.vitals.dimension = row.dimension
+            case .failed:
+                // The stream ends with the leg; the game-session loop owns
+                // the user-visible outcome. Nothing to mutate.
+                continue
+            }
+        }
+        ephemeral.session = session
+        return StateChange(ephemeral: ephemeral)
+    }
+}
+
+// MARK: - Prospection mutations (X-Ray map overlay)
+
+extension Intent.ProspectionChanged: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        guard var session = ephemeral.session, session.prospectionRegion != nil else {
+            return .noChange
+        }
+        for event in events {
+            switch event {
+            case .updated(let row):
+                // The fix origin: the server measured the bearing from
+                // where the player stood at `last_prospection_timestamp`,
+                // so it is captured once per prospection and frozen. Rows
+                // also rewrite for contribution-only changes and get
+                // re-delivered on watch reconnects — the server timestamp
+                // tells those apart from a genuine new fix. (The position
+                // is the latest poll snapshot, ≤1 s old; prospection is a
+                // stationary channel, so that is the same spot the server
+                // measured from.)
+                let prospectionMs = Double(row.lastProspectionMicros) / 1_000
+                let isNewFix = session.prospection.lastProspectionMs == nil
+                    || prospectionMs > session.prospection.lastProspectionMs!
+                    || session.prospection.fixX == nil
+                if isNewFix, let position = session.snapshot?.position {
+                    session.prospection.fixX = position.worldX
+                    session.prospection.fixZ = position.worldZ
+                }
+                session.prospection.prospectingID = row.prospectingID
+                session.prospection.trailEntityID = row.crumbTrailEntityID
+                session.prospection.completedSteps = Int(row.completedSteps)
+                session.prospection.ongoingStep = Int(row.ongoingStep)
+                session.prospection.totalSteps = Int(row.totalSteps)
+                session.prospection.nextCrumbAngles = row.nextCrumbAngles
+                session.prospection.toNextNode = row.toNextNode
+                session.prospection.lastProspectionMs = prospectionMs
+            case .ended, .failed:
+                // Trail done/abandoned, or the watch died — a stale cone
+                // must never linger. A later poll re-arms the watch.
+                session.prospection = EphemeralState.Session.ProspectionState()
+            }
+        }
+        ephemeral.session = session
+        return StateChange(ephemeral: ephemeral)
+    }
+}
+
 extension Intent.SignOut: StateMutator {
     func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
         var persistent = persistent
@@ -797,6 +1018,8 @@ extension Intent.SignOut: StateMutator {
         ephemeral.session?.streamLoop?.cancel()
         ephemeral.session?.gameSessionLoop?.cancel()
         ephemeral.session?.buildingsLoop?.cancel()
+        ephemeral.session?.vitalsLoop?.cancel()
+        ephemeral.session?.prospectionLoop?.cancel()
         ephemeral.session = nil
         persistent.identity = nil
         if ephemeral.accountDrivenSignIn {
@@ -1029,5 +1252,290 @@ extension Intent.ForgetBitCraftAccount: StateMutator {
         guard persistent.bitCraftAccount != nil else { return .noChange }
         persistent.bitCraftAccount = nil
         return StateChange(persistent: persistent)
+    }
+}
+
+// MARK: - Craft-driver mutations (account-driven apps)
+
+/// Builds the craft plan from the buildings state (recipe pacing/stamina
+/// from the catalogs, speeds from the materialized stats) or explains why
+/// the craft cannot be driven. Nil plan + nil failure = guards failed
+/// silently (not a renderable craft, no session).
+private func buildCraftPlan(
+    craftEntityID: UInt64,
+    session: EphemeralState.Session
+) -> (plan: EphemeralState.Session.CraftPlan?, failure: String?) {
+    guard let craft = session.buildings.crafts[craftEntityID],
+          case .active(let progress, let craftCount, _, _) = craft.kind else {
+        return (nil, nil) // not a renderable progressive craft
+    }
+    let gamedata = session.buildings.gamedata
+    let recipeName = gamedata.recipeDisplayName(craft.recipeID)
+    let actionsRequired = gamedata.recipeActionsRequired[craft.recipeID]
+    let effortTotal = actionsRequired.map { Int($0) * Int(craftCount) } ?? 0
+    if let actionsRequired, progress >= actionsRequired * craftCount {
+        return (nil, nil) // already complete — the list stops rendering it
+    }
+
+    // Pacing: the server's own delay formula over the materialized stats
+    // (`time_requirement / (CraftingSpeed + skill_speed − 1)`), with the
+    // ≥95 % cadence-gate margin. A recipe the catalog can't pace is a
+    // refusal, not a guess.
+    guard let timeRequirement = gamedata.recipeTimeRequirement[craft.recipeID] else {
+        return (nil, "Recipe pacing unknown — the catalog hasn't landed for it.")
+    }
+    let config = GameConfig.shared
+    let speedStat = session.vitals.craftingSpeed ?? 1.0
+    let skillID = gamedata.recipeSkills[craft.recipeID]
+    let skillSpeedStat = skillID.flatMap { session.vitals.skillSpeed(skillID: $0) } ?? 1.0
+    // The server's multiplier denominator (`event_delay`: CraftingSpeed +
+    // skill_speed − 1); each speed defaults to 1.0 when the stats vector
+    // hasn't landed (no stat ⇒ neutral, the module source's own fallback).
+    let denominator = max(0.1, Double(speedStat + skillSpeedStat - 1.0))
+    let delayMs = Double(timeRequirement) / denominator * 1_000 * config.craftDelayMargin
+    let staminaPerAction = gamedata.recipeStaminaRequirement[craft.recipeID] ?? 0
+
+    // Station stand-off: footprint radius +2 tiles guarantees ≤2 tiles
+    // from every footprint tile (rotation-invariant metric). Interior
+    // (enterable) stations are out of v1 scope.
+    let buildingDescID = session.buildings.buildings[craft.buildingEntityID]?.buildingDescriptionID
+    let desc = buildingDescID.flatMap { gamedata.buildings[$0] }
+    if let desc, !desc.unenterable {
+        return (nil, "Interior stations aren't supported yet — craft there in game.")
+    }
+    let standDistanceTiles = (desc?.footprintRadiusTiles ?? 0) + 2
+    let walkSpeed = config.walkSpeedRawPerSec * Double(session.vitals.movementMultiplier ?? 1.0)
+
+    let stationName = session.buildings.nicknames[craft.buildingEntityID]
+        ?? desc?.name
+        ?? session.buildings.buildings[craft.buildingEntityID].map { "Building \($0.entityID)" }
+
+    let plan = EphemeralState.Session.CraftPlan(
+        progressiveActionEntityID: craftEntityID,
+        buildingEntityID: craft.buildingEntityID,
+        recipeID: craft.recipeID,
+        recipeName: recipeName,
+        stationName: stationName,
+        effortTotal: effortTotal,
+        effortDone: Int(progress),
+        staminaPerAction: staminaPerAction,
+        delayMs: delayMs,
+        standDistanceTiles: standDistanceTiles,
+        walkSpeedRawPerSec: max(1_000, walkSpeed)
+    )
+    return (plan, nil)
+}
+
+extension Intent.TapCraft: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        guard var session = ephemeral.session,
+              let leg = session.regionLeg,
+              // A finished/failed banner must be dismissed before a new
+              // drive; an active/paused drive is not replaceable either.
+              session.driver.phase == .idle,
+              let playerEntityID = UInt64(session.entityID) else {
+            return .noChange
+        }
+        let built = buildCraftPlan(craftEntityID: craftEntityID, session: session)
+        if let failure = built.failure {
+            session.driver.phase = .failed(message: failure)
+            session.driver.plan = nil
+            ephemeral.session = session
+            return StateChange(ephemeral: ephemeral)
+        }
+        guard let plan = built.plan else { return .noChange }
+        session.driver.phase = .walking(stationName: plan.stationName)
+        session.driver.plan = plan
+        let driverLoop = CancellableTask()
+        session.driverLoop = driverLoop
+        ephemeral.session = session
+        return StateChange(ephemeral: ephemeral, activities: [
+            Activity.CraftDriverLoop(
+                leg: leg,
+                playerEntityID: playerEntityID,
+                plan: plan,
+                cancellable: driverLoop
+            )
+        ])
+    }
+}
+
+extension Intent.PauseCraftDriver: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        guard var session = ephemeral.session else { return .noChange }
+        switch session.driver.phase {
+        case .walking, .crafting:
+            break
+        default:
+            return .noChange
+        }
+        session.driverLoop?.cancel()
+        session.driverLoop = nil
+        session.driver.phase = .paused(.byUser)
+        ephemeral.session = session
+        return StateChange(ephemeral: ephemeral)
+    }
+}
+
+extension Intent.ResumeCraftDriver: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        guard var session = ephemeral.session,
+              let leg = session.regionLeg,
+              case .paused = session.driver.phase,
+              let plan = session.driver.plan,
+              session.driverLoop == nil,
+              let playerEntityID = UInt64(session.entityID) else {
+            return .noChange
+        }
+        session.driver.phase = .crafting
+        let driverLoop = CancellableTask()
+        session.driverLoop = driverLoop
+        ephemeral.session = session
+        return StateChange(ephemeral: ephemeral, activities: [
+            Activity.CraftDriverLoop(
+                leg: leg,
+                playerEntityID: playerEntityID,
+                plan: plan,
+                cancellable: driverLoop
+            )
+        ])
+    }
+}
+
+extension Intent.StopCraftDriver: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        guard var session = ephemeral.session else { return .noChange }
+        guard session.driver.phase != .idle else { return .noChange }
+        let plan = session.driver.plan
+        session.driverLoop?.cancel()
+        session.driverLoop = nil
+        session.driver = EphemeralState.Session.DriverState()
+        ephemeral.session = session
+        guard let plan, let leg = session.regionLeg else {
+            return StateChange(ephemeral: ephemeral)
+        }
+        return StateChange(ephemeral: ephemeral, activities: [
+            Activity.StopCraft(leg: leg, pocketID: plan.progressiveActionEntityID)
+        ])
+    }
+}
+
+extension Intent.DismissCraftBanner: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        guard var session = ephemeral.session else { return .noChange }
+        switch session.driver.phase {
+        case .completed, .failed:
+            session.driver = EphemeralState.Session.DriverState()
+        default:
+            return .noChange
+        }
+        ephemeral.session = session
+        return StateChange(ephemeral: ephemeral)
+    }
+}
+
+extension Intent.DriverEvent: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        guard var session = ephemeral.session,
+              session.driver.plan?.progressiveActionEntityID == craftEntityID else {
+            return .noChange
+        }
+        switch outcome {
+        case .crafting(let effortDone, let stamina):
+            session.driver.phase = .crafting
+            session.driver.plan?.effortDone = effortDone
+            if let stamina {
+                session.vitals.stamina = stamina
+            }
+        case .paused(let reason):
+            session.driverLoop?.cancel()
+            session.driverLoop = nil
+            session.driver.phase = .paused(reason)
+        case .completed(let effortDone):
+            session.driverLoop?.cancel()
+            session.driverLoop = nil
+            session.driver.plan?.effortDone = effortDone
+            session.driver.phase = .completed(recipeName: session.driver.plan?.recipeName)
+        case .failed(let message):
+            session.driverLoop?.cancel()
+            session.driverLoop = nil
+            session.driver.phase = .failed(message: message)
+        }
+        ephemeral.session = session
+        return StateChange(ephemeral: ephemeral)
+    }
+}
+
+// MARK: - App lifecycle mutations
+
+extension Intent.AppBackgrounded: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        guard var session = ephemeral.session else { return .noChange }
+        switch session.driver.phase {
+        case .walking, .crafting:
+            session.driverLoop?.cancel()
+            session.driverLoop = nil
+            session.driver.phase = .paused(.backgrounded)
+        default:
+            return .noChange
+        }
+        ephemeral.session = session
+        return StateChange(ephemeral: ephemeral)
+    }
+}
+
+extension Intent.AppForegrounded: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        guard var session = ephemeral.session,
+              let leg = session.regionLeg,
+              case .paused(.backgrounded) = session.driver.phase,
+              let plan = session.driver.plan,
+              session.driverLoop == nil,
+              let playerEntityID = UInt64(session.entityID) else {
+            return .noChange
+        }
+        session.driver.phase = .crafting
+        let driverLoop = CancellableTask()
+        session.driverLoop = driverLoop
+        ephemeral.session = session
+        return StateChange(ephemeral: ephemeral, activities: [
+            Activity.CraftDriverLoop(
+                leg: leg,
+                playerEntityID: playerEntityID,
+                plan: plan,
+                cancellable: driverLoop
+            )
+        ])
+    }
+}
+
+extension Intent.WalkOutcome: StateMutator {
+    func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
+        var ephemeral = ephemeral
+        guard var session = ephemeral.session,
+              session.driver.plan?.progressiveActionEntityID == craftEntityID else {
+            return .noChange
+        }
+        switch outcome {
+        case .arrived(let x, let z):
+            guard case .walking = session.driver.phase else { return .noChange }
+            session.driver.phase = .crafting
+            session.vitals.positionX = x
+            session.vitals.positionZ = z
+        case .failed(let message):
+            session.driverLoop?.cancel()
+            session.driverLoop = nil
+            session.driver.phase = .failed(message: message)
+        }
+        ephemeral.session = session
+        return StateChange(ephemeral: ephemeral)
     }
 }

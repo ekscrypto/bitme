@@ -39,6 +39,7 @@ struct CrafterApp: App {
                 workstations: workstations,
                 ingest: { intent in await machine.ingest(intent) }
             )
+            .modifier(LifecycleModifier(ingest: { intent in await machine.ingest(intent) }))
             .task {
                 let stream = machine.crafterRep.values
                 for await rep in stream {
@@ -89,6 +90,28 @@ struct RootView: View {
             CrafterHomeView(session: session, workstations: workstations, ingest: ingest)
         case nil:
             Color(white: 0.05).ignoresSafeArea()
+        }
+    }
+}
+
+/// Backgrounding pauses a running craft drive (iOS suspends the process —
+/// the client-paced loop cannot run); returning to the foreground resumes
+/// a drive paused that way. User-paused and stamina-paused drives stay
+/// paused until the user says otherwise.
+private struct LifecycleModifier: ViewModifier {
+    let ingest: @Sendable (Sendable) async -> Void
+    @Environment(\.scenePhase) private var scenePhase
+
+    func body(content: Content) -> some View {
+        content.onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .background:
+                Task { await ingest(Intent.AppBackgrounded()) }
+            case .active:
+                Task { await ingest(Intent.AppForegrounded()) }
+            @unknown default:
+                break
+            }
         }
     }
 }

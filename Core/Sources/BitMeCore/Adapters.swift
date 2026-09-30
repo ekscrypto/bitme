@@ -85,6 +85,33 @@ public struct Adapters: Sendable {
         /// claim. Nil = no answer. Defaults to "no fallback" so hosts and
         /// tests that never exercise the path stay silent.
         public let resolveOwnClaimMembership: @Sendable (_ leg: RegionLeg, _ playerEntityID: UInt64) async -> UInt64?
+        /// Live player-vitals sync over the game session's region leg
+        /// (`RegionVitalsClient`): the own-row subscription set (pools,
+        /// stats, action record, position). The returned stream ends when
+        /// the leg closes or the setup fails — a terminal `.failed` event
+        /// always precedes a setup failure's end. Defaults to "no vitals"
+        /// so hosts and tests that never exercise the path stay silent.
+        public let syncPlayerVitals: @Sendable (_ leg: RegionLeg, _ playerEntityID: UInt64) -> AsyncStream<PlayerVitalsEvent>
+        /// Prospection watch (`RegionProspectClient`): the tracked player's
+        /// own `prospecting_state` row, read anonymously off the region
+        /// mirror (name-driven hosts hold no game session, so the mirror is
+        /// their only region window). Ends on watch failure; `.ended`
+        /// events mark a finished/abandoned trail or a lost connection.
+        /// Defaults to "no prospection" so hosts and tests stay silent.
+        public let syncProspection: @Sendable (_ playerEntityID: UInt64, _ region: Int) -> AsyncStream<ProspectionEvent>
+        /// Craft-driver reducer calls (`RegionDriverClient`): each returns
+        /// the receipt's own-action row effects, or throws the game's
+        /// refusal text. Defaults refuse everything, so hosts and tests
+        /// that never drive stay silent.
+        public let craftContinueStart: @Sendable (_ leg: RegionLeg, _ progressiveActionEntityID: UInt64, _ timestampMs: UInt64) async throws -> DriverReceipt
+        public let craftContinue: @Sendable (_ leg: RegionLeg, _ progressiveActionEntityID: UInt64, _ timestampMs: UInt64) async throws -> DriverReceipt
+        public let craftCancel: @Sendable (_ leg: RegionLeg, _ pocketID: UInt64) async throws -> DriverReceipt
+        public let playerActionCancel: @Sendable (_ leg: RegionLeg) async throws -> DriverReceipt
+        public let movePlayer: @Sendable (_ leg: RegionLeg, _ timestampMs: UInt64, _ destinationX: Int32, _ destinationZ: Int32, _ dimension: UInt32, _ originX: Int32?, _ originZ: Int32?, _ durationSeconds: Float, _ moveType: Int32) async throws -> DriverReceipt
+        /// One-off station location (`location_state` PK equality).
+        public let stationLocation: @Sendable (_ leg: RegionLeg, _ buildingEntityID: UInt64) async throws -> LocationRow?
+        /// One-off own-position read (`mobile_entity_state` PK equality).
+        public let ownPosition: @Sendable (_ leg: RegionLeg, _ playerEntityID: UInt64) async throws -> MobileEntityRow?
 
         public init(
             requestAccessCode: @escaping @Sendable (String) async throws -> Void,
@@ -92,7 +119,26 @@ public struct Adapters: Sendable {
             resolveAccountPlayer: @escaping @Sendable (String, String) async throws -> AccountPlayer,
             openGlobalSession: @escaping @Sendable (String, String, Int?, Bool, String?) -> AsyncStream<GlobalSessionEvent>,
             syncClaimBuildings: @escaping @Sendable (RegionLeg, UInt64, UInt64) -> AsyncStream<[ClaimBuildingsEvent]>,
-            resolveOwnClaimMembership: @escaping @Sendable (RegionLeg, UInt64) async -> UInt64? = { _, _ in nil }
+            resolveOwnClaimMembership: @escaping @Sendable (RegionLeg, UInt64) async -> UInt64? = { _, _ in nil },
+            syncPlayerVitals: @escaping @Sendable (RegionLeg, UInt64) -> AsyncStream<PlayerVitalsEvent> = { _, _ in AsyncStream { $0.finish() } },
+            syncProspection: @escaping @Sendable (UInt64, Int) -> AsyncStream<ProspectionEvent> = { _, _ in AsyncStream { $0.finish() } },
+            craftContinueStart: @escaping @Sendable (RegionLeg, UInt64, UInt64) async throws -> DriverReceipt = { _, _, _ in
+                throw DriverUnavailableError()
+            },
+            craftContinue: @escaping @Sendable (RegionLeg, UInt64, UInt64) async throws -> DriverReceipt = { _, _, _ in
+                throw DriverUnavailableError()
+            },
+            craftCancel: @escaping @Sendable (RegionLeg, UInt64) async throws -> DriverReceipt = { _, _ in
+                throw DriverUnavailableError()
+            },
+            playerActionCancel: @escaping @Sendable (RegionLeg) async throws -> DriverReceipt = { _ in
+                throw DriverUnavailableError()
+            },
+            movePlayer: @escaping @Sendable (RegionLeg, UInt64, Int32, Int32, UInt32, Int32?, Int32?, Float, Int32) async throws -> DriverReceipt = { _, _, _, _, _, _, _, _, _ in
+                throw DriverUnavailableError()
+            },
+            stationLocation: @escaping @Sendable (RegionLeg, UInt64) async throws -> LocationRow? = { _, _ in nil },
+            ownPosition: @escaping @Sendable (RegionLeg, UInt64) async throws -> MobileEntityRow? = { _, _ in nil }
         ) {
             self.requestAccessCode = requestAccessCode
             self.authenticate = authenticate
@@ -100,6 +146,15 @@ public struct Adapters: Sendable {
             self.openGlobalSession = openGlobalSession
             self.syncClaimBuildings = syncClaimBuildings
             self.resolveOwnClaimMembership = resolveOwnClaimMembership
+            self.syncPlayerVitals = syncPlayerVitals
+            self.syncProspection = syncProspection
+            self.craftContinueStart = craftContinueStart
+            self.craftContinue = craftContinue
+            self.craftCancel = craftCancel
+            self.playerActionCancel = playerActionCancel
+            self.movePlayer = movePlayer
+            self.stationLocation = stationLocation
+            self.ownPosition = ownPosition
         }
     }
 
@@ -179,6 +234,45 @@ public struct Adapters: Sendable {
                 },
                 resolveOwnClaimMembership: { leg, player in
                     await RegionBuildingsClient.resolveOwnClaim(client: leg.client, player: player)
+                },
+                syncPlayerVitals: { leg, player in
+                    RegionVitalsClient.events(leg: leg, player: player)
+                },
+                syncProspection: { player, region in
+                    RegionProspectClient.events(entityID: player, region: region)
+                },
+                craftContinueStart: { leg, entity, timestampMs in
+                    try await RegionDriverClient.craftContinueStart(
+                        client: leg.client,
+                        progressiveActionEntityID: entity, timestampMs: timestampMs
+                    )
+                },
+                craftContinue: { leg, entity, timestampMs in
+                    try await RegionDriverClient.craftContinue(
+                        client: leg.client,
+                        progressiveActionEntityID: entity, timestampMs: timestampMs
+                    )
+                },
+                craftCancel: { leg, pocketID in
+                    try await RegionDriverClient.craftCancel(client: leg.client, pocketID: pocketID)
+                },
+                playerActionCancel: { leg in
+                    try await RegionDriverClient.playerActionCancel(client: leg.client)
+                },
+                movePlayer: { leg, timestampMs, destinationX, destinationZ, dimension, originX, originZ, durationSeconds, moveType in
+                    try await RegionDriverClient.playerMove(
+                        client: leg.client,
+                        timestampMs: timestampMs,
+                        destinationX: destinationX, destinationZ: destinationZ, dimension: dimension,
+                        originX: originX, originZ: originZ,
+                        durationSeconds: durationSeconds, moveType: moveType
+                    )
+                },
+                stationLocation: { leg, building in
+                    try await RegionDriverClient.stationLocation(client: leg.client, building: building)
+                },
+                ownPosition: { leg, player in
+                    try await RegionDriverClient.ownPosition(client: leg.client, player: player)
                 }
             ),
             loadFoodBuffGamedata: { await GamedataService.loadFoodBuffGamedata() },

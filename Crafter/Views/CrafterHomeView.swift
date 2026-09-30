@@ -19,8 +19,14 @@ struct CrafterHomeView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+            if let vitals = session.vitals {
+                VitalsBanner(vitals: vitals)
+            }
+            if let banner = session.craftBanner {
+                ActiveCraftBanner(banner: banner, ingest: ingest)
+            }
             TabView {
-                CraftingTab(session: session, workstations: workstations)
+                CraftingTab(session: session, workstations: workstations, ingest: ingest)
                     .tabItem { Image(systemName: "hammer") }
                     .accessibilityLabel("Crafting")
                 StorageTab(session: session, workstations: workstations)
@@ -116,6 +122,7 @@ struct CrafterHomeView: View {
 private struct CraftingTab: View {
     let session: CrafterRep.Session
     let workstations: WorkstationsRep
+    let ingest: @Sendable (Sendable) async -> Void
 
     /// Collapsed by default — a busy claim carries many stations, and the
     /// running-craft card already surfaces the active work on top.
@@ -187,13 +194,13 @@ private struct CraftingTab: View {
                             )
                             if expandedStations.contains(building.entityID) {
                                 ForEach(group.craftsByStation[building.entityID] ?? [], id: \.entityID) { craft in
-                                    CraftRow(craft: craft)
+                                    CraftRow(craft: craft, ingest: ingest)
                                         .padding(.leading, 24)
                                 }
                             }
                         }
                         ForEach(group.awayCrafts, id: \.entityID) { craft in
-                            CraftRow(craft: craft)
+                            CraftRow(craft: craft, ingest: ingest)
                         }
                         if group.profession == .other && stations.craftsOverflow > 0 {
                             Text("+\(stations.craftsOverflow) more")
@@ -470,6 +477,7 @@ private struct StationRow: View {
 /// player opened (anyone may contribute effort) with an outlined one.
 private struct CraftRow: View {
     let craft: WorkstationsRep.Craft
+    let ingest: @Sendable (Sendable) async -> Void
 
     var body: some View {
         HStack(spacing: 8) {
@@ -489,6 +497,20 @@ private struct CraftRow: View {
             }
             Spacer()
             CraftPhaseBadge(craft: craft)
+            // "Go & craft": walks the player to the station and drives the
+            // craft_continue loop (own pending or another player's shared
+            // bench craft — anything this row renders).
+            if let entityID = UInt64(craft.entityID) {
+                Button {
+                    Task { await ingest(Intent.TapCraft(craftEntityID: entityID)) }
+                } label: {
+                    Image(systemName: "play.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(.orange)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Go and craft \(craft.recipeName ?? "this craft")")
+            }
         }
         .padding(.vertical, 2)
     }
@@ -556,6 +578,190 @@ private struct RunningCraftCard: View {
 }
 
 // MARK: - Banners & pills
+
+/// The active-craft banner pinned under the vitals strip: the tapped
+/// craft's name with live effort ("effort done / effort needed" — the
+/// same denominator the in-game bar uses), the driver's phase, and its
+/// controls — Pause/Stop while crafting or walking, Resume while paused,
+/// Dismiss once completed or failed. Collect stays out of scope.
+private struct ActiveCraftBanner: View {
+    let banner: CrafterRep.Session.CraftBanner
+    let ingest: @Sendable (Sendable) async -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                stateIcon
+                    .font(.subheadline.bold())
+                    .foregroundStyle(tint)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(headline)
+                        .font(.subheadline.bold())
+                        .lineLimit(1)
+                    if let detail {
+                        Text(detail)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                }
+                Spacer()
+                controls
+            }
+            if case .crafting = banner.state,
+               let done = banner.effortDone, let total = banner.effortTotal, total > 0 {
+                ProgressView(value: Double(done), total: Double(total))
+                    .tint(.orange)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Color(white: 0.1))
+    }
+
+    @ViewBuilder private var controls: some View {
+        switch banner.state {
+        case .walking, .crafting:
+            HStack(spacing: 12) {
+                Button("Pause") { Task { await ingest(Intent.PauseCraftDriver()) } }
+                    .font(.caption.bold())
+                Button("Stop") { Task { await ingest(Intent.StopCraftDriver()) } }
+                    .font(.caption.bold())
+                    .foregroundStyle(.red)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        case .paused:
+            HStack(spacing: 12) {
+                Button("Resume") { Task { await ingest(Intent.ResumeCraftDriver()) } }
+                    .font(.caption.bold())
+                Button("Stop") { Task { await ingest(Intent.StopCraftDriver()) } }
+                    .font(.caption.bold())
+                    .foregroundStyle(.red)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        case .completed, .failed:
+            Button("Dismiss") { Task { await ingest(Intent.DismissCraftBanner()) } }
+                .font(.caption.bold())
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+        }
+    }
+
+    private var headline: String {
+        let name = banner.recipeName ?? "craft"
+        return switch banner.state {
+        case .walking: "Walking to craft: \(name)"
+        case .crafting: "Active Craft: \(name)"
+        case .paused(true): "Paused — out of stamina: \(name)"
+        case .paused(false): "Paused: \(name)"
+        case .completed: "Completed craft: \(name)"
+        case .failed: "Craft stopped: \(name)"
+        }
+    }
+
+    private var detail: String? {
+        switch banner.state {
+        case .walking(let station):
+            station.map { "Heading to \($0)…" }
+        case .failed(let message):
+            message
+        case .crafting, .paused, .completed:
+            effort.map { "Effort \($0.done)/\($0.total)" }
+        }
+    }
+
+    private var effort: (done: Int, total: Int)? {
+        guard let done = banner.effortDone, let total = banner.effortTotal else { return nil }
+        return (done, total)
+    }
+
+    private var stateIcon: some View {
+        switch banner.state {
+        case .walking: Image(systemName: "figure.walk")
+        case .crafting: Image(systemName: "hammer")
+        case .paused: Image(systemName: "pause.circle")
+        case .completed: Image(systemName: "checkmark.circle.fill")
+        case .failed: Image(systemName: "exclamationmark.triangle")
+        }
+    }
+
+    private var tint: Color {
+        switch banner.state {
+        case .walking, .crafting: .orange
+        case .paused: .yellow
+        case .completed: .green
+        case .failed: .red
+        }
+    }
+}
+
+/// The two-line status banner pinned under the header while this app
+/// holds the game session: what the player is doing (the craft driver's
+/// phase while a drive runs, else the server's own action record) and
+/// the four pools from the region leg's own-row sync. Values show "—"
+/// until the snapshot lands.
+private struct VitalsBanner: View {
+    let vitals: CrafterRep.Session.Vitals
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: activitySymbol)
+                    .font(.caption2.bold())
+                    .foregroundStyle(.tint)
+                Text(vitals.activity)
+                    .font(.caption.bold())
+                Spacer()
+            }
+            HStack(spacing: 12) {
+                stat("STA", vitals.stamina, vitals.maxStamina, .green)
+                stat("HP", vitals.health, vitals.maxHealth, .red)
+                stat("TP", vitals.teleportEnergy, vitals.maxTeleportEnergy, .cyan)
+                stat("FOOD", vitals.satiation, vitals.maxSatiation, .orange)
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+        .background(Color(white: 0.08))
+    }
+
+    private func stat(
+        _ label: String, _ value: Float?, _ max: Float?, _ tint: Color
+    ) -> some View {
+        HStack(spacing: 3) {
+            Text(label)
+                .font(.caption2.bold())
+                .foregroundStyle(tint.opacity(0.8))
+            Text(Self.pair(value, max))
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private static func pair(_ value: Float?, _ max: Float?) -> String {
+        switch (value, max) {
+        case let (value?, max?):
+            "\(Int(value.rounded()))/\(Int(max.rounded()))"
+        case let (value?, nil):
+            "\(Int(value.rounded()))"
+        default:
+            "—"
+        }
+    }
+
+    private var activitySymbol: String {
+        switch vitals.activity {
+        case "Crafting": "hammer"
+        case "Walking", "Running": "figure.walk"
+        case "Gathering": "leaf"
+        case "Climbing": "figure.climbing"
+        default: "person"
+        }
+    }
+}
 
 private struct ConnectionPill: View {
     let connection: SessionConnection

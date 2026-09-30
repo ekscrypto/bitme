@@ -9,7 +9,11 @@ Two mobile companion apps for BitCraft, one shared core:
 - **BitMe Pocket Crafter** (bundle `life.encoded.bitme.crafter`) — the
   claim's workstations and craft tasks on the go. Signs in with the BitCraft
   account (email → emailed access code) and tracks the account's own player,
-  located over the game's global database — no character-name entry. The
+  located over the game's global database — no character-name entry. Tapping
+  a craft drives it: the app walks the player to the station and runs the
+  paced `craft_continue` loop with a live banner (activity, stamina/health/
+  teleport/food) over the same region leg — see
+  [docs/protocol/region-move-and-craft-continue.md](docs/protocol/region-move-and-craft-continue.md) §6. The
   game session's region-shard leg carries a live claim-buildings sync (the
   pinned claim's buildings, catalogs, nicknames, and crafts — see
   [docs/protocol/region-claim-buildings.md](docs/protocol/region-claim-buildings.md)).

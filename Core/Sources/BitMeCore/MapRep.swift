@@ -33,6 +33,31 @@ public struct MapRep: Equatable, Sendable {
         public var tileZ: Int
     }
 
+    /// A pending prospection's target area (docs/protocol/prospecting.md):
+    /// a bearing cone anchored at where the player stood when they
+    /// prospected, out to the measured range, plus the crumb-radius circle
+    /// at the cone's midline (the dead-reckoned target point). Static until
+    /// the next prospection — it does not follow the player marker.
+    public struct Prospect: Equatable, Sendable {
+        /// The fix origin — the player's position at prospection time.
+        public var fixX: Double
+        public var fixZ: Double
+        /// Compass cone (radians, `atan2(Δz, Δx)`, world axes; +z is map
+        /// north). `bearingLo == bearingHi` = the final step's precise
+        /// bearing to the prize.
+        public var bearingLo: Double
+        public var bearingHi: Double
+        /// Player→target distance, world units.
+        public var distance: Double
+        /// Crumb acceptance radius (world units) — the target circle.
+        public var crumbRadius: Double
+        /// True on the final step: the prize is the target.
+        public var isFinalStep: Bool
+        /// 1-based step / total (total = crumbs + final).
+        public var step: Int
+        public var totalSteps: Int
+    }
+
     public var region: Int?
     public var originX: Int?
     public var originZ: Int?
@@ -51,6 +76,8 @@ public struct MapRep: Equatable, Sendable {
     public var stream: StreamStatus
     public var player: Player?
     public var target: Target?
+    /// Pending prospection overlay (nil while the player has none).
+    public var prospect: Prospect?
     /// Bumped on every tile-affecting change (window fetch, delta, dict,
     /// terrain) — renderers key their prerender caches on it instead of
     /// diffing 160k words.
@@ -60,7 +87,7 @@ public struct MapRep: Equatable, Sendable {
         region: nil, originX: nil, originZ: nil, width: nil, words: [],
         entries: [:], tally: [:], terrain: nil, anchorX: nil, anchorZ: nil,
         populatedTiles: 0, stream: .off, player: nil, target: nil,
-        tileVersion: 0
+        prospect: nil, tileVersion: 0
     )
 
     static func from(ephemeral: EphemeralState) -> MapRep {
@@ -90,6 +117,28 @@ public struct MapRep: Equatable, Sendable {
             target = nil
         }
 
+        let prospect: Prospect?
+        if session.prospection.isActive,
+           let distance = session.prospection.toNextNode, distance > 0,
+           let fixX = session.prospection.fixX, let fixZ = session.prospection.fixZ {
+            let angles = session.prospection.nextCrumbAngles
+            let lo = angles.map(Double.init).min() ?? 0
+            let hi = angles.map(Double.init).max() ?? 0
+            prospect = Prospect(
+                fixX: fixX,
+                fixZ: fixZ,
+                bearingLo: lo,
+                bearingHi: hi,
+                distance: Double(distance),
+                crumbRadius: GameConfig.shared.prospectCrumbRadius,
+                isFinalStep: session.prospection.ongoingStep >= session.prospection.totalSteps - 1,
+                step: session.prospection.ongoingStep + 1,
+                totalSteps: session.prospection.totalSteps
+            )
+        } else {
+            prospect = nil
+        }
+
         let stream: StreamStatus
         switch map.streamStatus {
         case .off: stream = .off
@@ -113,6 +162,7 @@ public struct MapRep: Equatable, Sendable {
             stream: stream,
             player: player,
             target: target,
+            prospect: prospect,
             tileVersion: map.tileVersion
         )
     }

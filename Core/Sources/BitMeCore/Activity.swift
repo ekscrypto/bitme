@@ -552,3 +552,339 @@ extension Activity.ClaimBuildingsLoop: AsyncActivity, StampableActivity {
         }
     }
 }
+
+// MARK: - Player vitals
+
+extension Activity {
+    /// The player-vitals sync on the game session's region leg
+    /// (`RegionVitalsClient`): the own-row subscription set for the
+    /// stamina/health/satiation/teleport pools, the materialized stats,
+    /// the action record, and position. Runs for the life of the leg,
+    /// forwarding each event as one intent — vitals are low-rate (the
+    /// pools tick at most ~1 Hz), so no pooling.
+    struct PlayerVitalsLoop: Sendable {
+        let leg: RegionLeg
+        let playerEntityID: UInt64
+        /// Machine-stamped with the spawned task; stored in session state
+        /// by the starting intent so session teardown can cancel it.
+        let cancellable: CancellableTask
+    }
+}
+
+extension Activity.PlayerVitalsLoop: AsyncActivity, StampableActivity {
+    var stampTarget: CancellableTask { cancellable }
+
+    func start(ingestor: IntentIngestor, adapters: Adapters) async {
+        for await event in adapters.bitCraft.syncPlayerVitals(leg, playerEntityID) {
+            if Task.isCancelled { return }
+            await ingestor.ingest(Intent.PlayerVitalsChanged(events: [event]))
+        }
+        // The stream ends with the leg (its terminal `.failed` event, if
+        // any, already flowed through as an intent) — nothing to report.
+    }
+}
+
+// MARK: - Prospection watch
+
+extension Activity {
+    /// The prospection watch on the region mirror (`RegionProspectClient`):
+    /// the tracked player's own `prospecting_state` row, read anonymously —
+    /// name-driven hosts hold no game session, so the mirror is their only
+    /// region window. Low-rate (rows move only on re-prospection), so each
+    /// event is one intent; the loop runs until cancelled (session
+    /// teardown, sign-out, or a region change restart).
+    struct ProspectionWatch: Sendable {
+        let playerEntityID: UInt64
+        let region: Int
+        /// Machine-stamped with the spawned task; stored in session state
+        /// by the starting intent so teardown and restarts can cancel it.
+        let cancellable: CancellableTask
+    }
+}
+
+extension Activity.ProspectionWatch: AsyncActivity, StampableActivity {
+    var stampTarget: CancellableTask { cancellable }
+
+    func start(ingestor: IntentIngestor, adapters: Adapters) async {
+        for await event in adapters.bitCraft.syncProspection(playerEntityID, region) {
+            if Task.isCancelled { return }
+            await ingestor.ingest(Intent.ProspectionChanged(events: [event]))
+        }
+        // The stream ends on watch failure (its `.failed` event already
+        // flowed through) — a later poll re-arms a fresh watch.
+    }
+}
+
+// MARK: - Craft driver
+
+extension Activity {
+    /// The craft driver: walks the player to a stand-point by the tapped
+    /// craft's station (v1: outdoor stations — the mutation already
+    /// refused interior ones), then runs the client-paced
+    /// `craft_continue_start` → `craft_continue` loop until the effort
+    /// goal, a refusal, or cancellation. Pacing honors the server's own
+    /// delay formula with the ≥95 % cadence margin (the plan carries it);
+    /// every awaited call's receipt is the own-action feedback channel
+    /// (effort, stamina, position). Pause cancels the loop (the server
+    /// suspends the craft when its lock lapses); resume re-arms with a
+    /// fresh `craft_continue_start`.
+    struct CraftDriverLoop: Sendable {
+        let leg: RegionLeg
+        let playerEntityID: UInt64
+        let plan: EphemeralState.Session.CraftPlan
+        /// Machine-stamped with the spawned task; stored in session state
+        /// by the starting intent so pause/stop/teardown can cancel it.
+        let cancellable: CancellableTask
+    }
+
+    /// Best-effort stop: `craft_cancel` + `player_action_cancel` after the
+    /// user tapped Stop. Failures are logged only — the craft may already
+    /// be gone, and the banner has already moved on.
+    struct StopCraft: Sendable {
+        let leg: RegionLeg
+        let pocketID: UInt64
+    }
+}
+
+extension Activity.CraftDriverLoop: AsyncActivity, StampableActivity {
+    var stampTarget: CancellableTask { cancellable }
+
+    func start(ingestor: IntentIngestor, adapters: Adapters) async {
+        let config = GameConfig.shared
+        let entity = plan.progressiveActionEntityID
+
+        // Monotonic client clock for the request timestamps (epoch ms —
+        // the wire format; the server sanity-clamps +1 s/−8 s).
+        var lastTimestampMs: UInt64 = 0
+        func nextTimestampMs() -> UInt64 {
+            let now = UInt64(Date().timeIntervalSince1970 * 1_000)
+            lastTimestampMs = max(lastTimestampMs + 1, now)
+            return lastTimestampMs
+        }
+
+        // 1. Walk stage — skipped when already in craft range.
+        switch await Self.walkToStation(
+            leg: leg, plan: plan, playerEntityID: playerEntityID,
+            adapters: adapters, nextTimestampMs: nextTimestampMs
+        ) {
+        case .arrived(let x, let z):
+            await ingestor.ingest(Intent.WalkOutcome(
+                craftEntityID: entity, outcome: .arrived(positionX: x, positionZ: z)
+            ))
+        case .failed(let message):
+            await ingestor.ingest(Intent.WalkOutcome(
+                craftEntityID: entity, outcome: .failed(message)
+            ))
+            return
+        case .cancelled:
+            return
+        }
+
+        // 2. Craft loop.
+        await ingestor.ingest(Intent.DriverEvent(
+            craftEntityID: entity,
+            outcome: .crafting(effortDone: plan.effortDone, stamina: nil)
+        ))
+        var delayMs = plan.delayMs
+        var effortDone = plan.effortDone
+        var consecutiveFailures = 0
+        while !Task.isCancelled {
+            do {
+                // Arm the iteration, pace the server's delay, complete it.
+                _ = try await adapters.bitCraft.craftContinueStart(leg, entity, nextTimestampMs())
+                try await adapters.sleep(delayMs / 1_000)
+                let receipt = try await adapters.bitCraft.craftContinue(leg, entity, nextTimestampMs())
+                consecutiveFailures = 0
+                if let craft = receipt.craft {
+                    effortDone = Int(craft.progress)
+                }
+                if plan.effortTotal > 0, effortDone >= plan.effortTotal {
+                    await ingestor.ingest(Intent.DriverEvent(
+                        craftEntityID: entity, outcome: .completed(effortDone: effortDone)
+                    ))
+                    return
+                }
+                await ingestor.ingest(Intent.DriverEvent(
+                    craftEntityID: entity,
+                    outcome: .crafting(effortDone: effortDone, stamina: receipt.stamina?.stamina)
+                ))
+                try await adapters.sleep(config.craftInterIterationGapSecs)
+            } catch let error as RegionDriverClient.CallError {
+                guard case .refused(let message) = error else {
+                    // Transport-class failure (the leg may be dying — the
+                    // game-session loop owns the user-visible outcome):
+                    // a few retries, then end the drive.
+                    consecutiveFailures += 1
+                    if consecutiveFailures >= config.craftMaxConsecutiveErrors {
+                        await ingestor.ingest(Intent.DriverEvent(
+                            craftEntityID: entity,
+                            outcome: .failed("the region connection stopped responding")
+                        ))
+                        return
+                    }
+                    try? await adapters.sleep(0.5)
+                    if Task.isCancelled { return }
+                    continue
+                }
+                switch DriverRefusal.classify(message) {
+                case .outOfStamina:
+                    await ingestor.ingest(Intent.DriverEvent(
+                        craftEntityID: entity, outcome: .paused(.outOfStamina)
+                    ))
+                    return
+                case .tooQuickly:
+                    // The cadence gate caught us under 95 % — widen the
+                    // delay and let the loop head re-arm via _start.
+                    delayMs = min(
+                        delayMs * config.craftTooFastBackoff,
+                        plan.delayMs * config.craftTooFastBackoffCap
+                    )
+                    continue
+                case .craftGone, .tooFar, .other:
+                    await ingestor.ingest(Intent.DriverEvent(
+                        craftEntityID: entity, outcome: .failed(message)
+                    ))
+                    return
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                // Transport-class failure: the leg may be dying (the
+                // game-session loop owns the user-visible outcome) — a few
+                // retries, then end the drive.
+                consecutiveFailures += 1
+                if consecutiveFailures >= config.craftMaxConsecutiveErrors {
+                    await ingestor.ingest(Intent.DriverEvent(
+                        craftEntityID: entity,
+                        outcome: .failed("the region connection stopped responding")
+                    ))
+                    return
+                }
+                try? await adapters.sleep(0.5)
+                if Task.isCancelled { return }
+            }
+        }
+    }
+
+    // MARK: Walk stage
+
+    private enum WalkOutcome2 {
+        case arrived(Int32, Int32)
+        case failed(String)
+        case cancelled
+    }
+
+    /// Walks to the stand-point — straight-line hops of ≤1 tile paced
+    /// under the measured walk speed, each confirmed by its receipt; a
+    /// rejected hop halves once, then fails. Already-in-range skips the
+    /// walk entirely (the common resume case).
+    private static func walkToStation(
+        leg: RegionLeg,
+        plan: EphemeralState.Session.CraftPlan,
+        playerEntityID: UInt64,
+        adapters: Adapters,
+        nextTimestampMs: () -> UInt64
+    ) async -> WalkOutcome2 {
+        let config = GameConfig.shared
+        let leg = leg // capture clarity in the closures below
+        do {
+            guard let station = try await adapters.bitCraft.stationLocation(leg, plan.buildingEntityID) else {
+                return .failed("Station location unknown — try again in a moment.")
+            }
+            guard station.dimension == 1 else {
+                return .failed("Interior stations aren't supported yet — craft there in game.")
+            }
+            guard let own = try await adapters.bitCraft.ownPosition(leg, playerEntityID) else {
+                return .failed("Player position unknown — try again in a moment.")
+            }
+
+            let stationTile = (
+                x: Int32((Double(station.x) / 1_000).rounded()),
+                z: Int32((Double(station.z) / 1_000).rounded())
+            )
+            let ownTile = (
+                x: Int32((Double(own.locationX) / 1_000).rounded()),
+                z: Int32((Double(own.locationZ) / 1_000).rounded())
+            )
+            let tileDistance = hexTileDistance(
+                dx: ownTile.x - stationTile.x, dz: ownTile.z - stationTile.z
+            )
+            if tileDistance <= plan.standDistanceTiles {
+                return .arrived(own.locationX, own.locationZ)
+            }
+
+            // Stand-point: the station's center shifted toward the player
+            // by the stand-off distance, in raw milli-tile units.
+            let dx = Double(own.locationX - station.x)
+            let dz = Double(own.locationZ - station.z)
+            let length = (dx * dx + dz * dz).squareRoot()
+            let offset = Double(plan.standDistanceTiles) * 1_000
+            let target = (
+                x: Int32((Double(station.x) + dx / length * offset).rounded()),
+                z: Int32((Double(station.z) + dz / length * offset).rounded())
+            )
+
+            var current = (x: Double(own.locationX), z: Double(own.locationZ))
+            var origin: (x: Int32, z: Int32)? = (own.locationX, own.locationZ)
+            let deadline = Date().addingTimeInterval(config.walkTimeoutSecs)
+            var hopScale = 1.0
+            while Date() < deadline {
+                if Task.isCancelled { return .cancelled }
+                let rx = Double(target.x) - current.x
+                let rz = Double(target.z) - current.z
+                let remaining = (rx * rx + rz * rz).squareRoot()
+                if remaining < 10 { // within a hundredth of a tile
+                    // The final zero-duration stop call anchors the
+                    // position server-side (the captured client's pattern).
+                    _ = try await adapters.bitCraft.movePlayer(
+                        leg, nextTimestampMs(),
+                        target.x, target.z, 1,
+                        target.x, target.z,
+                        0, 1
+                    )
+                    return .arrived(target.x, target.z)
+                }
+                let hopLength = min(config.walkHopRawDistance * hopScale, remaining)
+                let nx = current.x + rx / remaining * hopLength
+                let nz = current.z + rz / remaining * hopLength
+                let duration = Float(hopLength / plan.walkSpeedRawPerSec * config.walkDurationMargin)
+                do {
+                    _ = try await adapters.bitCraft.movePlayer(
+                        leg, nextTimestampMs(),
+                        Int32(nx.rounded()), Int32(nz.rounded()), 1,
+                        origin?.x, origin?.z,
+                        duration, 2
+                    )
+                    hopScale = 1.0
+                } catch let error as RegionDriverClient.CallError {
+                    guard case .refused(let message) = error else { throw error }
+                    if hopScale > 0.45 {
+                        hopScale /= 2 // one halving retry for a rejected hop
+                        continue
+                    }
+                    return .failed("The walk was refused: \(message)")
+                }
+                origin = (Int32(nx.rounded()), Int32(nz.rounded()))
+                current = (nx, nz)
+            }
+            return .failed("The walk took too long — try again closer to the station.")
+        } catch is CancellationError {
+            return .cancelled
+        } catch {
+            return .failed("The region connection dropped while walking.")
+        }
+    }
+}
+
+extension Activity.StopCraft: AsyncActivity {
+    func start(ingestor: IntentIngestor, adapters: Adapters) async {
+        do {
+            _ = try await adapters.bitCraft.craftCancel(leg, pocketID)
+            coreLog.info("craft driver: craft \(pocketID, privacy: .public) cancelled")
+        } catch {
+            coreLog.info("craft driver: craft_cancel best-effort failed: \(String(describing: error), privacy: .public)")
+        }
+        // Clear any in-flight action lock too — both best-effort.
+        _ = try? await adapters.bitCraft.playerActionCancel(leg)
+    }
+}

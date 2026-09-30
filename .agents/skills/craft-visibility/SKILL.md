@@ -57,14 +57,22 @@ never trusts client timing:
   completes ("Invalid repeat action");
 - strikes (`move_validation_strike_counter_state`, admin-tuned window in
   `private_parameters_desc`) escalate to hard rejection — and position
-  resets for `player_move`;
+  resets for `player_move`. **Tolerated strikes are silent** (counter
+  table private, action succeeds); only hard rejections show — Err
+  receipt ("Tried to … too quickly") plus `last_action_result =
+  TimingFail` on the public own `player_action_state` row (usable as a
+  tripwire subscription);
 - request timestamps are sanity-clamped: ≤ 1 s ahead / ≤ 8 s behind
   server clock, monotonic. They are ms; row/server timestamps are µs.
 
 Observation guardrail: `*_event` tables (`craft_continue_start_event`, …)
 are v2-subscription-only, and a caller's own actions are never echoed to
 them — craft tracking stays on `progressive_action_state` /
-`public_progressive_action_state`, never events.
+`public_progressive_action_state`, never events. When the app itself
+drives (`Activity.CraftDriverLoop`), own-action feedback (effort,
+stamina, position) comes from the callReducer receipts
+(`DriverReceipt`), not subscriptions; pacing and refusal handling:
+region-move-and-craft-continue.md §6.
 
 ## Recipe skill ids
 
