@@ -61,6 +61,9 @@ struct MapScreen: View {
                 Canvas { context, size in
                     draw(in: &context, size: size, pulse: timeline.date.timeIntervalSinceReferenceDate)
                 }
+                // Full-bleed, so the canvas frame is the whole screen and
+                // `canvasSize` (UIScreen bounds) is exact for hit-testing.
+                .ignoresSafeArea()
                 .simultaneousGesture(panGesture)
                 .simultaneousGesture(zoomGesture)
                 .simultaneousGesture(SpatialTapGesture().onEnded { tap in
@@ -450,8 +453,9 @@ struct MapScreen: View {
     // MARK: - Chrome
 
     private var canvasSize: CGSize {
-        // The Canvas fills the safe-area-ignoring ZStack; GeometryReader-free
-        // best effort (only used for default zoom / hit-testing margins).
+        // The Canvas ignores the safe area, so it really is the full screen
+        // and UIScreen bounds are exact — used for tap hit-testing, default
+        // zoom, and fit-to-window.
         UIScreen.main.bounds.size
     }
 
