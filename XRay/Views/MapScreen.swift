@@ -1,6 +1,10 @@
 import SwiftUI
 import BitMeCore
 import UIKit
+import os
+
+/// Map-screen diagnostics (tap hit-testing geometry).
+private let mapLog = Logger(subsystem: "life.encoded.bitme.ios", category: "map")
 
 /// The odd-r hex grid map — the mobile counterpart of the X-Ray web map,
 /// and X-Ray's root screen.
@@ -27,6 +31,19 @@ struct MapScreen: View {
     @State private var selectedTile: TileCoordinate?
     @State private var lastDragDelta: CGSize = .zero
     @State private var pinchBaseZoom: Double?
+    /// Diagnostics: the canvas's actual frame, as its draw closure reports
+    /// it — lets the tap log compare hit-testing's assumed geometry against
+    /// reality.
+    @State private var drawSize: CGSize = .zero
+    /// Verification aid: the last tap's canvas-local point and time — drawn
+    /// as a fading crosshair so tap localization is visible on device
+    /// without reading logs.
+    @State private var tapMark: (point: CGPoint, at: Date)?
+    /// Live drag-to-dismiss translation of the filter panel (0 = resting).
+    @State private var panelDragOffset: CGFloat = 0
+    /// True while the panel header drag gesture is recognizing — the canvas
+    /// pan is a simultaneous gesture, so it must explicitly stand down.
+    @State private var panelDragActive = false
     /// Tracked resource ids (JSON in UserDefaults, like the web client's
     /// localStorage). Empty set = show everything.
     @AppStorage("map.trackedResourceIds") private var trackedData = Data()
@@ -56,22 +73,47 @@ struct MapScreen: View {
 
     var body: some View {
         ZStack {
-            Color(white: 0.055).ignoresSafeArea()
             TimelineView(.periodic(from: .now, by: 0.25)) { timeline in
-                Canvas { context, size in
-                    draw(in: &context, size: size, pulse: timeline.date.timeIntervalSinceReferenceDate)
+                GeometryReader { geo in
+                    Canvas { context, size in
+                        draw(in: &context, size: size, pulse: timeline.date.timeIntervalSinceReferenceDate)
+                        if drawSize != size { drawSize = size } // diagnostics capture, settles after the first frame
+                    }
+                    .contentShape(Rectangle())
+                    // Do NOT trust a gesture's implicit local space: on
+                    // device, SpatialTapGesture's location ran above the
+                    // true touch whether the canvas was full-bleed or in the
+                    // safe-area frame. Instead take the tap in .global space
+                    // and convert with the canvas's own global frame — both
+                    // measured in the same space, so the conversion is exact
+                    // regardless of how SwiftUI insets or lays out the
+                    // canvas. (Pan/zoom stay on the implicit gestures: they
+                    // consume only translation deltas and scale, never
+                    // absolute locations.)
+                    .onTapGesture(coordinateSpace: .global) { location in
+                        let frame = geo.frame(in: .global)
+                        let local = CGPoint(
+                            x: location.x - frame.minX,
+                            y: location.y - frame.minY
+                        )
+                        tapMark = (local, Date())
+                        mapLog.debug("""
+                            tap global (\(location.x, format: .fixed(precision: 1), privacy: .public), \(location.y, format: .fixed(precision: 1), privacy: .public)) \
+                            canvas frame (\(frame.minX, format: .fixed(precision: 1), privacy: .public), \(frame.minY, format: .fixed(precision: 1), privacy: .public), \
+                            \(frame.width, format: .fixed(precision: 0), privacy: .public)×\(frame.height, format: .fixed(precision: 0), privacy: .public)) \
+                            → local (\(local.x, format: .fixed(precision: 1), privacy: .public), \(local.y, format: .fixed(precision: 1), privacy: .public))
+                            """)
+                        selectTile(at: local, size: frame.size)
+                    }
+                    .simultaneousGesture(panGesture)
+                    .simultaneousGesture(zoomGesture)
                 }
-                // Full-bleed, so the canvas frame is the whole screen and
-                // `canvasSize` (UIScreen bounds) is exact for hit-testing.
-                .ignoresSafeArea()
-                .simultaneousGesture(panGesture)
-                .simultaneousGesture(zoomGesture)
-                .simultaneousGesture(SpatialTapGesture().onEnded { tap in
-                    selectTile(at: tap.location, size: canvasSize)
-                })
             }
             chrome
         }
+        // Full-bleed backdrop that can't infect the canvas's layout: as a
+        // background it ignores the safe area purely visually.
+        .background(Color(white: 0.055).ignoresSafeArea())
         .preferredColorScheme(.dark)
         .fullScreenCover(isPresented: $showDashboard) {
             ActivityScreen(machine: machine, ingest: ingest)
@@ -95,6 +137,17 @@ struct MapScreen: View {
         for await next in machine.mapRep.values {
             rep = next
             if follow, let player = next.player, player.dimension == 1 {
+                // Diagnostic: a follow re-center should be a small drift; a
+                // large jump means the reported player position teleported —
+                // which would leave a world-anchored selection far behind.
+                let dx = player.worldX - camera.centerX
+                let dz = player.worldZ - camera.centerZ
+                if abs(dx) > 3 || abs(dz) > 3 {
+                    mapLog.debug("""
+                        camera snap (\(dx, format: .fixed(precision: 1), privacy: .public), \(dz, format: .fixed(precision: 1), privacy: .public)) tiles \
+                        to player (\(player.worldX, format: .fixed(precision: 1), privacy: .public), \(player.worldZ, format: .fixed(precision: 1), privacy: .public))
+                        """)
+                }
                 camera.centerX = player.worldX
                 camera.centerZ = player.worldZ
             }
@@ -148,6 +201,20 @@ struct MapScreen: View {
         drawProspect(in: &context, size: size)
         drawSelectedTile(in: &context, size: size)
         drawPlayer(in: &context, size: size, pulse: pulse)
+        // Verification aid: fading crosshair at the last reported tap point.
+        // It must sit exactly under the finger; if it does but the selection
+        // doesn't, the fault is in the hit-test/draw math, not localization.
+        if let mark = tapMark {
+            let age = Date().timeIntervalSince(mark.at)
+            if age < 2 {
+                var cross = Path()
+                cross.move(to: CGPoint(x: mark.point.x - 7, y: mark.point.y))
+                cross.addLine(to: CGPoint(x: mark.point.x + 7, y: mark.point.y))
+                cross.move(to: CGPoint(x: mark.point.x, y: mark.point.y - 7))
+                cross.addLine(to: CGPoint(x: mark.point.x, y: mark.point.y + 7))
+                context.stroke(cross, with: .color(.yellow.opacity(1 - age / 2)), lineWidth: 1.5)
+            }
+        }
     }
 
     private func drawVectorTiles(in context: inout GraphicsContext, size: CGSize) {
@@ -401,6 +468,10 @@ struct MapScreen: View {
     private var panGesture: some Gesture {
         DragGesture(minimumDistance: 1)
             .onChanged { value in
+                guard !panelDragActive else { return } // a panel drag co-fires (simultaneous)
+                if lastDragDelta == .zero { // diagnostics: a drag began — a tap that moved this much never fires
+                    mapLog.debug("pan start (\(value.location.x, format: .fixed(precision: 1), privacy: .public), \(value.location.y, format: .fixed(precision: 1), privacy: .public))")
+                }
                 follow = false
                 let delta = CGSize(
                     width: value.translation.width - lastDragDelta.width,
@@ -443,6 +514,39 @@ struct MapScreen: View {
                 }
             }
         }
+        // On-device diagnostic for the tap-offset bug: `drawn` is where
+        // drawSelectedTile will stroke the chosen tile — Δ vs the tap must
+        // stay within one hex (the snap to the tile's center). canvas may
+        // legitimately differ from screen by the safe-area insets; what
+        // matters is that hit-testing and drawing agree.
+        let canvas = drawSize == .zero ? size : drawSize
+        let insets = UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.keyWindow }
+            .first?.safeAreaInsets ?? .zero
+        let playerText = rep.player.map {
+            String(format: "player (%.1f, %.1f)", $0.worldX, $0.worldZ)
+        } ?? "player none"
+        if let best {
+            let drawn = screenPixel(x: Double(best.x), z: Double(best.z), size: canvas) ?? .zero
+            mapLog.debug("""
+                tap (\(point.x, format: .fixed(precision: 1), privacy: .public), \(point.y, format: .fixed(precision: 1), privacy: .public)) \
+                Δ (\(drawn.x - point.x, format: .fixed(precision: 1), privacy: .public), \(drawn.y - point.y, format: .fixed(precision: 1), privacy: .public)) \
+                canvas \(canvas.width, format: .fixed(precision: 0), privacy: .public)×\(canvas.height, format: .fixed(precision: 0), privacy: .public) \
+                screen \(size.width, format: .fixed(precision: 0), privacy: .public)×\(size.height, format: .fixed(precision: 0), privacy: .public) \
+                insets \(insets.top, format: .fixed(precision: 0), privacy: .public)/\(insets.bottom, format: .fixed(precision: 0), privacy: .public) \
+                zoom \(camera.pxPerHex, format: .fixed(precision: 1), privacy: .public) \
+                cam (\(camera.centerX, format: .fixed(precision: 1), privacy: .public), \(camera.centerZ, format: .fixed(precision: 1), privacy: .public)) \
+                \(playerText, privacy: .public) follow \(follow ? "on" : "off", privacy: .public) \
+                tile (\(best.x, privacy: .public), \(best.z, privacy: .public)) \(best == selectedTile ? "dismiss" : "select", privacy: .public)
+                """)
+        } else {
+            mapLog.debug("""
+                tap (\(point.x, format: .fixed(precision: 1), privacy: .public), \(point.y, format: .fixed(precision: 1), privacy: .public)) \
+                no nearby tile at zoom \(camera.pxPerHex, format: .fixed(precision: 1), privacy: .public) \
+                cam (\(camera.centerX, format: .fixed(precision: 1), privacy: .public), \(camera.centerZ, format: .fixed(precision: 1), privacy: .public)) \
+                \(playerText, privacy: .public) follow \(follow ? "on" : "off", privacy: .public)
+                """)
+        }
         if let best, best == selectedTile {
             selectedTile = nil // tap again to dismiss
         } else {
@@ -453,10 +557,11 @@ struct MapScreen: View {
     // MARK: - Chrome
 
     private var canvasSize: CGSize {
-        // The Canvas ignores the safe area, so it really is the full screen
-        // and UIScreen bounds are exact — used for tap hit-testing, default
-        // zoom, and fit-to-window.
-        UIScreen.main.bounds.size
+        // The canvas's true size, as its draw closure reports it. Gestures
+        // and drawing share this space, so hit-testing must too — UIScreen
+        // bounds are off by the safe-area insets. (The UIScreen fallback
+        // covers zoom setup before the first drawn frame.)
+        drawSize == .zero ? UIScreen.main.bounds.size : drawSize
     }
 
     private var chrome: some View {
@@ -502,6 +607,7 @@ struct MapScreen: View {
                 HStack(spacing: 10) {
                     MapButton(icon: "minus") { zoom(by: 1 / 1.3) }
                     MapButton(icon: "line.3.horizontal.decrease.circle", active: !tracked.isEmpty) {
+                        panelDragOffset = 0 // clear any leftover dismiss-drag translation
                         withAnimation(.easeOut(duration: 0.2)) { filterVisible = true }
                     }
                     MapButton(icon: "location", active: follow) {
@@ -739,36 +845,45 @@ struct MapScreen: View {
         return "Tracking \(tracked.count) \(plural) — \(nearby) nearby · others faded"
     }
 
+    /// The resource filter sheet. The header (grabber + title + status) is a
+    /// drag handle: dragging it down moves the whole panel, and releasing
+    /// past the threshold (or a fast downward flick) dismisses — the iOS
+    /// sheet convention. The canvas pan is a simultaneous gesture, so it
+    /// stands down via `panelDragActive` while the drag is live.
     private var filterPanel: some View {
         VStack(spacing: 10) {
-            Capsule()
-                .fill(.white.opacity(0.35))
-                .frame(width: 36, height: 4)
-                .padding(.top, 8)
+            VStack(spacing: 10) {
+                Capsule()
+                    .fill(.white.opacity(0.35))
+                    .frame(width: 36, height: 4)
+                    .padding(.top, 8)
 
-            HStack {
-                Text("Resources")
-                    .font(.subheadline.bold())
-                Spacer()
-                if !tracked.isEmpty {
-                    Button("Show all") { tracked = [] }
-                        .font(.caption.bold())
-                        .foregroundStyle(.cyan)
+                HStack {
+                    Text("Resources")
+                        .font(.subheadline.bold())
+                    Spacer()
+                    if !tracked.isEmpty {
+                        Button("Show all") { tracked = [] }
+                            .font(.caption.bold())
+                            .foregroundStyle(.cyan)
+                    }
+                    Button {
+                        withAnimation(.easeIn(duration: 0.15)) { filterVisible = false }
+                    } label: {
+                        Image(systemName: "chevron.down.circle.fill")
+                            .font(.body)
+                            .foregroundStyle(.white.opacity(0.85))
+                    }
+                    .accessibilityLabel("Close filter panel")
                 }
-                Button {
-                    withAnimation(.easeIn(duration: 0.15)) { filterVisible = false }
-                } label: {
-                    Image(systemName: "chevron.down.circle.fill")
-                        .font(.body)
-                        .foregroundStyle(.white.opacity(0.85))
-                }
-                .accessibilityLabel("Close filter panel")
+
+                Text(trackingStatusText)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-
-            Text(trackingStatusText)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .gesture(panelDismissDrag)
 
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
@@ -821,6 +936,34 @@ struct MapScreen: View {
             Color(white: 0.08).opacity(0.97),
             in: UnevenRoundedRectangle(topLeadingRadius: 16, topTrailingRadius: 16)
         )
+        // Follows the finger; the dismissal transition slides it the rest
+        // of the way from wherever the finger left it. Reset on reopen.
+        .offset(y: panelDragOffset)
+    }
+
+    /// Drag the panel header: down-drag translates the sheet, release past
+    /// ~1/3 of its height (or a fast flick) dismisses, otherwise it springs
+    /// back. Upward drags are clamped — the sheet is bottom-anchored.
+    private var panelDismissDrag: some Gesture {
+        DragGesture(minimumDistance: 8)
+            .onChanged { value in
+                panelDragActive = true
+                panelDragOffset = max(0, value.translation.height)
+            }
+            .onEnded { value in
+                panelDragActive = false
+                let dismissed = value.translation.height > 130
+                    || value.predictedEndTranslation.height > 320
+                if dismissed {
+                    // Keep `panelDragOffset` as-is: the removal transition
+                    // animates the panel off from the dragged position.
+                    withAnimation(.easeIn(duration: 0.15)) { filterVisible = false }
+                } else {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        panelDragOffset = 0
+                    }
+                }
+            }
     }
 
     private func panelSection(_ title: String) -> some View {
