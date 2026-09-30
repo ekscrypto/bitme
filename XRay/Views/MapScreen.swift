@@ -108,12 +108,18 @@ struct MapScreen: View {
                     .simultaneousGesture(panGesture)
                     .simultaneousGesture(zoomGesture)
                 }
+                // Edge-to-edge by design: the canvas spans the full window
+                // while the chrome sibling keeps its safe-area layout. Tap
+                // correctness does not depend on the frame — the global→local
+                // conversion above adapts to wherever the canvas lands.
+                .ignoresSafeArea()
             }
             chrome
         }
         // Full-bleed backdrop that can't infect the canvas's layout: as a
-        // background it ignores the safe area purely visually.
-        .background(Color(white: 0.055).ignoresSafeArea())
+        // background it ignores the safe area purely visually. Matches the
+        // canvas's own void fill so any pre-first-frame margin is invisible.
+        .background(HexMapRenderer.voidColor.ignoresSafeArea())
         .preferredColorScheme(.dark)
         .fullScreenCover(isPresented: $showDashboard) {
             ActivityScreen(machine: machine, ingest: ingest)
