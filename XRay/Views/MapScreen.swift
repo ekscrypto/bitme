@@ -41,8 +41,11 @@ struct MapScreen: View {
     @State private var tapMark: (point: CGPoint, at: Date)?
     /// Live drag-to-dismiss translation of the filter panel (0 = resting).
     @State private var panelDragOffset: CGFloat = 0
-    /// True while the panel header drag gesture is recognizing — the canvas
-    /// pan is a simultaneous gesture, so it must explicitly stand down.
+    /// Live drag-to-dismiss translation of the tile-info card (0 = resting).
+    @State private var cardDragOffset: CGFloat = 0
+    /// True while a chrome drag (filter-panel header, tile-info card) is
+    /// recognizing — the canvas pan is a simultaneous gesture, so it must
+    /// explicitly stand down.
     @State private var panelDragActive = false
     /// Tracked resource ids (JSON in UserDefaults, like the web client's
     /// localStorage). Empty set = show everything.
@@ -554,9 +557,10 @@ struct MapScreen: View {
                 """)
         }
         if let best, best == selectedTile {
-            selectedTile = nil // tap again to dismiss
+            withAnimation(.easeIn(duration: 0.15)) { selectedTile = nil } // tap again to dismiss
         } else {
-            selectedTile = best
+            cardDragOffset = 0 // a fresh card rests at its anchor
+            withAnimation(.easeOut(duration: 0.2)) { selectedTile = best }
         }
     }
 
@@ -605,6 +609,7 @@ struct MapScreen: View {
             }
             if let tile = selectedTile, !filterVisible {
                 tileInfoCard(tile)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             if filterVisible {
                 filterPanel
@@ -780,6 +785,14 @@ struct MapScreen: View {
                 Text("N \(superOffset.z) · E \(superOffset.x)")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
+                Button {
+                    withAnimation(.easeIn(duration: 0.15)) { selectedTile = nil }
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.body)
+                        .foregroundStyle(.white.opacity(0.85))
+                }
+                .accessibilityLabel("Dismiss tile info")
             }
             HStack(spacing: 10) {
                 if let entry {
@@ -802,6 +815,34 @@ struct MapScreen: View {
         .background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 10))
         .padding(.horizontal, 12)
         .padding(.bottom, 4)
+        .contentShape(Rectangle())
+        .gesture(cardDismissDrag)
+        .offset(y: cardDragOffset)
+    }
+
+    /// Drag the tile-info card: a downward drag translates the card, and
+    /// release past ~⅔ of its height (or a fast downward flick) clears the
+    /// selection — the same convention as the filter panel.
+    private var cardDismissDrag: some Gesture {
+        DragGesture(minimumDistance: 8)
+            .onChanged { value in
+                panelDragActive = true
+                cardDragOffset = max(0, value.translation.height)
+            }
+            .onEnded { value in
+                panelDragActive = false
+                let dismissed = value.translation.height > 40
+                    || value.predictedEndTranslation.height > 120
+                if dismissed {
+                    // Keep `cardDragOffset` as-is: the removal transition
+                    // slides the card off from the dragged position.
+                    withAnimation(.easeIn(duration: 0.15)) { selectedTile = nil }
+                } else {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        cardDragOffset = 0
+                    }
+                }
+            }
     }
 
     // MARK: - Resource filter panel
