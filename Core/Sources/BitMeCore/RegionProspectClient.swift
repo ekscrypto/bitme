@@ -21,6 +21,12 @@ public enum ProspectionEvent: Equatable, Sendable {
 /// itself but does not re-establish subscriptions, so each `.connected`
 /// re-subscribes; when the reconnect budget is exhausted the stream ends
 /// (a stale overlay must never linger — a later poll re-arms the watch).
+///
+/// The subscription's initial snapshot is dropped: a prospection already
+/// pending when the watch armed was measured from where the player stood
+/// at some unknowable earlier moment, so anchoring its cone at the current
+/// poll position would draw it from the wrong spot. The overlay starts
+/// only from prospections the watch witnesses live.
 enum RegionProspectClient {
 
     /// The mirror's region port is `3000 + region` (verified live:
@@ -64,52 +70,64 @@ enum RegionProspectClient {
         defer { Task { await client.disconnect() } }
 
         await client.registerTableRowDecoder(ProspectingStateRow.self)
-        let rowEvents = await client.tableEvents(named: ProspectingStateRow.tableName)
         let connectionEvents = await client.connectionEvents
 
         await withTaskGroup(of: Void.self) { group in
-            group.addTask {
-                for await event in rowEvents {
-                    guard event.tableName == ProspectingStateRow.tableName else { continue }
-                    for insert in event.inserts {
-                        if let row = insert as? ProspectingStateRow {
-                            emit(.updated(row))
+            var watchingRows = false
+            for await event in connectionEvents {
+                guard !Task.isCancelled else { break }
+                switch event {
+                case .connected:
+                    // Initial connection and every transport reconnect:
+                    // (re-)establish the subscription.
+                    do {
+                        let subscription = try await client.subscribe([
+                            Self.query(entityID: entityID),
+                        ])
+                        try await subscription.applied()
+                    } catch {
+                        if !Task.isCancelled {
+                            emit(.failed("prospection subscription failed (\(String(describing: error)))"))
                         }
-                    }
-                    if event.inserts.isEmpty, !event.deletes.isEmpty {
-                        emit(.ended)
-                    }
-                }
-            }
-            group.addTask {
-                for await event in connectionEvents {
-                    switch event {
-                    case .connected:
-                        // Initial connection and every transport reconnect:
-                        // (re-)establish the subscription.
-                        do {
-                            let subscription = try await client.subscribe([
-                                Self.query(entityID: entityID),
-                            ])
-                            try await subscription.applied()
-                        } catch {
-                            if !Task.isCancelled {
-                                emit(.failed("prospection subscription failed (\(String(describing: error)))"))
-                            }
-                            return
-                        }
-                    case .reconnecting:
-                        continue
-                    case .disconnected, .error:
-                        // The SDK either reconnects (the next `.connected`
-                        // re-subscribes) or has exhausted its budget —
-                        // either way the stale overlay must go.
-                        emit(.ended)
+                        group.cancelAll()
                         return
                     }
+                    guard !watchingRows else { continue }
+                    watchingRows = true
+                    // The row stream attaches only here, after the first
+                    // subscription applies — the one deliberate exception
+                    // to "attach tableEvents before subscribe" (see the
+                    // type comment). The SDK dispatches the snapshot rows
+                    // before resolving `applied()`, and a late attachment
+                    // never sees prior emissions, so the first row that
+                    // flows is one this watch witnessed live — or a
+                    // reconnect re-delivery, bounded by the transport gap,
+                    // which the mutator's timestamp check already handles.
+                    let rowEvents = await client.tableEvents(named: ProspectingStateRow.tableName)
+                    group.addTask {
+                        for await event in rowEvents {
+                            guard event.tableName == ProspectingStateRow.tableName else { continue }
+                            for insert in event.inserts {
+                                if let row = insert as? ProspectingStateRow {
+                                    emit(.updated(row))
+                                }
+                            }
+                            if event.inserts.isEmpty, !event.deletes.isEmpty {
+                                emit(.ended)
+                            }
+                        }
+                    }
+                case .reconnecting:
+                    continue
+                case .disconnected, .error:
+                    // The SDK either reconnects (the next `.connected`
+                    // re-subscribes) or has exhausted its budget —
+                    // either way the stale overlay must go.
+                    emit(.ended)
+                    group.cancelAll()
+                    return
                 }
             }
-            await group.next()
             group.cancelAll()
         }
     }

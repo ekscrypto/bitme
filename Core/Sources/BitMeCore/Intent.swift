@@ -979,8 +979,12 @@ extension Intent.ProspectionChanged: StateMutator {
                 // so it is captured once per prospection and frozen. Rows
                 // also rewrite for contribution-only changes and get
                 // re-delivered on watch reconnects — the server timestamp
-                // tells those apart from a genuine new fix. (The position
-                // is the latest poll snapshot, ≤1 s old; prospection is a
+                // tells those apart from a genuine new fix. The first row
+                // after arming is always one the watch witnessed live (or
+                // a reconnect re-delivery, bounded by the transport gap):
+                // `RegionProspectClient` drops the subscription snapshot,
+                // whose fix origin would be unknowable. (The position is
+                // the latest poll snapshot, ≤1 s old; prospection is a
                 // stationary channel, so that is the same spot the server
                 // measured from.)
                 let prospectionMs = Double(row.lastProspectionMicros) / 1_000

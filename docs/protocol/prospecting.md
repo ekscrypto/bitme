@@ -87,3 +87,15 @@ position once per fix (keyed on that timestamp — contribution-only row
 rewrites and reconnect re-deliveries reuse the stored origin) and the
 overlay is anchored there, static until the next prospection. It never
 follows the moving player marker.
+
+That origin is only knowable for prospections witnessed live. A row
+already pending when the watch arms (delivered in the subscription's
+initial snapshot) was measured from where the player stood at some
+unknowable earlier moment — anchoring it at the current poll position
+would draw the cone from the wrong spot. So `RegionProspectClient`
+attaches its row stream only *after* the first `applied()` resolves:
+the SDK dispatches snapshot rows before resolving that future and a
+late `tableEvents` attachment never sees prior emissions, so the
+snapshot never flows. The overlay appears only from live rows (reconnect
+re-deliveries are still accepted — bounded by the transport gap, and the
+timestamp check keeps their fix frozen).
