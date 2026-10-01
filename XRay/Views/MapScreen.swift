@@ -297,20 +297,22 @@ struct MapScreen: View {
 
     // MARK: - Prospection overlay
 
-    /// The pending prospection: a filled bearing cone out to the measured
-    /// range, the crumb-radius circle at the cone's midline (the
-    /// dead-reckoned target point), and — on the final step — a precise
-    /// dashed needle to the prize. Everything anchors at the **fix origin**
-    /// — where the player stood when they prospected — and stays put until
-    /// the next prospection, even as the player walks on. Geometry is
-    /// sampled in world tile space and projected per point, so the odd-r
-    /// shear stays honest (docs/protocol/prospecting.md).
+    /// The pending prospection: a bearing cone drawn as the two straight
+    /// tangent lines from the fix origin to the crumb-radius target circle
+    /// (so the cone exactly envelops the circle it explains), and — on the
+    /// final step — a precise dashed needle to the prize. Everything
+    /// anchors at the **fix origin** — where the player stood when they
+    /// prospected — and stays put until the next prospection, even as the
+    /// player walks on. The cone is constructed in screen space: both
+    /// endpoints are exact projections of world points and the edges are
+    /// single straight segments — sampling a world ray per point instead
+    /// would follow the odd-r shear's per-row zigzag (wiggly edges), and
+    /// sweeping the server's lo/hi angles breaks on cones wrapping ±π
+    /// (docs/protocol/prospecting.md).
     private func drawProspect(in context: inout GraphicsContext, size: CGSize) {
         guard let prospect = rep.prospect,
               let origin = screenPixel(x: prospect.fixX, z: prospect.fixZ, size: size) else { return }
 
-        let px = prospect.fixX
-        let pz = prospect.fixZ
         let tint = Self.prospectColor
 
         // The fix origin itself: a small ring, so the detached cone reads
@@ -320,68 +322,64 @@ struct MapScreen: View {
         originRing.addEllipse(in: CGRect(x: origin.x - ringR, y: origin.y - ringR, width: ringR * 2, height: ringR * 2))
         context.stroke(originRing, with: .color(tint.opacity(0.7)), lineWidth: 1.5)
 
-        // World-space point along a bearing at a distance.
-        func point(bearing: Double, at d: Double) -> CGPoint? {
-            screenPixel(x: px + d * cos(bearing), z: pz + d * sin(bearing), size: size)
-        }
+        // The dead-reckoned target: the midline bearing (the server's true
+        // bearing) at the measured range.
+        guard let center = screenPixel(
+            x: prospect.fixX + prospect.distance * cos(prospect.bearingMid),
+            z: prospect.fixZ + prospect.distance * sin(prospect.bearingMid),
+            size: size
+        ) else { return }
+        let radius = max(4, prospect.crumbRadius * camera.pxPerHex)
 
-        // Normalize the cone: shortest sweep, possibly wrapping ±π.
-        var lo = prospect.bearingLo
-        var hi = prospect.bearingHi
-        while hi < lo { hi += 2 * .pi }
-        var sweep = hi - lo
-        if sweep > .pi { sweep -= 2 * .pi }
-
-        if sweep > 0.02 {
-            // The bearing wedge: origin → lo ray → arc at the range → hi
-            // ray → closed. Rays are straight (short enough); the arc is
-            // sampled so the shear never bends it wrong.
-            var wedge = Path()
-            wedge.move(to: origin)
-            let steps = max(8, Int(prospect.distance / 2))
-            for i in 0...steps {
-                let d = prospect.distance * Double(i) / Double(steps)
-                if let p = point(bearing: lo, at: d) { wedge.addLine(to: p) }
-            }
-            let arcSteps = max(6, Int(abs(sweep) / 0.06))
-            for i in 1...arcSteps {
-                let a = lo + sweep * Double(i) / Double(arcSteps)
-                if let p = point(bearing: a, at: prospect.distance) { wedge.addLine(to: p) }
-            }
-            for i in stride(from: steps, through: 0, by: -1) {
-                let d = prospect.distance * Double(i) / Double(steps)
-                if let p = point(bearing: hi, at: d) { wedge.addLine(to: p) }
-            }
-            wedge.closeSubpath()
-            context.fill(wedge, with: .color(tint.opacity(0.14)))
-            context.stroke(wedge, with: .color(tint.opacity(0.55)), lineWidth: 1.2)
-        } else {
+        if prospect.isFinalStep {
             // Final step: one precise needle to the prize.
-            if let tip = point(bearing: lo, at: prospect.distance) {
-                var needle = Path()
-                needle.move(to: origin)
-                needle.addLine(to: tip)
-                context.stroke(
-                    needle,
-                    with: .color(tint.opacity(0.8)),
-                    style: StrokeStyle(lineWidth: 2, dash: [6, 5])
-                )
+            var needle = Path()
+            needle.move(to: origin)
+            needle.addLine(to: center)
+            context.stroke(
+                needle,
+                with: .color(tint.opacity(0.8)),
+                style: StrokeStyle(lineWidth: 2, dash: [6, 5])
+            )
+        } else {
+            // Crumb step: origin → tangent point → far arc of the circle →
+            // other tangent point → closed. Tangents only exist while the
+            // origin is outside the circle; at degenerate zoom the circle
+            // alone still reads.
+            let dx = Double(origin.x - center.x)
+            let dy = Double(origin.y - center.y)
+            let d = (dx * dx + dy * dy).squareRoot()
+            if d > radius + 1 {
+                // The tangent points sit ±β either side of the
+                // circle→origin bearing; the far arc is the long way
+                // around, away from the origin.
+                let beta = acos(min(1, radius / d))
+                let toOrigin = atan2(dy, dx)
+                let start = toOrigin + beta
+                let sweep = 2 * .pi - 2 * beta
+                var wedge = Path()
+                wedge.move(to: origin)
+                wedge.addLine(to: CGPoint(x: center.x + radius * cos(start), y: center.y + radius * sin(start)))
+                let arcSteps = max(8, Int(sweep / 0.06))
+                for i in 1...arcSteps {
+                    let a = start + sweep * Double(i) / Double(arcSteps)
+                    wedge.addLine(to: CGPoint(x: center.x + radius * cos(a), y: center.y + radius * sin(a)))
+                }
+                wedge.closeSubpath()
+                context.fill(wedge, with: .color(tint.opacity(0.14)))
+                context.stroke(wedge, with: .color(tint.opacity(0.55)), lineWidth: 1.2)
             }
         }
 
         // Target circle at the cone midline (the best point estimate).
-        let mid = lo + sweep / 2
-        if let center = point(bearing: mid, at: prospect.distance) {
-            let r = max(4, prospect.crumbRadius * camera.pxPerHex)
-            var circle = Path()
-            circle.addEllipse(in: CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2))
-            context.fill(circle, with: .color(tint.opacity(0.18)))
-            context.stroke(
-                circle,
-                with: .color(tint.opacity(0.9)),
-                style: StrokeStyle(lineWidth: 2, dash: [4, 4])
-            )
-        }
+        var circle = Path()
+        circle.addEllipse(in: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2))
+        context.fill(circle, with: .color(tint.opacity(0.18)))
+        context.stroke(
+            circle,
+            with: .color(tint.opacity(0.9)),
+            style: StrokeStyle(lineWidth: 2, dash: [4, 4])
+        )
     }
 
     static let prospectColor = Color(red: 0.72, green: 0.45, blue: 0.98)

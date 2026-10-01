@@ -179,8 +179,53 @@ import BSATN
         let rep = MapRep.from(ephemeral: change.ephemeralState ?? ephemeral)
         #expect(rep.prospect?.isFinalStep == true)
         #expect(rep.prospect?.bearingLo == rep.prospect?.bearingHi)
+        #expect(abs((rep.prospect?.bearingMid ?? 0) - (-2.951465)) < 1e-6)
         #expect(rep.prospect?.step == 4)
         #expect(rep.prospect?.totalSteps == 4)
+    }
+
+    /// The cone midline is the server's true bearing — the midpoint of the
+    /// *signed shortest* arc lo→hi. A cone straddling the ±π wrap (roughly
+    /// due map-west) must keep pointing west: rendered from a naive
+    /// (lo+hi)/2 or an unsigned sweep, these used to collapse into the
+    /// final step's single dashed needle on a crumb step (the "random
+    /// dashed line" bug).
+    @Test func westwardConeKeepsItsMidlineAcrossThePiWrap() {
+        let ephemeral = Self.sessionWithProspection()
+        let mutator = Intent.ProspectionChanged(events: [
+            .updated(try! ProspectingStateRow(reader: BSATNReader(data: Self.stateRow(
+                angles: [3.0, -3.0]
+            )))),
+        ])
+        let change = mutator.mutate(persistent: PersistentState(), ephemeral: ephemeral)
+        let prospect = MapRep.from(ephemeral: change.ephemeralState ?? ephemeral).prospect
+        #expect(prospect != nil)
+        #expect(prospect?.isFinalStep == false)
+        // Midline ≈ ±π (west), not the naive average 0 (east).
+        #expect(abs(abs(prospect!.bearingMid) - .pi) < 0.15)
+    }
+
+    @Test func coneMidlineIsTheArcMidpointForPlainCones() {
+        let ephemeral = Self.sessionWithProspection()
+        let mutator = Intent.ProspectionChanged(events: [
+            .updated(try! ProspectingStateRow(reader: BSATNReader(data: Self.stateRow()))),
+        ])
+        let change = mutator.mutate(persistent: PersistentState(), ephemeral: ephemeral)
+        let prospect = MapRep.from(ephemeral: change.ephemeralState ?? ephemeral).prospect
+        #expect(abs((prospect?.bearingMid ?? 0) - (-0.073060728)) < 1e-6)
+    }
+
+    @Test func emptyAnglesRenderNoProspect() {
+        let ephemeral = Self.sessionWithProspection()
+        let mutator = Intent.ProspectionChanged(events: [
+            .updated(try! ProspectingStateRow(reader: BSATNReader(data: Self.stateRow(
+                angles: []
+            )))),
+        ])
+        let change = mutator.mutate(persistent: PersistentState(), ephemeral: ephemeral)
+        // No angle = no direction to draw; a fallback bearing would point
+        // somewhere the trail doesn't.
+        #expect(MapRep.from(ephemeral: change.ephemeralState ?? ephemeral).prospect == nil)
     }
 
     @Test func prospectionFixStaysPutUntilTheNextFix() {

@@ -79,7 +79,10 @@ row is deleted on completion or abandonment.
 mirror (`relay.bitcraftsync.app:300<region>`, db `bitcraft-live-<region>`)
 — the mirror accepts anonymous reads even though the game's own servers do
 not. `MapRep.prospect` carries the cone + range and `MapScreen` renders the
-wedge, the range arc, and the crumb-radius circle at the cone midpoint.
+cone as two straight tangent lines from the fix origin to the crumb-radius
+circle at the midline bearing (`bearingMid` — the signed-shortest-arc
+midpoint of lo/hi, wrap-safe across ±π), or, on the final step, a dashed
+needle along the precise bearing.
 
 The fix origin matters: the server measured the bearing from where the
 player stood at `last_prospection_timestamp`, so the mutator captures the

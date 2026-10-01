@@ -47,6 +47,16 @@ public struct MapRep: Equatable, Sendable {
         /// bearing to the prize.
         public var bearingLo: Double
         public var bearingHi: Double
+
+        /// The cone's midline — the server's true bearing to the target.
+        /// Midpoint of the *signed shortest* arc lo→hi, so cones that
+        /// straddle ±π (roughly due map-west) keep pointing west instead
+        /// of flipping through east; on the final step (lo == hi) it is
+        /// the precise bearing itself.
+        public var bearingMid: Double {
+            let sweep = atan2(sin(bearingHi - bearingLo), cos(bearingHi - bearingLo))
+            return bearingLo + sweep / 2
+        }
         /// Player→target distance, world units.
         public var distance: Double
         /// Crumb acceptance radius (world units) — the target circle.
@@ -120,7 +130,12 @@ public struct MapRep: Equatable, Sendable {
         let prospect: Prospect?
         if session.prospection.isActive,
            let distance = session.prospection.toNextNode, distance > 0,
-           let fixX = session.prospection.fixX, let fixZ = session.prospection.fixZ {
+           let fixX = session.prospection.fixX, let fixZ = session.prospection.fixZ,
+           // An angle-less row has no direction to draw — the server
+           // always sends one (final) or two (cone); anything else is a
+           // decode anomaly, and a fallback bearing would point somewhere
+           // the trail doesn't.
+           !session.prospection.nextCrumbAngles.isEmpty {
             let angles = session.prospection.nextCrumbAngles
             let lo = angles.map(Double.init).min() ?? 0
             let hi = angles.map(Double.init).max() ?? 0
