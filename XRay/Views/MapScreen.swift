@@ -246,12 +246,19 @@ struct MapScreen: View {
                 let word = rep.words[(z - originZ) * width + (x - originX)]
                 guard word != 0 else { continue }
                 guard let center = screenPixel(x: Double(x), z: Double(z), size: size) else { continue }
-                let style = HexMapRenderer.tileStyle(word: word, x: x, z: z, terrain: rep.terrain, entries: rep.entries)
+                let style = HexMapRenderer.tileStyle(
+                    word: word, x: x, z: z, terrain: rep.terrain,
+                    entries: rep.entries, pavingEntries: rep.pavingEntries,
+                    pavingTiers: rep.pavingTiers
+                )
                 guard style != .uncharted else { continue }
                 var color = HexMapRenderer.color(style)
                 // Untracked resources fade while tracking is active (the
-                // web client's 10%-alpha treatment).
-                let resourceID = rep.entries[TileWord.dictIndex(word)]?.resourceID
+                // web client's 10%-alpha treatment). Paving is not part of
+                // resource tracking and never fades.
+                let resourceID = TileWord.isPaving(word)
+                    ? nil
+                    : rep.entries[TileWord.dictIndex(word)]?.resourceID
                 let faded = trackingActive && resourceID.map { !tracked.contains($0) } ?? false
                 if faded { color = color.opacity(0.1) }
                 var path = fills[color] ?? Path()
@@ -764,7 +771,19 @@ struct MapScreen: View {
 
     private func tileInfoCard(_ tile: TileCoordinate) -> some View {
         let word = rep.word(at: tile)
-        let entry = word.flatMap { TileWord.dictIndex($0) != 0 ? rep.entries[TileWord.dictIndex($0)] : nil }
+        let paving = word.map { TileWord.isPaving($0) && TileWord.dictIndex($0) != 0 } ?? false
+        // The bit-14 paving namespace has its own entry list — a paving
+        // word must never resolve through the resource entries.
+        let entry: ResourceDictionary.Entry? = word.flatMap { word in
+            let index = TileWord.dictIndex(word)
+            guard index != 0 else { return nil }
+            return TileWord.isPaving(word)
+                ? rep.pavingEntries[index]
+                : rep.entries[index]
+        }
+        let pavingTier = paving
+            ? (entry?.pavingTypeID).flatMap { rep.pavingTiers[$0] }
+            : nil
         let superOffset = SuperHexMath.tileToSuperOffset(x: tile.x, z: tile.z)
         let terrain = rep.terrain?.cell(atTileX: tile.x, z: tile.z)
         // Wire format: dictionary index 0 — word 0 or water-only — means
@@ -773,12 +792,23 @@ struct MapScreen: View {
         // the loaded window.
         let fallbackTitle = word == nil
             ? "Outside map window"
-            : TileWord.dictIndex(word!) == 0 ? "Empty tile" : "Unknown resource"
+            : TileWord.dictIndex(word!) == 0 ? "Empty tile" : paving ? "Paved tile" : "Unknown resource"
 
         return VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(entry?.name ?? fallbackTitle)
                     .font(.subheadline.bold())
+                if let pavingTier {
+                    Text("T\(pavingTier)")
+                        .font(.caption2.bold().monospacedDigit())
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            (HexMapRenderer.tierPalette[pavingTier] ?? HexMapRenderer.untieredPavingColor)
+                                .opacity(0.35),
+                            in: Capsule()
+                        )
+                }
                 Spacer()
                 Text("N \(superOffset.z) · E \(superOffset.x)")
                     .font(.caption.monospacedDigit())
@@ -793,7 +823,7 @@ struct MapScreen: View {
                 .accessibilityLabel("Dismiss tile info")
             }
             HStack(spacing: 10) {
-                if let entry {
+                if let entry, entry.paving != true {
                     if entry.harvestable == true { Text("harvestable").font(.caption2) }
                     if let maxHealth = entry.maxHealth { Text("HP \(Int(maxHealth))").font(.caption2) }
                     if let respawn = entry.respawnTimeSecs, respawn > 0 {

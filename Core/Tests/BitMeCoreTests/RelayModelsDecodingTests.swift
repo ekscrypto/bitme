@@ -193,12 +193,16 @@ struct RelayModelsDecodingTests {
         #expect(rock.maxHealth == 5_000)
         #expect(rock.pavingTypeID == nil)
 
-        // Paving entries carry paving_type_id instead of resource fields.
-        let road = try #require(dictionary.entryByIndex[2])
+        // Paving entries carry paving_type_id instead of resource fields —
+        // and live in their own bit-14 index namespace (`pavingByIndex`),
+        // so equal indices across namespaces never collide.
+        let road = try #require(dictionary.pavingByIndex[2])
         #expect(road.paving == true)
         #expect(road.resourceID == nil)
         #expect(road.pavingTypeID == 895_904_764)
         #expect(road.harvestable == nil)
+        #expect(dictionary.entryByIndex[2] == nil)
+        #expect(dictionary.pavingByIndex.count == 1)
 
         let bush = try #require(dictionary.entryByIndex[3])
         #expect(bush.harvestable == true)

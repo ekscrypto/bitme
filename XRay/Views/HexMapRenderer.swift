@@ -73,23 +73,48 @@ enum HexMapRenderer {
     // MARK: - Tile styling
 
     /// How a tile renders. The BMR1 word is authoritative for *what* is on
-    /// the tile (resource / water flag); the BME1 plane supplies elevation
-    /// and water depth for the ramps.
+    /// the tile (resource / paving / water flags); the BME1 plane supplies
+    /// elevation and water depth for the ramps.
     enum TileStyle: Hashable {
         /// Resource hex colored by its (stable, golden-angle) id hue.
         case resource(Int)
+        /// Paved hex colored by paving tier (nil = untiered — special
+        /// pavement, or the catalog/tier isn't known yet).
+        case paving(tier: Int?)
         case water(depth: Int, known: Bool)
         case land(elevation: Int16)
         /// No terrain behind this tile yet — leave the void background.
         case uncharted
     }
 
+    /// The game's item-tier ladder T1–T10, sampled from the client's
+    /// per-tier paving artwork (`T?StonePaving` texture arrays — see
+    /// docs/client-assets.md; the paving type names follow the same ladder:
+    /// Gray, Orange, Green, Blue, Purple, Red, Yellow, Teal, Black, White).
+    static let tierPalette: [Int: Color] = [
+        1: Color(red: 0x89 / 255, green: 0x94 / 255, blue: 0x9A / 255),
+        2: Color(red: 0xA6 / 255, green: 0x81 / 255, blue: 0x6B / 255),
+        3: Color(red: 0x84 / 255, green: 0x93 / 255, blue: 0x7A / 255),
+        4: Color(red: 0x7A / 255, green: 0x8A / 255, blue: 0xA6 / 255),
+        5: Color(red: 0x8E / 255, green: 0x6B / 255, blue: 0x81 / 255),
+        6: Color(red: 0x96 / 255, green: 0x69 / 255, blue: 0x63 / 255),
+        7: Color(red: 0xB0 / 255, green: 0xA1 / 255, blue: 0x73 / 255),
+        8: Color(red: 0x76 / 255, green: 0x9E / 255, blue: 0x9E / 255),
+        9: Color(red: 0x54 / 255, green: 0x5B / 255, blue: 0x62 / 255),
+        10: Color(red: 0xC7 / 255, green: 0xDE / 255, blue: 0xE9 / 255),
+    ]
+
+    /// Untiered pavement (confetti, hay, …) and not-yet-resolved tiers.
+    static let untieredPavingColor = Color(red: 0x3D / 255, green: 0x52 / 255, blue: 0x6B / 255)
+
     static func tileStyle(
         word: UInt16,
         x: Int,
         z: Int,
         terrain: TerrainPlane?,
-        entries: [Int: ResourceDictionary.Entry]
+        entries: [Int: ResourceDictionary.Entry],
+        pavingEntries: [Int: ResourceDictionary.Entry] = [:],
+        pavingTiers: [Int: Int] = [:]
     ) -> TileStyle {
         let index = TileWord.dictIndex(word)
         let cell = terrain?.cell(atTileX: x, z: z)
@@ -98,6 +123,12 @@ enum HexMapRenderer {
         if TileWord.hasResource(word), !TileWord.isWater(word),
            let entry = entries[index], let resourceID = entry.resourceID {
             return .resource(resourceID)
+        }
+        if TileWord.isPaving(word) {
+            // Bits 0–9 are the paving-namespace index; the entry carries the
+            // paving type whose tier (global catalog) picks the fill color.
+            let typeID = pavingEntries[index]?.pavingTypeID
+            return .paving(tier: typeID.flatMap { pavingTiers[$0] })
         }
         if TileWord.isWater(word) {
             if let cell = liveCell, cell.waterLevel != TerrainPlane.waterNone {
@@ -115,6 +146,8 @@ enum HexMapRenderer {
         switch style {
         case .resource(let resourceID):
             return Color(resourceID: resourceID)
+        case .paving(let tier):
+            return tier.flatMap { tierPalette[$0] } ?? untieredPavingColor
         case .water(let depth, _):
             let t = clamp01(Double(depth) / 40)
             return Color(hue: 210 / 360, saturation: (52 + t * 16) / 100, brightness: (34 - t * 20) / 100)
@@ -179,7 +212,11 @@ enum HexMapBitmap {
                     guard word != 0 else { continue }
                     let x = originX + c
                     let z = originZ + r
-                    let style = HexMapRenderer.tileStyle(word: word, x: x, z: z, terrain: rep.terrain, entries: rep.entries)
+                    let style = HexMapRenderer.tileStyle(
+                        word: word, x: x, z: z, terrain: rep.terrain,
+                        entries: rep.entries, pavingEntries: rep.pavingEntries,
+                        pavingTiers: rep.pavingTiers
+                    )
                     guard style != .uncharted else { continue }
                     // Untracked resources fade while tracking is active.
                     let faded: Bool

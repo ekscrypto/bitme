@@ -56,10 +56,39 @@ Smithing, Survival, Tailoring, Trading (+ a generic "Any" icon), as
 
 ### Tier & rarity palette
 
-Sampled from the extracted `Fill_SQ_Tier*` and `Frame_SQ_BDG_*` art (the PNGs
-are authoritative; these hexes are for code/UI styling):
+**Item tiers run T1–T10** (confirmed in game data: `item_desc.tier` values
+1–10, −1 untiered, plus stray −3/0 specials like *Salvaged Pirate's Weapon*).
+The client has no `Tier7..10` fill sprites — the true T1–T10 palette is baked
+into the per-tier paving artwork (`Texture2DArray` assets `T1..T10
+StonePaving` / `GravelPavement` / `BricksPavement` in the addressables
+bundle). Sampled from the `T?StonePaving` slice-0 average (the PNGs are
+authoritative; these hexes are for code/UI styling):
 
-| Tier fill | Hex | | Rarity badge | Hex |
+| Tier | Hex | Reads as |
+|---|---|---|
+| T1 | `#89949A` | grey |
+| T2 | `#A6816B` | orangish earth |
+| T3 | `#84937A` | pastel green |
+| T4 | `#7A8AA6` | gem blue |
+| T5 | `#8E6B81` | magenta-ish |
+| T6 | `#966963` | pink-ish |
+| T7 | `#B0A173` | yellow-like |
+| T8 | `#769E9E` | pastel cyan |
+| T9 | `#545B62` | dark grey, almost black |
+| T10 | `#C7DEE9` | white-ish |
+| Untiered | `#3D526B` | (from the fill sprite below) |
+
+Saturated per-tier accents also exist as `StarstoneTrail_T1..T11` materials
+(`_BaseColor`: T2 `#FF4000`, T3 `#00FF00`, T4 `#002AFF`, T5 `#9900FF`,
+T6 `#FF0004`, T7 `#FFD500`, T8 `#00FF90`), but T1/T10 are plain white and T9
+duplicates T4's blue — the paving artwork is the consistent T1–T10 ladder.
+
+Separately, the extracted `Fill_SQ_Tier1..6` + `Untiered` and
+`Frame_SQ_BDG_*` art (`GameAssets/frames/`) is the **entity-container**
+6-tier ladder — storage chests run `ChestStoneT1..T6`, for example — *not*
+the item tier palette:
+
+| Container fill | Hex | | Rarity badge | Hex |
 |---|---|---|---|---|
 | Tier 1 | `#788DA5` | | Common | `#53677C` |
 | Tier 2 | `#008A64` | | Uncommon | `#855C51` |
@@ -70,9 +99,7 @@ are authoritative; these hexes are for code/UI styling):
 | Untiered | `#3D526B` | | | |
 
 Each frame/fill exists in square (`SQ`) and hex (`HX`) variants, plus
-`Fill_Pointlight_Tier*` glow sprites. Note the UI tier ladder is 6 tiers;
-item names go up to T10 (e.g. `Belt_Duelist_T10`) — higher-numbered gear
-recycles the 6-step palette.
+`Fill_Pointlight_Tier*` glow sprites.
 
 ## Mapping to our data
 
@@ -95,6 +122,11 @@ Steam rewrites the bundle; re-run the extractor and commit in
 cd tools/asset-extraction
 .venv/bin/python extract_assets.py   # writes bitme-resources/GameAssets/
 ```
+
+To re-sample the tier palette, decode the `T?StonePaving` Texture2DArrays
+from the bundle with UnityPy (data is in the streamed archive — fetch via
+`get_resource_data(m_StreamData.…)`; UnityPy's `.images` property silently
+returns empty when `image_data` is `b""`) and average slice 0 per tier.
 
 After a game update, also re-verify schema-dependent assumptions per
 [AGENTS.md](../AGENTS.md) (the client and the region DBs move together).

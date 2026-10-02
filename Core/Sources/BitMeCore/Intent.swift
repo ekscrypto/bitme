@@ -179,6 +179,12 @@ extension Intent {
 
     struct GamedataLoaded: Sendable {
         let gamedata: FoodBuffGamedata?
+        let paving: PavingCatalog?
+
+        init(gamedata: FoodBuffGamedata?, paving: PavingCatalog? = nil) {
+            self.gamedata = gamedata
+            self.paving = paving
+        }
     }
 
     struct SessionPolled: Sendable {
@@ -468,6 +474,14 @@ extension Intent.GamedataLoaded: StateMutator {
     func mutate(persistent: PersistentState, ephemeral: EphemeralState) -> StateChange {
         var ephemeral = ephemeral
         ephemeral.gamedata = gamedata
+        // A changed paving catalog recolors paved tiles — bump the map's
+        // tile version so renderers invalidate their prerender caches.
+        if ephemeral.pavingCatalog != paving {
+            ephemeral.pavingCatalog = paving
+            if ephemeral.session != nil {
+                ephemeral.session?.resourceMap.tileVersion += 1
+            }
+        }
         return StateChange(ephemeral: ephemeral)
     }
 }
@@ -640,6 +654,7 @@ extension Intent.ResourceDictionaryLoaded: StateMutator {
         guard dictionary.ready, dictionary.region == region else { return .noChange }
         session.resourceMap.dictionary = dictionary
         session.resourceMap.entryByIndex = dictionary.entryByIndex
+        session.resourceMap.pavingByIndex = dictionary.pavingByIndex
         session.resourceMap.tileVersion += 1
         ephemeral.session = session
         return StateChange(ephemeral: ephemeral)

@@ -73,8 +73,15 @@ public struct MapRep: Equatable, Sendable {
     public var originZ: Int?
     public var width: Int?
     public var words: [UInt16]
-    /// Dictionary index → entry (identity for coloring/naming tiles).
+    /// Dictionary index → resource entry (identity for coloring/naming
+    /// resource tiles).
     public var entries: [Int: ResourceDictionary.Entry]
+    /// Dictionary index → paving entry (the bit-14 namespace — indices are
+    /// independent of `entries`).
+    public var pavingEntries: [Int: ResourceDictionary.Entry]
+    /// `paving_type_id` → tier (1–10) from the global paving catalog; a
+    /// paved tile whose type is absent renders untiered.
+    public var pavingTiers: [Int: Int]
     /// Dictionary index → populated resource tiles in the window (the
     /// filter panel's nearby counts).
     public var tally: [Int: Int]
@@ -95,7 +102,8 @@ public struct MapRep: Equatable, Sendable {
 
     public static let empty = MapRep(
         region: nil, originX: nil, originZ: nil, width: nil, words: [],
-        entries: [:], tally: [:], terrain: nil, anchorX: nil, anchorZ: nil,
+        entries: [:], pavingEntries: [:], pavingTiers: [:], tally: [:],
+        terrain: nil, anchorX: nil, anchorZ: nil,
         populatedTiles: 0, stream: .off, player: nil, target: nil,
         prospect: nil, tileVersion: 0
     )
@@ -169,6 +177,8 @@ public struct MapRep: Equatable, Sendable {
             width: map.window?.width,
             words: map.window?.words ?? [],
             entries: map.entryByIndex ?? [:],
+            pavingEntries: map.pavingByIndex ?? [:],
+            pavingTiers: ephemeral.pavingCatalog?.tiers ?? [:],
             tally: map.tally,
             terrain: map.terrain,
             anchorX: map.anchorX,

@@ -350,9 +350,16 @@ public struct ResourceDictionary: Codable, Equatable, Sendable {
         self.entries = entries
     }
 
-    /// Index → entry lookup (indices are unique within a dictionary).
+    /// Index → resource entry lookup. Resource and paving entries share the
+    /// 10-bit index space (tile words disambiguate via bit 14), so this map
+    /// covers only resource entries — use `pavingByIndex` for paving words.
     public var entryByIndex: [Int: Entry] {
-        Dictionary(entries.map { ($0.index, $0) }, uniquingKeysWith: { first, _ in first })
+        Dictionary(entries.filter { $0.paving != true }.map { ($0.index, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    /// Index → paving entry lookup (the bit-14 namespace's own list).
+    public var pavingByIndex: [Int: Entry] {
+        Dictionary(entries.filter { $0.paving == true }.map { ($0.index, $0) }, uniquingKeysWith: { first, _ in first })
     }
 }
 

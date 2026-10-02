@@ -961,6 +961,37 @@ struct StateMachineTests {
         #expect(session.resourceMap.nearby.isEmpty == false)
         await machine.ingest(Intent.SignOut()) // retire the loops
     }
+
+    // MARK: - Paving catalog
+
+    /// `GamedataLoaded` carries the paving tier catalog; a *changed* catalog
+    /// must bump the map's tile version (prerendered bitmaps are keyed on
+    /// it — paved tiles recolor), while a repeat load of the same catalog
+    /// must not.
+    @Test func gamedataLoadedStoresPavingCatalogAndInvalidatesPrerender() {
+        let catalog = PavingCatalog(tiers: [1_408_958_051: 4], fetchedAt: .now)
+
+        // No session yet: the catalog lands, there is nothing to invalidate.
+        var ephemeral = EphemeralState()
+        let first = Intent.GamedataLoaded(gamedata: nil, paving: catalog)
+            .mutate(persistent: PersistentState(), ephemeral: ephemeral)
+        #expect(first.ephemeralState?.pavingCatalog == catalog)
+
+        // With a live session: tile version bumps once for the new catalog…
+        var session = EphemeralState.Session(
+            entityID: "1000", loop: CancellableTask(), streamLoop: CancellableTask()
+        )
+        session.resourceMap.tileVersion = 7
+        ephemeral.session = session
+        let second = Intent.GamedataLoaded(gamedata: nil, paving: catalog)
+            .mutate(persistent: PersistentState(), ephemeral: ephemeral)
+        #expect(second.ephemeralState?.session?.resourceMap.tileVersion == 8)
+
+        // …and not again for the identical catalog.
+        let third = Intent.GamedataLoaded(gamedata: nil, paving: catalog)
+            .mutate(persistent: PersistentState(), ephemeral: second.ephemeralState ?? ephemeral)
+        #expect(third.ephemeralState?.session?.resourceMap.tileVersion == 8)
+    }
 }
 
 

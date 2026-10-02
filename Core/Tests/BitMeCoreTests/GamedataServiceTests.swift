@@ -135,4 +135,47 @@ struct GamedataServiceTests {
             at: url.deletingLastPathComponent().appendingPathComponent("does-not-exist.json")
         ) == nil)
     }
+
+    // MARK: - Paving catalog
+
+    /// Live `paving_tile_desc` shapes (captured 2026-10-01 from
+    /// `bitcraft-live-global` via /roads/paving-types): tiered types run
+    /// 1–10; special pavement (confetti, hay) carries tier -1 — those and
+    /// missing/zero tiers must drop out of the catalog, not render as T0.
+    @Test func pavingRowsDecodeAndTierFilterApplies() throws {
+        let rows = try JSONDecoder().decode([PavingTileDescRow].self, from: Data(#"""
+        [
+          {"id": 369582221, "name": "Cobblestone (Gray)", "tier": 1},
+          {"id": 1408958051, "name": "Stone Tile (Blue)", "tier": 4},
+          {"id": 1286087168, "name": "Stone Tile (White)", "tier": 10},
+          {"id": 1913042228, "name": "Black Confetti Pavement", "tier": -1},
+          {"id": 132592403, "name": "Hay Paving", "tier": -1},
+          {"id": 555, "name": "Unstreamed type"}
+        ]
+        """#.utf8))
+
+        var tiers: [Int: Int] = [:]
+        for row in rows where (row.tier ?? 0) > 0 {
+            tiers[row.id] = row.tier
+        }
+        #expect(tiers == [369_582_221: 1, 1_408_958_051: 4, 1_286_087_168: 10])
+        #expect(tiers[1_913_042_228] == nil) // confetti — untiered
+        #expect(tiers[555] == nil)           // tier missing entirely
+    }
+
+    @Test func pavingCatalogCacheRoundTripAndStaleness() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bitme-test-paving-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let original = PavingCatalog(
+            tiers: [1_408_958_051: 4, 1_286_087_168: 10],
+            fetchedAt: Date(timeIntervalSinceNow: -PavingCatalog.ttl - 60)
+        )
+        GamedataService.writePavingCache(original, at: url)
+        #expect(GamedataService.cachedPavingCatalog(at: url) == original)
+        #expect(original.isStale()) // past the 48 h TTL
+
+        #expect(!PavingCatalog(tiers: [:], fetchedAt: .now).isStale())
+    }
 }

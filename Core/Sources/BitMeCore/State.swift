@@ -38,6 +38,8 @@ struct EphemeralState: Sendable {
     var resolveError: String?
     var resolvedOfflineHint = false
     var gamedata: FoodBuffGamedata?
+    /// Global paving catalog (paving_type_id → tier) — recolors paved tiles.
+    var pavingCatalog: PavingCatalog?
     var session: Session?
     /// Seeded once from `StateMachine.Configuration`; mutators gate the
     /// resource-map activities on it. Apps share one value for their whole
@@ -375,8 +377,10 @@ struct EphemeralState: Sendable {
             /// stacking a second one.
             var fetchInFlight = false
             var dictionary: ResourceDictionary?
-            /// `dictionary`'s index lookup, derived once on load.
+            /// `dictionary`'s resource-namespace index lookup, derived once on load.
             var entryByIndex: [Int: ResourceDictionary.Entry]?
+            /// `dictionary`'s paving-namespace index lookup (bit-14 words).
+            var pavingByIndex: [Int: ResourceDictionary.Entry]?
             /// BME1 terrain plane behind the window (renderer background).
             var terrain: TerrainPlane?
             /// Local-clock ms of the terrain fetch (10 min TTL guidance).

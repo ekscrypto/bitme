@@ -160,6 +160,54 @@ public struct BuffInfo: Codable, Equatable, Sendable {
     }
 }
 
+/// The global `paving_tile_desc` catalog, reduced to what the map needs:
+/// `paving_type_id` → tier for coloring paved tiles (the tier ladder is
+/// T1–T10; special pavement — confetti, hay — carries tier ≤ 0 and renders
+/// untiered). Same fetch/cache policy as the food-buff gamedata: static
+/// global data, live fetch, 48 h on-disk cache, stale beats absent.
+public struct PavingCatalog: Codable, Equatable, Sendable {
+    public static let ttl: TimeInterval = 48 * 60 * 60
+
+    /// `paving_tile_desc.id` → tier (tiers ≤ 0 are omitted — untiered).
+    public let tiers: [Int: Int]
+    public let fetchedAt: Date
+
+    public init(tiers: [Int: Int], fetchedAt: Date) {
+        self.tiers = tiers
+        self.fetchedAt = fetchedAt
+    }
+
+    public func isStale(now: Date = .now) -> Bool {
+        now.timeIntervalSince(fetchedAt) >= PavingCatalog.ttl
+    }
+}
+
+/// One `paving_tile_desc` row off the mirror WebSocket.
+struct PavingTileDescRow: Decodable, Equatable, Sendable {
+    let id: Int
+    let name: String?
+    let tier: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case tier
+    }
+
+    init(id: Int, name: String? = nil, tier: Int? = nil) {
+        self.id = id
+        self.name = name
+        self.tier = tier
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(Int.self, forKey: .id)
+        name = try container.decodeIfPresent(String.self, forKey: .name)
+        tier = try container.decodeIfPresent(Int.self, forKey: .tier)
+    }
+}
+
 public enum GamedataService {
     public static let client = SpacetimeSubscribeClient(
         hostPort: "relay.bitcraftsync.app:3000",
@@ -170,6 +218,39 @@ public enum GamedataService {
         FileManager.default
             .urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("bitme-food-buff-gamedata.json")
+    }
+
+    public static var pavingCacheURL: URL {
+        FileManager.default
+            .urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("bitme-paving-catalog.json")
+    }
+
+    /// Cache-first over `paving_tile_desc` (public global table) — same
+    /// policy as `loadFoodBuffGamedata`: fresh cache wins, fetch failures
+    /// fall back to the stale cache.
+    public static func loadPavingCatalog(now: Date = .now) async -> PavingCatalog? {
+        let cached = cachedPavingCatalog()
+        if let cached, !cached.isStale(now: now) {
+            return cached
+        }
+        do {
+            gamedataLog.info("fetching paving catalog over mirror WS…")
+            let rows = try await client.fetchRows(tables: ["paving_tile_desc"])
+            let decoded = try rows["paving_tile_desc", default: []]
+                .map { try JSONDecoder().decode(PavingTileDescRow.self, from: $0) }
+            var tiers: [Int: Int] = [:]
+            for row in decoded where (row.tier ?? 0) > 0 {
+                tiers[row.id] = row.tier
+            }
+            let fresh = PavingCatalog(tiers: tiers, fetchedAt: .now)
+            writePavingCache(fresh)
+            gamedataLog.info("paving catalog fetched: \(tiers.count) tiered types")
+            return fresh
+        } catch {
+            gamedataLog.error("paving fetch failed: \(String(describing: error), privacy: .public); cached=\(cached != nil)")
+            return cached
+        }
     }
 
     /// Cache-first: return the cached set when fresh; otherwise fetch over
@@ -219,6 +300,16 @@ public enum GamedataService {
 
     public static func writeCache(_ gamedata: FoodBuffGamedata, at url: URL = cacheURL) {
         guard let data = try? JSONEncoder().encode(gamedata) else { return }
+        try? data.write(to: url, options: .atomic)
+    }
+
+    public static func cachedPavingCatalog(at url: URL = pavingCacheURL) -> PavingCatalog? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(PavingCatalog.self, from: data)
+    }
+
+    public static func writePavingCache(_ catalog: PavingCatalog, at url: URL = pavingCacheURL) {
+        guard let data = try? JSONEncoder().encode(catalog) else { return }
         try? data.write(to: url, options: .atomic)
     }
 }

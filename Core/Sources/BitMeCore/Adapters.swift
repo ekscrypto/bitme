@@ -162,6 +162,9 @@ public struct Adapters: Sendable {
     /// Food-buff gamedata over the mirror WebSocket, 48 h cached. Failing
     /// adapters return the stale cache (or nil) instead of throwing.
     public let loadFoodBuffGamedata: @Sendable () async -> FoodBuffGamedata?
+    /// Paving tier catalog (`paving_tile_desc`) over the mirror WebSocket,
+    /// 48 h cached; nil on failure (paved tiles render untiered).
+    public let loadPavingCatalog: @Sendable () async -> PavingCatalog?
     /// Identity persistence (nil deletes). Called on the serial actor after
     /// every persistent mutation.
     public let restoreIdentity: @Sendable () async -> StoredIdentity?
@@ -177,6 +180,7 @@ public struct Adapters: Sendable {
         relay: Relay,
         bitCraft: BitCraft,
         loadFoodBuffGamedata: @escaping @Sendable () async -> FoodBuffGamedata?,
+        loadPavingCatalog: @escaping @Sendable () async -> PavingCatalog? = { nil },
         restoreIdentity: @escaping @Sendable () async -> StoredIdentity?,
         persistIdentity: @escaping @Sendable (StoredIdentity?) async -> Void,
         restoreBitCraftAccount: @escaping @Sendable () async -> BitCraftAccount?,
@@ -186,6 +190,7 @@ public struct Adapters: Sendable {
         self.relay = relay
         self.bitCraft = bitCraft
         self.loadFoodBuffGamedata = loadFoodBuffGamedata
+        self.loadPavingCatalog = loadPavingCatalog
         self.restoreIdentity = restoreIdentity
         self.persistIdentity = persistIdentity
         self.restoreBitCraftAccount = restoreBitCraftAccount
@@ -276,6 +281,7 @@ public struct Adapters: Sendable {
                 }
             ),
             loadFoodBuffGamedata: { await GamedataService.loadFoodBuffGamedata() },
+            loadPavingCatalog: { await GamedataService.loadPavingCatalog() },
             restoreIdentity: { Self.restoreIdentity() },
             persistIdentity: { Self.persistIdentity($0) },
             restoreBitCraftAccount: {

@@ -147,8 +147,12 @@ extension Activity {
 
 extension Activity.LoadGamedata: AsyncActivity {
     func start(ingestor: IntentIngestor, adapters: Adapters) async {
-        let gamedata = await adapters.loadFoodBuffGamedata()
-        await ingestor.ingest(Intent.GamedataLoaded(gamedata: gamedata))
+        async let gamedata = adapters.loadFoodBuffGamedata()
+        async let paving = adapters.loadPavingCatalog()
+        await ingestor.ingest(Intent.GamedataLoaded(
+            gamedata: await gamedata,
+            paving: await paving
+        ))
     }
 }
 
