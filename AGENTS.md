@@ -42,7 +42,7 @@ Key documents in the workspace root:
 ### `relay-bitcraftsync-app/spacetimedb-bitcraft-mirror` — the relay itself
 
 A purpose-built fork of SpacetimeDB (pinned to the v2.7.1 lineage the
-BitCraft edge speaks) that mirrors all `bitcraft-live-*` region databases in
+BitCraft edge speaks) that mirrors all `idc-*` region databases in
 one process, with the embedded `relay-cache` serving the Bit-Me HTTP API.
 
 - `crates/relay-cache/BITME-API.md` — **authoritative Bit-Me API reference**;

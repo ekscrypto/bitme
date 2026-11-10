@@ -139,12 +139,12 @@ struct BitCraftAuthClientTests {
 
     @Test func connectionInfoDecodesCapturedShape() async throws {
         StubURLProtocol.handler = { _ in
-            (200, Data(#"{"uri":"https://bitcraft-early-access.spacetimedb.com","name":"bitcraft-live-global"}"#.utf8))
+            (200, Data(#"{"uri":"https://bitcraft-release.spacetimedb.com","name":"idc-global"}"#.utf8))
         }
         let info = try await Self.client.connectionInfo()
         #expect(info == BitCraftConnectionInfo(
-            uri: "https://bitcraft-early-access.spacetimedb.com",
-            name: "bitcraft-live-global"
+            uri: "https://bitcraft-release.spacetimedb.com",
+            name: "idc-global"
         ))
     }
 

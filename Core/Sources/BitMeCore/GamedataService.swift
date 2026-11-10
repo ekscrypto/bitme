@@ -211,7 +211,7 @@ struct PavingTileDescRow: Decodable, Equatable, Sendable {
 public enum GamedataService {
     public static let client = SpacetimeSubscribeClient(
         hostPort: "relay.bitcraftsync.app:3000",
-        database: "bitcraft-live-global"
+        database: "idc-global"
     )
 
     public static var cacheURL: URL {

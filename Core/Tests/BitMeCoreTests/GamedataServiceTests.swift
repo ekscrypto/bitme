@@ -3,7 +3,7 @@ import Foundation
 @testable import BitMeCore
 
 /// GamedataService pieces: wire-row decoding, food classification against
-/// real live rows (captured 2026-09-05 from `bitcraft-live-global`), 48 h
+/// real live rows (captured 2026-09-05 from `idc-global`), 48 h
 /// cache staleness, and cache round-trip.
 struct GamedataServiceTests {
 
@@ -139,7 +139,7 @@ struct GamedataServiceTests {
     // MARK: - Paving catalog
 
     /// Live `paving_tile_desc` shapes (captured 2026-10-01 from
-    /// `bitcraft-live-global` via /roads/paving-types): tiered types run
+    /// `idc-global` via /roads/paving-types): tiered types run
     /// 1–10; special pavement (confetti, hay) carries tier -1 — those and
     /// missing/zero tiers must drop out of the catalog, not render as T0.
     @Test func pavingRowsDecodeAndTierFilterApplies() throws {

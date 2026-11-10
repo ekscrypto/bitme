@@ -74,14 +74,20 @@ public enum GlobalSessionEvent: Equatable, Sendable {
 
 /// The account's game session: connections to the game's databases that
 /// sign the account in and hold open. The desktop client holds **two
-/// legs** — `bitcraft-live-global` (social/presence) and its region shard
-/// `bitcraft-live-<N>` (gameplay) — calling `sign_in` on each. The
+/// legs** — `idc-global` (social/presence) and its region shard
+/// `idc-<N>` (gameplay) — calling `sign_in` on each. The
 /// one-session slot is enforced per database: presence
 /// (`signed_in_player_state`) is keyed by the `owner_entity_id`, clients
 /// validate against it, and a `sign_in` on a leg takes that leg's slot.
 /// Signing in on the shard is what contests an active gameplay session;
 /// global-only leaves the other device playing (verified live, 2026-09-26).
 struct GlobalSessionClient: Sendable {
+    /// Game database names (1.0 release fleet). Verified 2026-11-10 from
+    /// 1.0 `region_connection_info`: every region row is `idc-{N}` on
+    /// `https://bitcraft-release.spacetimedb.com`; the auth discovery
+    /// endpoint advertises the global leg (`get-connection-info` → `name`).
+    static let globalDatabase = "idc-global"
+
     /// The `sign_in` argument: `owner_entity_id` — the account's user
     /// entity from `user_state` (`AccountPlayer.entityID`). Verified
     /// against the 2026-09-25 tap capture: the desktop's 8 BSATN bytes are
@@ -94,9 +100,9 @@ struct GlobalSessionClient: Sendable {
     /// Database names for the session's legs: the global DB plus the
     /// account's region shard when one is known.
     static func databases(regionID: Int?) -> [String] {
-        var names = ["bitcraft-live-global"]
+        var names = [globalDatabase]
         if let regionID {
-            names.append("bitcraft-live-\(regionID)")
+            names.append("idc-\(regionID)")
         }
         return names
     }
@@ -158,10 +164,10 @@ struct GlobalSessionClient: Sendable {
                 // first, then the best-effort global leg.
                 var legs: [(database: String, loadBearing: Bool)] = []
                 if let regionID {
-                    legs.append(("bitcraft-live-\(regionID)", true))
+                    legs.append(("idc-\(regionID)", true))
                 }
                 if !skipGlobal {
-                    legs.append(("bitcraft-live-global", regionID == nil))
+                    legs.append((Self.globalDatabase, regionID == nil))
                 }
 
                 var clients: [SpacetimeDBClient] = []
@@ -175,12 +181,12 @@ struct GlobalSessionClient: Sendable {
                         let client = try await connectLeg(
                             host: connection.uri, database: leg.database,
                             token: token, arguments: arguments,
-                            queueIdentityHex: leg.database == "bitcraft-live-global" ? nil : queueIdentityHex
+                            queueIdentityHex: leg.database == Self.globalDatabase ? nil : queueIdentityHex
                         )
                         clients.append(client)
                         openLegs.append((client, leg.loadBearing))
                         if leg.loadBearing {
-                            if leg.database != "bitcraft-live-global" {
+                            if leg.database != Self.globalDatabase {
                                 // The shard leg is live: hand it to the machine
                                 // so the claim-buildings sync can ride it.
                                 coreLog.info("game session: region leg live — starting the claim-buildings sync")

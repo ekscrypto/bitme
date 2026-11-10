@@ -9,7 +9,7 @@ BitCraft client ──HTTP──▶ 127.0.0.1:8443 ──HTTPS──▶ api.bitc
                           (logged; SpacetimeDB URIs in responses rewritten
                            to ws://127.0.0.1:9443)
 
-BitCraft client ──ws://──▶ 127.0.0.1:9443 ──wss://──▶ bitcraft-early-access.spacetimedb.com
+BitCraft client ──ws://──▶ 127.0.0.1:9443 ──wss://──▶ bitcraft-release.spacetimedb.com
                           (frames recorded both directions, forwarded verbatim)
 ```
 
@@ -43,7 +43,7 @@ since modifying bundle contents invalidates the signature.
 
 The WebSocket rewrite happens automatically in two places:
 
-1. **API responses**: any `wss://bitcraft-early-access.spacetimedb.com` URI
+1. **API responses**: any `wss://bitcraft-release.spacetimedb.com` URI
    the API returns is rewritten to the local forwarder before the client
    sees it (covers `/global-module/get-connection-info`, hence the global
    leg). `server.log` notes bare occurrences of the hostname so a new
@@ -63,7 +63,7 @@ The WebSocket rewrite happens automatically in two places:
 ```sh
 node decode.js captures/<session>            # all connections: summary + timeline
 node decode.js captures/<session> 3          # just conn-03
-node decode.js captures/<session> --scan bitcraft-live   # find frames containing text
+node decode.js captures/<session> --scan idc-   # find frames containing text
 ```
 
 Writes `conn-NN/decoded.jsonl` (every message structured: subscriptions with

@@ -16,8 +16,8 @@ struct RelayModelsDecodingTests {
       "identity": "c2003111fc31ca323b17ed6063f1522a6a446f1384d78eadb23449b6cb9ce4a6",
       "region_id": 7,
       "region_name": "Virexal",
-      "host": "https://bitcraft-early-access.spacetimedb.com",
-      "module": "bitcraft-live-7",
+      "host": "https://bitcraft-release.spacetimedb.com",
+      "module": "idc-7",
       "signed_in": true
     }
     """

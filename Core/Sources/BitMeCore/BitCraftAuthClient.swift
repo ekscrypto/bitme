@@ -66,7 +66,7 @@ struct BitCraftAuthClient: Sendable {
     // MARK: - GET /global-module/get-connection-info
 
     /// Unauthenticated: where the game's global database lives
-    /// (`{"uri": "https://…spacetimedb.com", "name": "bitcraft-live-global"}`).
+    /// (`{"uri": "https://…spacetimedb.com", "name": "idc-global"}`).
     func connectionInfo() async throws -> BitCraftConnectionInfo {
         let url = try url(path: "/global-module/get-connection-info", query: [])
         let (data, response) = try await urlSession.data(from: url)

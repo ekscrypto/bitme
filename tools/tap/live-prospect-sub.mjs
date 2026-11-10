@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 
-const url = 'wss://relay.bitcraftsync.app:3000/v1/database/bitcraft-live-14/subscribe';
+const url = 'wss://relay.bitcraftsync.app:3000/v1/database/idc-14/subscribe';
 const ws = new WebSocket(url, ['v1.json.spacetimedb']);
 const queries = [
   'SELECT * FROM prospecting_state',

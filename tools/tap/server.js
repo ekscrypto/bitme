@@ -4,7 +4,7 @@
 //   BitCraft client ──HTTP──▶ 127.0.0.1:8443 ──HTTPS──▶ api.bitcraftonline.com
 //                              (logged, SpacetimeDB URI rewritten to localhost)
 //
-//   BitCraft client ──ws://──▶ 127.0.0.1:9443 ──wss://──▶ bitcraft-early-access.spacetimedb.com
+//   BitCraft client ──ws://──▶ 127.0.0.1:9443 ──wss://──▶ bitcraft-release.spacetimedb.com
 //                              (every frame recorded, both directions, verbatim passthrough)
 //
 // Captures land in captures/<session>/:
@@ -30,7 +30,7 @@ const CFG = {
   apiPort: parseInt(process.env.TAP_API_PORT || '8443', 10),
   wsPort: parseInt(process.env.TAP_WS_PORT || '9443', 10),
   upstreamApi: process.env.TAP_UPSTREAM_API || 'https://api.bitcraftonline.com',
-  upstreamWsHost: process.env.TAP_UPSTREAM_WS_HOST || 'bitcraft-early-access.spacetimedb.com',
+  upstreamWsHost: process.env.TAP_UPSTREAM_WS_HOST || 'bitcraft-release.spacetimedb.com',
   session: new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19),
 };
 
@@ -103,7 +103,7 @@ function redactUrl(u) {
 // Rule 1: full wss:// URIs anywhere in API response bodies.
 const WSS_URI_RE = new RegExp(`wss://${CFG.upstreamWsHost.replace(/\./g, '\\.')}(?::443)?`, 'g');
 // Rule 2: the game-server address as delivered by /global-module/get-connection-info:
-// {"uri":"https://bitcraft-early-access.spacetimedb.com","name":"..."} — the client's
+// {"uri":"https://bitcraft-release.spacetimedb.com","name":"..."} — the client's
 // SpacetimeDB SDK converts the scheme (https->wss, http->ws), so handing it a local
 // http URI sends the WebSocket leg to our plaintext forwarder.
 const CONN_URI_RE = new RegExp(
@@ -144,7 +144,7 @@ function rewriteBody(body, contentType) {
 // (verified live: the client closed the socket 4 ms after receiving a
 // shortened-rows frame). Same length ⇒ all offsets stay valid. The local
 // URI is therefore http://<34-char host>:9443 (7+34+5 = 46 bytes, same
-// as https://bitcraft-early-access.spacetimedb.com), with the host
+// as https://bitcraft-release.spacetimedb.com), with the host
 // resolving to 127.0.0.1 via /etc/hosts. Frames are decompressed,
 // patched, and recompressed with their ORIGINAL algorithm; the capture
 // still records the ORIGINAL server bytes (ground truth).

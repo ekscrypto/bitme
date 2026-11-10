@@ -628,7 +628,7 @@ struct ClaimBuildingsTests {
     /// not-connected SDK client is enough; the identity is all the flows
     /// need.
     static func makeLeg() -> RegionLeg {
-        let client = try! SpacetimeDBClient(host: "wss://region.test.invalid", db: "bitcraft-live-14")
+        let client = try! SpacetimeDBClient(host: "wss://region.test.invalid", db: "idc-14")
         return RegionLeg(client: client)
     }
 

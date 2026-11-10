@@ -307,7 +307,7 @@ public struct MobileEntityRow: BSATNTableWithPrimaryKey, Equatable, Sendable {
 /// `prospecting_state` — the live prospection compass projection, one row
 /// per active prospector (deleted when the trail completes or is
 /// abandoned). Field order pinned 2026-09-29 against the live mirror schema
-/// (`/v1/database/bitcraft-live-14/schema?version=9`) and verified against
+/// (`/v1/database/idc-14/schema?version=9`) and verified against
 /// real rows streamed off the mirror — bearings, distances, and step
 /// progression checked end-to-end against a player's actual walk
 /// (docs/protocol/prospecting.md). `next_crumb_angle` carries one or two

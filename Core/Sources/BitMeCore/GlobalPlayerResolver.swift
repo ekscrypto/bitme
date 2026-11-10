@@ -26,8 +26,9 @@ public struct AccountPlayer: Equatable, Sendable {
 }
 
 /// Resolves a BitCraft account (SpacetimeDB token) to its player over the
-/// game's global database (`bitcraft-live-global`), the same rows the real
-/// client reads after login (docs/protocol/session-2026-09-25-tap-analysis.md
+/// game's global database (`idc-global` on the 1.0 release fleet), the same
+/// rows the real client reads after login
+/// (docs/protocol/session-2026-09-25-tap-analysis.md
 /// §2.1: `user_state WHERE identity = 0x…`, then per-entity queries).
 ///
 /// Rides our spacetimedb-swift-sdk (v2.bsatn over the SDK's HTTP/1.1

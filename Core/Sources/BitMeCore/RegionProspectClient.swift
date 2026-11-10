@@ -30,7 +30,7 @@ public enum ProspectionEvent: Equatable, Sendable {
 enum RegionProspectClient {
 
     /// The mirror's region port is `3000 + region` (verified live:
-    /// `bitcraft-live-14` answers on `:3014`).
+    /// `idc-14` answers on `:3014`).
     static func mirrorHost(region: Int) -> String {
         "https://relay.bitcraftsync.app:\(3000 + region)"
     }
@@ -60,7 +60,7 @@ enum RegionProspectClient {
     ) async {
         let client: SpacetimeDBClient
         do {
-            client = try SpacetimeDBClient(host: mirrorHost(region: region), db: "bitcraft-live-\(region)")
+            client = try SpacetimeDBClient(host: mirrorHost(region: region), db: "idc-\(region)")
             // Anonymous: no token — the mirror is a read replica.
             try await client.connect(token: nil, enableAutoReconnect: true)
         } catch {
