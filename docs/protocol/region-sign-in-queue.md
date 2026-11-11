@@ -1,5 +1,7 @@
 # Region sign-in: the queue gate
 
+> **EA-era capture (bitcraft-live-*, pre-1.0) — pending re-capture on 1.0; names/IPs may differ.**
+
 Why a region `sign_in` sometimes refuses with **"You must join the queue
 first."** and what the client must do instead. Researched 2026-09-28 against
 the game module source (BitCraftPublic `release sept-17`) and the first-ever

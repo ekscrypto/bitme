@@ -1,5 +1,7 @@
 # BitCraft protocol session analysis — 2025-09-25 tap capture
 
+> **EA-era capture (bitcraft-live-*, pre-1.0) — pending re-capture on 1.0; names/IPs may differ.**
+
 Reference for implementing the BitMe iOS client against BitCraft's servers.
 Captured with [tools/tap](../../tools/tap/README.md) (API proxy + WebSocket
 forwarder), decoded with `tools/tap/decode.js` against the SpacetimeDB v2

@@ -35,16 +35,22 @@ reference scenario for X-Ray's dashboard.
 | [docs/relay-data-requirements.md](docs/relay-data-requirements.md) | Design history — the original data-requirements spec sent to the relay team (superseded; static-gamedata list §6 still applies). |
 | [docs/protocol/session-2026-09-25-tap-analysis.md](docs/protocol/session-2026-09-25-tap-analysis.md) | **Protocol: global-DB tap** — auth flow, connection topology, v2.bsatn wire facts, the desktop client's subscription/reducer catalog. |
 | [docs/protocol/region-claim-buildings.md](docs/protocol/region-claim-buildings.md) | **Protocol: claim-buildings sync** — the region tables behind a claim's workstations (shapes, indexes, guardrails) and the subscription set Pocket Crafter rides on the game session's region leg. |
+| [docs/protocol/region-sign-in-queue.md](docs/protocol/region-sign-in-queue.md) | **Protocol: region sign-in queue** — why a region `sign_in` refuses with "You must join the queue first." and what the client does instead. |
+| [docs/protocol/prospecting.md](docs/protocol/prospecting.md) | **Protocol: prospecting** — where the compass target lives on the wire and how X-Ray derives the target area. |
+| [docs/protocol/reducers.txt](docs/protocol/reducers.txt) | Reducer name catalog from the client (raw list). |
+| [docs/bitcraft-network-recon.md](docs/bitcraft-network-recon.md) | **Network recon** — every endpoint the BitCraft client talks to (hosts/ports/protocols). |
+| [docs/client-assets.md](docs/client-assets.md) | **Client assets** — where the game's art lives locally, what we extract into the private `bitme-resources` repo, tier palette, refresh procedure. |
 | [docs/protocol/region-move-and-craft-continue.md](docs/protocol/region-move-and-craft-continue.md) | **Protocol: movement & shared-craft resume** — captured `player_move` / `craft_continue` reducer wire layouts (incl. the `[some, none]` tag trap and ms-vs-µs timestamps), the no-repeat `_start`/complete idiom with server-side cadence validation (95%/80% band, strikes), the v2-only `*_event` tables, and client-side speed/buff computation (materialized `character_stats_state`, buff stacking rules, movement-speed chain). |
+
+The `docs/protocol/` captures and the network recon predate BitCraft 1.0
+(`bitcraft-live-*` modules); they are pending re-capture against 1.0
+(`bitcraft-release.spacetimedb.com`, `idc-global` / `idc-N`).
 
 ## External sources of truth
 
-- **Relay API:** `relay-bitcraftsync-app/spacetimedb-bitcraft-mirror/crates/relay-cache/BITME-API.md`
+- **Relay API:** `../spacetimedb-bitcraft-mirror/crates/relay-cache/BITME-API.md`
   (handlers `bitme_serve.rs`, tracker `bitme.rs`). If it ever disagrees with
   our `docs/api.md`, the relay repo wins.
-- **Design rationale:** `relay-bitcraftsync-app/BITME-DATA-ASSESSMENT.md` —
-  why the relay team chose a server-side tracker + HTTP polling over raw
-  SpacetimeDB WebSocket subscriptions, with live measurements.
 - **Game-data timings** (`resource_desc` despawn/respawn, regen constants):
   resolved live by the relay; client-side constants (stamina regen curve,
   harvest pacing) are bundled gamedata and must be confirmed in playtests —
@@ -100,8 +106,11 @@ swift test                                  # core unit tests (no simulator)
 
 ### iOS apps
 
-SwiftUI (iOS 17+, Swift 6, zero third-party dependencies). The Xcode project
-is generated with XcodeGen:
+SwiftUI (iOS 17+, Swift 6, zero third-party dependencies). `Core` depends on
+our [spacetimedb-swift-sdk](https://github.com/ekscrypto/spacetimedb-swift-sdk)
+by local path (`Core/Package.swift`), so clone it as a sibling checkout at
+`../spacetimedb-swift-sdk` before building the apps or the CLI. The Xcode
+project is generated with XcodeGen:
 
 ```bash
 xcodegen generate          # creates BitMe.xcodeproj from project.yml
@@ -148,7 +157,7 @@ stamina regen constants need gamedata + playtest confirmation.
   client): BMR1 session/world windows, region dictionaries, BME1 terrain,
   and the BMD1 change-stream WebSocket.
 - Core + CLI: state machine, API, screen projections extracted (per-flow
-  `ViewRep`/`CrafterRep` since the two-app split); 109 unit tests; CLI
+  `ViewRep`/`CrafterRep` since the two-app split), unit-tested; CLI
   verified against production (resolve, live watch, live resource map —
   window + dictionary + stream). The session/map loops also survive the
   CLI's start → SignOut → resolve race (late bootstraps can no longer

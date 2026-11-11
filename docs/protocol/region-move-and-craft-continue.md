@@ -1,11 +1,13 @@
 # Region leg: player movement & shared-craft resume
 
+> **EA-era capture (bitcraft-live-*, pre-1.0) — pending re-capture on 1.0; names/IPs may differ.**
+
 Reducer ground truth for the two gameplay actions captured in tap
 `captures/2026-09-28_00-24-16`, conn-02 (`bitcraft-live-14`, 186,753 frames,
 0 framing errors): moving the player, and resuming a shared craft at a claim
 workstation. Verified 2026-09-28 by decoding the capture
 (`tools/tap/decode.js`) against the canonical module schema
-(`bitcraft-mats/bitjita-schema-region.json`); every byte layout below parses
+(`bitcraft-calculator-httpd/docs/archive/bitjita-schema-region.json`); every byte layout below parses
 its captured payloads exactly, with no trailing bytes.
 
 Companion docs: the leg's sign-in gate

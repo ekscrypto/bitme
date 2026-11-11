@@ -16,7 +16,7 @@ tags; timestamps are microseconds since the Unix epoch.
   region subscription rows (`*Row: BSATNTableWithPrimaryKey`) plus
   `RegionGamedataDecoder` for the one-off catalog rows. Global-leg rows:
   `GlobalSessionClient.swift`, `GlobalPlayerResolver.swift`.
-- **Canonical schema**: `../bitcraft-mats/bitjita-schema-region.json` /
+- **Canonical schema**: `../bitcraft-calculator-httpd/docs/archive/bitjita-schema-region.json` /
   `bitjita-schema-global.json`. Fastest field-order check: the
   `*.digest.md` companions list every table's columns in declaration
   order (grep the table name). `bitjita-schema-analysis.md` is the
@@ -26,9 +26,9 @@ tags; timestamps are microseconds since the Unix epoch.
 
 ## Re-verification procedure (after a game update)
 
-1. Refresh the `../bitcraft-mats` checkout — it carries the canonical
+1. Refresh the `../bitcraft-calculator-httpd` checkout — it carries the canonical
    module schema; the digest header names the module build (e.g.
-   `bitcraft-live-14`, table/type counts).
+   `idc-14`, table/type counts).
 2. For each subscribed table, grep the region digest and compare column
    order against the decoder's read sequence.
 3. Columns inserted or reordered **before** the decoder's last consumed
@@ -62,7 +62,7 @@ then. From `tools/tap/`:
 ```sh
 node decode.js captures/<session>            # summary + timeline, all conns
 node decode.js captures/<session> 3          # just conn-03
-node decode.js captures/<session> --scan bitcraft-live   # find frames containing text
+node decode.js captures/<session> --scan idc-          # find frames containing text
 ```
 
 Writes `conn-NN/decoded.jsonl` and prints the subscription SQL catalog,

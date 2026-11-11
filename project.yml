@@ -40,9 +40,9 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         SUPPORTS_MACCATALYST: NO
 
-  # The crafting companion (workstations + tasks). Stub until its data
-  # source lands — sign-in and the session loop are live, the map stack is
-  # disabled at construction (see CrafterApp).
+  # The crafting companion (workstations + tasks). Sign-in, the game
+  # session loop, claim-buildings sync, and craft driving are live; the map
+  # stack is disabled at construction (see CrafterApp).
   BitMeCrafter:
     type: application
     platform: iOS

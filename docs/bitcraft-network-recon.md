@@ -1,5 +1,7 @@
 # BitCraft client network recon
 
+> **EA-era capture (bitcraft-live-*, pre-1.0) — pending re-capture on 1.0; names/IPs may differ.**
+
 Goal: enumerate every endpoint the BitCraft client talks to (IP/port/protocol),
 so we can (phase 2) stand up a localhost listener/forwarder, observe the
 client↔server protocol, and eventually drive characters from the BitMe iOS app.

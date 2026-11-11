@@ -4,14 +4,16 @@ The HTTP + WebSocket endpoints Bit-Me consumes, served by the relay-cache
 embedded in the mirror fleet at **`https://relay.bitcraftsync.app`**. JSON
 over HTTPS for session data (§2–3), binary formats plus one WebSocket for
 the live resource map (§6–7) — no authentication, no SpacetimeDB protocol
-for either.
+for either. Operational behavior (deploys, clock skew, client flow, abuse
+posture) is in §4–5 and §8–9.
 
 > **Source of truth:** the relay repo's
-> `spacetimedb-bitcraft-mirror/crates/relay-cache/BITME-API.md`
-> (handlers: `src/bitme_serve.rs`, tracker: `src/bitme.rs`). This document
-> mirrors it for Bit-Me development; if the two ever disagree, the relay
-> repo wins. Design history: `relay-bitcraftsync-app/BITME-DATA-ASSESSMENT.md`.
-> Last synced: 2026-09-24.
+> `crates/relay-cache/BITME-API.md` in the sibling checkout
+> `../spacetimedb-bitcraft-mirror` (handlers: `src/bitme_serve.rs`,
+> tracker: `src/bitme.rs`). This document mirrors it for Bit-Me development
+> (same content, regrouped: its §4–8 are our §6–7, its §9–11 our §4, §8,
+> §9); if the two ever disagree, the relay repo wins.
+> Last synced: 2026-11-11.
 
 ---
 
@@ -25,7 +27,7 @@ for either.
 | Clocks | `*_ms` fields are unix **milliseconds**. Buff `start_timestamp`/`duration` are unix **seconds**. `stamina.last_decrease_at` is RFC 3339. `server_time_ms` lets you correct for device clock skew. |
 | Nulls | Present-but-`null` means *unknown or not applicable* — never an error. Every documented field is always present on the wire. |
 | Errors | `400` with `{"error": "…"}` for bad input; `404` with `{"found": false, …}` for misses; **`202` (empty body) means the region is still seeding** — back off (~30 s) and retry. |
-| Rate limits | None enforced today (nginx 60 s timeouts only). Design for **1 Hz polling** per active session; a snapshot is ~2–6 KB. The resource window is ~320 KB — fetch on drift/staleness, not on a timer (§6). |
+| Rate limits | None enforced today (nginx 60 s timeouts only). Design for **1 Hz polling** per active session; a snapshot is ~2–6 KB. The resource window is ~320 KB — fetch on drift/staleness, not on a timer (§6, §9). |
 | Sessions | A `GET /bitme/session/:id` **is** the registration. Stop polling for >15 min and the server drops its tracking (next poll transparently re-registers). |
 
 ---
@@ -38,7 +40,9 @@ player search exists separately at `GET /player?name=` — do not use it for
 onboarding.)
 
 Works for players of **all 25 regions** (global-module data), independent of
-which regions the mirror currently covers.
+which regions the mirror currently covers. (BitCraft 1.0 defines 25 regions,
+but only 9 — 7, 8, 9, 12, 13, 14, 17, 18, 19 — have player settlements; the
+other 16 are empty, reserved for future game development, and not mirrored.)
 
 | Param | Required | Meaning |
 |---|---|---|
@@ -55,8 +59,8 @@ which regions the mirror currently covers.
   "identity": "c2003111fc31ca323b17ed6063f1522a6a446f1384d78eadb23449b6cb9ce4a6",
   "region_id": 7,
   "region_name": "Virexal",
-  "host": "https://bitcraft-early-access.spacetimedb.com",
-  "module": "bitcraft-live-7",
+  "host": "https://bitcraft-release.spacetimedb.com",
+  "module": "idc-7",
   "signed_in": true
 }
 ```
@@ -68,10 +72,10 @@ which regions the mirror currently covers.
 | `username` | string | Display-cased name (region shard; falls back to lowercase form). |
 | `username_lowercase` | string | The exact key that matched. |
 | `identity` | string \| null | SpacetimeDB identity, canonical big-endian hex, no `0x` prefix. |
-| `region_id` | int \| null | Home region (1–25). |
+| `region_id` | int \| null | Home region (1–25; in practice one of the 9 populated regions). |
 | `region_name` | string \| null | Player-facing region name (e.g. `Virexal`). |
 | `host` | string \| null | Region sign-in host. |
-| `module` | string \| null | Database/module name (e.g. `bitcraft-live-7`). |
+| `module` | string \| null | Database/module name (e.g. `idc-7`). |
 | `signed_in` | bool \| null | Live sign-in state. `null` only when neither the global presence set nor a mirrored home region knows. |
 
 ### Errors
@@ -115,7 +119,7 @@ while sessions are being polled.
 | Field | Meaning |
 |---|---|
 | `signed_in` | `null` when unknown. Judge liveness together with `position.age_ms`. |
-| `server_time_ms` | Relay clock at snapshot build; use for skew correction (§5.1). |
+| `server_time_ms` | Relay clock at snapshot build; use for skew correction (§5). |
 
 ### 3.1 `position` — last known world position
 
@@ -232,9 +236,12 @@ disabled (it is enabled in production).
 - `health` is tracked server-side **only while a session is polling** and
   only from the first extract tick onward: expect `null` on the first poll
   after targeting, then per-tick updates.
-- `resource_id`/`name`/`max_health` resolve via the roads harvestable index,
-  the spawn log, and `resource_desc` gamedata; unknown resource types keep
-  `null` identity but still report `health`.
+- `resource_id`/`name`/`max_health` resolve via (in order) the roads
+  harvestable index, the spawn log, and — the runtime-authoritative path —
+  the Extract action's `recipe_id` joined against `extraction_recipe_desc`
+  plus `resource_desc` gamedata. This covers every extractable resource
+  type, including types added in future game patches; genuinely unknown
+  targets keep `null` identity but still report `health`.
 - `despawn_time_secs` / `respawn_time_secs` are passthrough gamedata for
   client-side countdowns.
 - `growth_ends_at_ms` is the server-authoritative end of the target's
@@ -309,8 +316,43 @@ HTTP 400  {"error": "entity_id must be a u64"}
 
 A player **resolves globally** even when their region is not mirrored, but a
 **session requires them to be present** in one of the mirrored regions
-(currently 3, 7, 8, 9, 11, 12, 13, 14, 15, 17, 18, 19, 23 — read dynamically
-from `GET /roads/regions` rather than hardcoding).
+(on 1.0, the 9 populated regions 7, 8, 9, 12, 13, 14, 17, 18, 19 — read
+dynamically from `GET /roads/regions` rather than hardcoding).
+
+---
+
+## 4. Readiness, deploys, failure modes
+
+- **Readiness probe:** `GET /cache-health` → `{"ready": true, …}`. If
+  `ready` is `false`, treat all relay data as stale.
+- **Deploys restart the mirror** (~15–20 min reseed). During that window the
+  JSON endpoints return `404 {"found": false, …}`, the resource window
+  returns `202` then `404`, and `/cache-health` flips to `ready: false`.
+  The §7 change stream emits `resync` (`reseed`, then `live` at seed
+  completion) and may close (`gone`) if the outage outlasts its ~60 s
+  no-position window. Retry with backoff (≥ 30 s). Countdowns already on
+  screen can keep running from the last snapshot — show a "reconnecting"
+  state.
+- Upstream game-server resets can also momentarily empty stores; same backoff.
+- Never hold state across deploys — on persistent `404`/`ready: false`,
+  re-resolve.
+- Region coverage can change; read the region list from
+  `GET /roads/regions` rather than hardcoding, if it matters.
+
+---
+
+## 5. Clock skew correction
+
+Snapshot fields are computed against the relay clock and returned with
+`server_time_ms`. To render countdowns that survive device clock drift:
+
+```
+offset_ms = server_time_ms - Date.now()          // on each snapshot
+now(relay) = Date.now() + offset_ms              // when interpolating
+```
+
+Recompute `offset_ms` on every poll (1 Hz) — it absorbs both drift and
+network jitter accumulation between snapshots.
 
 ---
 
@@ -345,7 +387,10 @@ index.
 
 The same BMR1 format anchored at an arbitrary world tile `(cx, cz)` (the
 anchor is the window center), for free-pan map rendering beyond the
-session window. `404` outside the covered region grid. The elevation
+session window. The region is derived from the coordinates (5×5 grid of
+7680×7680-tile regions, id 1 at `(0, 0)`); nothing is player-scoped (no
+session registration or TTL refresh). `404` outside the world grid or for a
+region without a resource map (an unmirrored one); `202` while seeding. The elevation
 variant returns **BME1**:
 
 **BME1 layout** — header (26 bytes): magic `BME1`, u16 version (2), u16
@@ -413,10 +458,19 @@ dictionary rotated — refetch the window.
 | Message | Meaning |
 |---|---|
 | `{"type":"subscribed","anchor":{"x":…,"z":…},"width":400,"region":…,"dict_version":…,"player_entity_id":"…"}` | Subscription active. Anchor = window center. |
-| `{"type":"resync"}` | Server rolled the window (dictionary rotation, reseed, …) — refetch. |
-| `{"type":"moved"}` | The anchor moved (player drifted far) — refetch to converge. |
-| `{"ts":…}` | Heartbeat, ~5 s cadence. No frame for ~15 s ⇒ treat the socket as dead (half-open TCP after sleep/wake never fires close) and reconnect. |
-| `{"type":"gone"}` | The session is gone — the server closes right after. |
+| `{"type":"resync","reason":"reseed"\|"live"}` | The region grid was replaced (upstream disconnect) or finished re-seeding — refetch the window (and the dictionary if the next frame's `dict_version` differs). |
+| `{"type":"moved","region":…,"anchor":{…}}` | The player crossed into another region; the stream re-anchored there — refetch the window. |
+| `{"ts":…}` | Heartbeat, ~5 s cadence; also refreshes the session TTL like an HTTP poll. No frame for ~15 s ⇒ treat the socket as dead (half-open TCP after sleep/wake never fires close) and reconnect. |
+| `{"type":"gone","player_entity_id":"…"}` | No live position in any mirrored region for ~60 s (logout, or a deploy outlasting the window) — the server closes right after. |
+
+The server answers WS pings; client → server frames are ignored. Frames are
+never silently dropped — backpressure closes the socket instead, so the
+delivered stream is totally ordered. Pre-upgrade errors match §6.1's, plus
+`503` when the fleet-wide WS cap (2048, shared with the dim-buildings
+stream) is reached. While walking, keep the movement-triggered window
+refetch: the server follows the anchor at ~1 s granularity, so
+trailing-edge tiles around a fast-moving player are trimmed until the next
+full fetch.
 
 **Lifecycle guidance** (matches the web client): connect one stream per
 player only while the session is live in the overworld; reconnect with
@@ -426,29 +480,37 @@ needed.
 
 ---
 
-## 4. Readiness, deploys, failure modes
+---
 
-- **Readiness probe:** `GET /cache-health` → `{"ready": true, …}`. If
-  `ready` is `false`, treat all relay data as stale.
-- **Deploys restart the mirror** (~15–20 min reseed). During that window both
-  endpoints return `404 {"found": false, …}` and `/cache-health` flips to
-  `ready: false`. Retry with backoff (≥ 30 s). Countdowns already on screen
-  can keep running from the last snapshot — show a "reconnecting" state.
-- Upstream game-server resets can also momentarily empty stores; same backoff.
-- Never hold state across deploys — on persistent `404`/`ready: false`,
-  re-resolve.
+## 8. Recommended client flow
+
+1. Onboarding: `resolve` the player name → store `entity_id`, `region_id`,
+   `module`.
+2. Activity screens: poll `session/:entity_id` at ~1 Hz while open.
+3. Resource map: fetch `region/:region_id/resource-dictionary`, then the
+   BMR1 window once per window placement, kept live with the §7 change
+   stream — apply BMD1 deltas; refetch the window on close/`resync`/`moved`
+   or a `dict_version` change (and the dictionary then too). Pan freely
+   with `world/:x/:z/resources`, paired with `world/:x/:z/elevation` for
+   terrain (refetch on `generation` change).
+4. Render countdowns client-side from the snapshot + bundled gamedata
+   (action progress from `ends_at_ms`; buff expiry from
+   `start_timestamp + duration`; stamina regen projected from
+   `last_decrease_at`; citric despawn from `expires_at_ms` /
+   `growth_ends_at_ms`).
+5. Citric detection: alert when an `activity_spawns` entry with a Citric
+   `resource_id` (§3.7 table) appears.
+6. Never hold state across deploys — on `404`/`ready: false`, back off and
+   re-resolve (§4).
 
 ---
 
-## 5. Clock skew correction
+## 9. Rate/abuse posture
 
-Snapshot fields are computed against the relay clock and returned with
-`server_time_ms`. To render countdowns that survive device clock drift:
-
-```
-offset_ms = server_time_ms - Date.now()          // on each snapshot
-now(relay) = Date.now() + offset_ms              // when interpolating
-```
-
-Recompute `offset_ms` on every poll (1 Hz) — it absorbs both drift and
-network jitter accumulation between snapshots.
+Anonymous, no API keys, no rate limits today (nginx caps request bodies and
+timeouts). Keep polling at ~1 Hz per active screen; debounce name lookups
+rather than resolving per keystroke. The resource window is ~320 KB and the
+elevation plane ~140 KB per fetch (before HTTP compression) — fetch them
+only when the window moves or a §7 recovery event asks for it, and let
+transport-level gzip handle compression. One change-stream socket per
+player; the fleet-wide WS cap is 2048 connections.

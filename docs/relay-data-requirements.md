@@ -7,13 +7,13 @@
 > WebSocket subscriptions. See [`api.md`](api.md) for the live API,
 > [`tutorial-onboarding-and-polling.md`](tutorial-onboarding-and-polling.md)
 > and [`tutorial-harvest-session.md`](tutorial-harvest-session.md) for app-side
-> usage, and `relay-bitcraftsync-app/BITME-DATA-ASSESSMENT.md` for why the
-> design changed and what was verified live. This document is kept for design
-> history; its §6 static-gamedata list still applies as written.
+> usage. This document is kept for design history (its region/module names
+> are EA-era); its §6 static-gamedata list still applies as written.
 
 Handoff document for the `spacetimedb-relay` development agent.
 Prepared from the BitCraft module schemas mirrored by the relay fleet
-(`bitjita-schema-global.json` / `bitjita-schema-region.json` in `bitcraft-mats`).
+(`bitjita-schema-global.json` / `bitjita-schema-region.json` in the sibling
+checkout `../bitcraft-calculator-httpd/docs/archive/`).
 
 ## 1. What Bit-Me is
 

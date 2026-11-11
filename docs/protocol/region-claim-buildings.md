@@ -1,9 +1,11 @@
 # Region claim-buildings sync — data source & subscription design
 
+> **EA-era capture (bitcraft-live-*, pre-1.0) — pending re-capture on 1.0; names/IPs may differ.**
+
 Reference for the Pocket Crafter workstation list: which region-database
 tables hold a claim's buildings (crafting, storage, other) and how to
 subscribe to them live. Researched 2026-09-26 against the game module
-schema (`bitcraft-mats/bitjita-schema-region.json`, schema version pinned
+schema (`bitcraft-calculator-httpd/docs/archive/bitjita-schema-region.json`, schema version pinned
 there) and the relay mirror's live subscriptions
 (`relay-bitcraftsync-app/spacetimedb-bitcraft-mirror`, `shard.rs` +
 `USED-TABLES.md`). The official client's region leg has since been

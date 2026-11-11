@@ -11,8 +11,8 @@ the worked example:
 
 Prerequisites: [tutorial 1](tutorial-onboarding-and-polling.md) (a running
 `SessionPoller` and relay-corrected clock) and bundled static gamedata
-(§6 of [api.md](api.md): `resource_desc`, `buff_desc`, `food_desc`,
-`parameters_desc`).
+(§6 of [relay-data-requirements.md](relay-data-requirements.md):
+`resource_desc`, `buff_desc`, `food_desc`, `parameters_desc`).
 
 ---
 
@@ -159,8 +159,8 @@ as "food" is resolved at runtime by `GamedataService`: it fetches
 JSON WebSocket (connect → `SubscribeSingle` → `SubscribeApplied` → close),
 classifies food types by name ("Food Buffs", "Food Regen", "Teas"), and
 caches the derived id set for 48 h — stale cache is used on fetch failure.
-The iOS implementation lives in `BitMe/Networking/SpacetimeSubscribeClient.swift`
-and `BitMe/Engine/GamedataService.swift`.
+The implementation lives in `Core/Sources/BitMeCore/SpacetimeSubscribeClient.swift`
+and `Core/Sources/BitMeCore/GamedataService.swift`.
 
 ```ts
 const foodBuffIDs = await gamedataService.foodBuffIDs(); // Set<number>, 48 h cache

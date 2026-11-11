@@ -1,9 +1,11 @@
 # Prospecting — the compass data model
 
+> **EA-era capture (bitcraft-live-*, pre-1.0) — pending re-capture on 1.0; names/IPs may differ.**
+
 Where the prospecting target lives on the wire, what the client actually
 receives, and how Bit-Me X-Ray derives the target area. Everything here was
 verified live 2026-09-29/30 against `bitcraft-live-14` on the relay mirror
-(anonymous `v2.bsatn` subscriptions; `bitcraft-mats/Sources/bitcraft-streamd/
+(anonymous `v2.bsatn` subscriptions; `bitcraft-calculator-httpd/Sources/bitcraft-streamd/
 src/bin/prospect_watch.rs` was the ground-truth harness).
 
 ## Tables
